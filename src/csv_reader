@@ -1,0 +1,21 @@
+import pandas as pd
+from typing import List, Dict
+
+print(pd.__version__)
+
+def get_file_path():
+    file_path=input("Enter the path to the CSV file: ")
+    return file_path
+
+
+def read_csv_from_file(file_path: str) -> pd.DataFrame:
+    """
+    Reads a CSV file and returns a DataFrame.
+    
+    :param file_path: Path to the CSV file.
+    :return: DataFrame containing the CSV data.
+    """
+    return pd.read_csv(file_path)
+
+my_csv = read_csv_from_file(get_file_path())
+my_csv.head()
