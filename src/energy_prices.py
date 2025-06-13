@@ -15,7 +15,7 @@ def adjust_df_format(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 def sample_data(df: pd.DataFrame, interval: int) -> pd.DataFrame:
-# Sample every 6th hour (24 rows for 24 hours)
+# Sample every 6th hour
     sampled_data = df.iloc[::24, :]
     return sampled_data
 
