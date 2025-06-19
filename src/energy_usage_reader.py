@@ -23,7 +23,7 @@ def read_csv_from_file(file_path: str) -> pd.DataFrame:
     return pd.read_csv(file_path)
 
 
-my_csv = read_csv_from_file(get_file_path())
+my_csv = read_csv_from_file("data/sample_customer_17779.csv")
 
 
 def adjust_df_format(df: pd.DataFrame) -> pd.DataFrame:
