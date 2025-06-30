@@ -1,7 +1,7 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import os
-import energy_prices
+from src import energy_prices
 
 
 def get_file_path():
