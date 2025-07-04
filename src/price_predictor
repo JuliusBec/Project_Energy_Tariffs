@@ -18,7 +18,7 @@ validation_data.set_index('datetime', inplace=True)  # Set 'datetime' as index
 
 # Load the energy prices data
 # Use the loaded model for forecasting
-loaded_model = pickle.load(open('data/sarimax_model_2years', 'rb'))
+loaded_model = pickle.load(open('data/prediction_models/sarimax_model_2years', 'rb'))
 
 plt.figure(figsize=(12, 6))
 # Define number of periods to show for historical data (e.g., last 10 days)

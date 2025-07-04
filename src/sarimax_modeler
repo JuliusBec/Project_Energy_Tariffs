@@ -60,9 +60,9 @@ def fit_sarimax_model(data: pd.DataFrame, order=(1, 0, 1), seasonal_order=(1, 1,
     print(results.summary())
 
     # Ensure the directory exists
-    os.makedirs('data', exist_ok=True)
+    os.makedirs('data/prediction_models', exist_ok=True)
     # Save the fitted model
-    with open('data/sarimax_model_2years', 'wb') as f:
+    with open('data/prediction_models/sarimax_model_2years', 'wb') as f:
         pickle.dump(results, f)
 
     end_time = time.time()
