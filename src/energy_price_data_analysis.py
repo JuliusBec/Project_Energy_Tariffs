@@ -7,6 +7,7 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error
 import numpy as np
 import matplotlib.pyplot as plt
 from statsmodels.tsa.seasonal import seasonal_decompose
+import time
 
 
 temperature_data = pd.read_csv("data/temperature_data_01:21-05:25.csv")
@@ -23,9 +24,6 @@ temperature_data = temperature_data[cols]
 
 market_data = energy_prices.adjust_df_format(energy_prices.get_german_price_data())
 
-print(market_data.info())
-print(temperature_data.info())
-
 market_data = market_data.sort_values('datetime')
 temperature_data = temperature_data.sort_values('datetime')
 
@@ -37,7 +35,7 @@ combined_data = pd.merge_asof(
     direction='backward'
 )
 
-
+# save combined data to CSV
 combined_data.to_csv("data/combined_market_temperature_data.csv", index=False)
 
 def plot_energy_prices(data: pd.DataFrame):
@@ -78,7 +76,7 @@ def seasonal_decompose_and_plot(series: pd.Series):
     :param series: Time series data.
     """
     # Daily seasonality (96 periods per day for 15-min intervals)
-    decomp_daily = seasonal_decompose(series.tail(96 * 50), model='additive', period=96)
+    decomp_daily = seasonal_decompose(series.tail(96 * 20), model='additive', period=96)
     fig1 = decomp_daily.plot()
     fig1.suptitle('Daily Seasonality Decomposition', fontsize=16)
     # Reduce marker size for residual and seasonal subplots
@@ -101,8 +99,8 @@ def seasonal_decompose_and_plot(series: pd.Series):
     plt.show()
 
     # Monthly seasonality
-    daily_data = series.resample('D').mean()  # Resample to daily frequency
-    decomp_monthly = seasonal_decompose(daily_data, model="additive", period=365)
+    monthly_data = series.resample('D').mean()  # Resample to daily frequency
+    decomp_monthly = seasonal_decompose(monthly_data, model="additive", period=30)  # 30 days for monthly seasonality
     fig2 = decomp_monthly.plot()
     fig2.suptitle('Monthly Seasonality Decomposition', fontsize=16)
     # Reduce marker size for residual and seasonal subplots
@@ -128,4 +126,20 @@ check_stationarity(combined_data['market_price'])
 
 # Set the index to the datetime column before decomposition and plotting
 series_with_datetime_index = combined_data.set_index('datetime')['market_price']
-seasonal_decompose_and_plot(series_with_datetime_index)
+# seasonal_decompose_and_plot(series_with_datetime_index)
+
+# lags = 96 for 15-minute intervals, adjust as needed
+def plot_acf_pacf(series: pd.Series, lags=96):
+    """
+    Plot ACF and PACF for a time series.
+    
+    :param series: Time series data.
+    :param lags: Number of lags to consider.
+    """
+    fig, axes = plt.subplots(1, 2, figsize=(16, 5))
+    plot_acf(series, lags=lags, ax=axes[0])
+    plot_pacf(series, lags=lags, ax=axes[1])
+    axes[0].set_title('Autocorrelation Function (ACF)')
+    axes[1].set_title('Partial Autocorrelation Function (PACF)')
+    plt.tight_layout()
+    plt.show()

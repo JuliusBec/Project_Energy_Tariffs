@@ -51,4 +51,5 @@ def calculate_past_cost(df: pd.DataFrame) -> float:
     cost = round(cost, 2)  # Round to 2 decimal places
     return cost
 
+
 print("market price of energy consumed in the last year: " + str(calculate_past_cost(adjusted_df)) + " Euro")

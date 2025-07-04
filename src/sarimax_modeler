@@ -1,0 +1,71 @@
+import time
+import pandas as pd
+from statsmodels.tsa.statespace.sarimax import SARIMAX
+import energy_prices
+import os
+import pickle
+
+TRAIN_MODEL = True  # Set to True when you want to train
+
+# Load the energy prices data
+# Adjust the format of the training data
+training_data = energy_prices.get_german_price_data()
+training_data = energy_prices.adjust_df_format(training_data)
+
+training_data.set_index('datetime', inplace=True)  # Set 'datetime' as index
+training_data_hourly = training_data.resample('H').mean()  # Sample every hour for hourly data
+
+# add weather as exogenous variables
+temperature_data = pd.read_csv("data/temperature_data_01:21-05:25.csv")
+temperature_data = temperature_data[['MESS_DATUM', 'TT_TU', 'RF_TU']]  # Select relevant columns
+# Convert 'MESS_DATUM' to datetime format
+temperature_data['datetime'] = pd.to_datetime(temperature_data['MESS_DATUM'], format='%Y%m%d%H')
+# Rename columns
+temperature_data.rename(columns={'TT_TU': 'temperature', 'RF_TU': 'relative_humidity'}, inplace=True)
+# Move 'datetime' to the first column
+cols = ['datetime'] + [col for col in temperature_data.columns if col != 'datetime']
+temperature_data = temperature_data[cols]
+# drop the 'MESS_DATUM' column as it's now redundant
+temperature_data.drop(columns=['MESS_DATUM'], inplace=True)
+# Select weather data from 2023 and 2024
+temperature_data = temperature_data[temperature_data['datetime'].dt.year.isin([2023, 2024])]
+# Merge the temperature data with the training data
+training_data_hourly = pd.merge_asof(
+    training_data_hourly,
+    temperature_data,
+    on='datetime',
+    direction='backward'
+)
+
+# add weekday as exogenous variable
+training_data_hourly['weekday'] = training_data_hourly['datetime'].dt.dayofweek
+training_data_hourly['is_weekend'] = training_data_hourly['weekday'].apply(lambda x: 1 if x >= 5 else 0)
+
+training_data_hourly.set_index('datetime', inplace=True)  # Ensure 'datetime' is the index
+training_data_hourly.to_csv("data/training_dataset_weather.csv", index=True)
+
+def fit_sarimax_model(data: pd.DataFrame, order=(1, 0, 1), seasonal_order=(1, 1, 1, 24)):
+    """
+    Fit a SARIMAX model to the time series data and save it using pickle.
+
+    :param data: DataFrame containing the time series data.
+    :param order: ARIMA order (p, d, q).
+    :param seasonal_order: Seasonal order (P, D, Q, s).
+    :return: Fitted SARIMAX model.
+    """
+    start_time = time.time()
+    model = SARIMAX(data['market_price'], order=order, seasonal_order=seasonal_order,
+                    exog=data[['temperature', 'relative_humidity', 'weekday', 'is_weekend']])
+    results = model.fit(disp=False)
+    print(results.summary())
+
+    # Ensure the directory exists
+    os.makedirs('data', exist_ok=True)
+    # Save the fitted model
+    with open('data/sarimax_model_2years', 'wb') as f:
+        pickle.dump(results, f)
+
+    end_time = time.time()
+    print(f"fit_sarimax_model runtime: {end_time - start_time:.2f} seconds")
+
+fit_sarimax_model(training_data_hourly)

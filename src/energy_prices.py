@@ -1,14 +1,14 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 
-def get_german_price_data():
-    price_data = pd.read_csv('data/market_prices_01:21-05:25.csv', sep=';')
+def get_german_price_data(file_path: str = 'data/training_dataset.csv') -> pd.DataFrame:
+    price_data = pd.read_csv(file_path, sep=';')
     german_price_data = price_data.iloc[:,0:3]
     return german_price_data
 
 def adjust_df_format(df: pd.DataFrame) -> pd.DataFrame:
     df.drop(columns=['Datum bis'], inplace=True)
-    df.rename(columns={'Datum von': 'datetime', 'Deutschland/Luxemburg [€/MWh] Berechnete Auflösungen': 'market_price'}, inplace=True)
+    df.columns.values[0:2] = ['datetime', 'market_price']
     df["datetime"] = pd.to_datetime(df["datetime"], format='%d.%m.%Y %H:%M')
     df["market_price"] = (df["market_price"].str.replace(',', '.').astype(float)
     )

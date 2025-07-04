@@ -3,3 +3,9 @@
 *.csv
 *.json
 *.xlsx
+
+# Figures
+/figures/
+*.png
+*.jpg
+*.svg
