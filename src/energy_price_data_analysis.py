@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 from statsmodels.tsa.seasonal import seasonal_decompose
 import time
 
-
+# auslesen der csv datei
 temperature_data = pd.read_csv("data/temperature_data_01:21-05:25.csv")
 
 temperature_data['datetime'] = pd.to_datetime(temperature_data['MESS_DATUM'], format='%Y%m%d%H')
