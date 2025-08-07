@@ -4,7 +4,7 @@
       <div class="header-content">
         <router-link to="/" class="logo">
           <i class="fas fa-bolt"></i>
-          <span>EnergyCompare</span>
+          <span>Stromtarif Vergleich</span>
         </router-link>
         
         <nav class="nav">
@@ -15,10 +15,6 @@
           <router-link to="/comparison" class="nav-link">
             <i class="fas fa-calculator"></i>
             <span>Tarifrechner</span>
-          </router-link>
-          <router-link to="/market" class="nav-link">
-            <i class="fas fa-chart-line"></i>
-            <span>Marktdaten</span>
           </router-link>
           <router-link to="/tips" class="nav-link">
             <i class="fas fa-lightbulb"></i>
@@ -40,10 +36,6 @@
         <router-link to="/comparison" class="mobile-nav-link" @click="closeMobileMenu">
           <i class="fas fa-calculator"></i>
           <span>Tarifrechner</span>
-        </router-link>
-        <router-link to="/market" class="mobile-nav-link" @click="closeMobileMenu">
-          <i class="fas fa-chart-line"></i>
-          <span>Marktdaten</span>
         </router-link>
         <router-link to="/tips" class="mobile-nav-link" @click="closeMobileMenu">
           <i class="fas fa-lightbulb"></i>

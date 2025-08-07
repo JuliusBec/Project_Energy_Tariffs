@@ -4,8 +4,8 @@
     <section class="hero">
       <div class="container">
         <div class="hero-content">
-          <h1>Stromtarife einfach vergleichen</h1>
-          <p>Finden Sie den günstigsten Tarif für Ihren Verbrauch und sparen Sie Geld</p>
+          <h1>Finden Sie den besten Stromtarif</h1>
+          <p>Vergleichen Sie Energietarife und sparen Sie bis zu 500€ pro Jahr</p>
           
           <div class="hero-actions">
             <router-link to="/comparison" class="btn btn-primary btn-large">
@@ -16,16 +16,16 @@
           
           <div class="hero-stats">
             <div class="stat">
+              <div class="stat-number">500€</div>
+              <div class="stat-label">Durchschnittliche Ersparnis</div>
+            </div>
+            <div class="stat">
               <div class="stat-number">2 Min</div>
               <div class="stat-label">Zeit für Vergleich</div>
             </div>
             <div class="stat">
               <div class="stat-number">100%</div>
               <div class="stat-label">Kostenlos</div>
-            </div>
-            <div class="stat">
-              <div class="stat-number">Einfach</div>
-              <div class="stat-label">Zu bedienen</div>
             </div>
           </div>
         </div>
@@ -41,24 +41,32 @@
             <div class="feature-icon">
               <i class="fas fa-search"></i>
             </div>
-            <h3>Schneller Vergleich</h3>
-            <p>Vergleichen Sie verschiedene Stromtarife schnell und übersichtlich</p>
+            <h3>Einfacher Vergleich</h3>
+            <p>Vergleichen Sie hunderte von Stromtarifen in wenigen Sekunden</p>
           </div>
           
           <div class="feature-card">
             <div class="feature-icon">
               <i class="fas fa-euro-sign"></i>
             </div>
-            <h3>Geld sparen</h3>
-            <p>Finden Sie günstigere Tarife und sparen Sie bei Ihren Stromkosten</p>
+            <h3>Garantierte Ersparnis</h3>
+            <p>Finden Sie den günstigsten Tarif und sparen Sie bares Geld</p>
           </div>
           
           <div class="feature-card">
             <div class="feature-icon">
-              <i class="fas fa-bolt"></i>
+              <i class="fas fa-leaf"></i>
             </div>
-            <h3>Dynamische Tarife</h3>
-            <p>Speziell optimiert für flexible und dynamische Stromtarife</p>
+            <h3>Ökostrom-Filter</h3>
+            <p>Wählen Sie umweltfreundliche Tarife für eine grünere Zukunft</p>
+          </div>
+          
+          <div class="feature-card">
+            <div class="feature-icon">
+              <i class="fas fa-shield-alt"></i>
+            </div>
+            <h3>100% Sicher</h3>
+            <p>Ihre Daten sind bei uns sicher und werden nicht weitergegeben</p>
           </div>
         </div>
       </div>
@@ -69,71 +77,70 @@
       <div class="container">
         <div class="quick-calc-content">
           <div class="quick-calc-info">
-            <h2>Berechnen Sie Ihr Sparpotenzial</h2>
-            <p>Geben Sie Ihren aktuellen Verbrauch ein und sehen Sie, wie viel Sie sparen können.</p>
-            
+            <h2>Schnellrechner</h2>
+            <p>Ermitteln Sie in wenigen Sekunden Ihr Sparpotenzial</p>
             <ul class="benefits-list">
-              <li>
-                <i class="fas fa-check text-emerald-600"></i>
-                Kostenlose Berechnung
-              </li>
-              <li>
-                <i class="fas fa-check text-emerald-600"></i>
-                Keine Verpflichtungen
-              </li>
-              <li>
-                <i class="fas fa-check text-emerald-600"></i>
-                Sofortiges Ergebnis
-              </li>
+              <li><i class="fas fa-check text-green-600"></i> Aktueller Marktvergleich</li>
+              <li><i class="fas fa-check text-green-600"></i> Alle Anbieter inklusive</li>
+              <li><i class="fas fa-check text-green-600"></i> Keine versteckten Kosten</li>
+              <li><i class="fas fa-check text-green-600"></i> Sofortige Ergebnisse</li>
             </ul>
           </div>
           
-          <div class="card">
-            <div class="card-header">
-              <h3 class="card-title">
-                <i class="fas fa-calculator text-emerald-600"></i>
-                Ihr Sparpotenzial
-              </h3>
-            </div>
-            
-            <form @submit.prevent="calculateSavings">
-              <div class="form-group">
-                <label class="form-label">Jahresverbrauch (kWh)</label>
-                <input 
-                  type="number" 
-                  v-model="quickCalc.annualKwh" 
-                  class="form-input" 
-                  placeholder="z.B. 3500"
-                  min="1"
-                  required
-                >
+          <div class="quick-calc-form">
+            <div class="card">
+              <div class="card-header">
+                <h3 class="card-title">
+                  <i class="fas fa-calculator text-emerald-600"></i>
+                  Ihr Sparpotenzial
+                </h3>
               </div>
               
-              <div class="form-group">
-                <label class="form-label">Aktuelle Jahreskosten (€)</label>
-                <input 
-                  type="number" 
-                  v-model="quickCalc.currentCost" 
-                  class="form-input" 
-                  placeholder="z.B. 1200"
-                  min="1"
-                  step="0.01"
-                  required
-                >
-              </div>
-              
-              <button type="submit" :disabled="calculating" class="btn btn-primary w-full">
-                <span v-if="calculating" class="loading-spinner small"></span>
-                <i v-else class="fas fa-calculator"></i>
-                {{ calculating ? 'Berechne...' : 'Sparpotenzial berechnen' }}
-              </button>
-            </form>
-            
-            <div v-if="savingsResult" class="savings-result">
-              <div class="savings-amount">
-                <span class="amount">{{ savingsResult.savings }}€</span>
-                <span class="label">mögliche Ersparnis pro Jahr</span>
-              </div>
+              <form @submit.prevent="calculateSavings">
+                <div class="form-group">
+                  <label class="form-label">Jahresverbrauch (kWh)</label>
+                  <input 
+                    type="number" 
+                    v-model="quickCalc.annualKwh" 
+                    class="form-input"
+                    placeholder="z.B. 3500"
+                    min="1000"
+                    max="20000"
+                    step="100"
+                  >
+                  <div class="form-help">
+                    Durchschnitt: 1-Person: 2.000 kWh, 4-Personen: 4.500 kWh
+                  </div>
+                </div>
+                
+                <div class="form-group">
+                  <label class="form-label">Aktuelle Jahreskosten (€)</label>
+                  <input 
+                    type="number" 
+                    v-model="quickCalc.currentCost" 
+                    class="form-input"
+                    placeholder="z.B. 1200"
+                    step="0.01"
+                  >
+                </div>
+                
+                <button type="submit" class="btn btn-primary w-full" :disabled="calculating">
+                  <span v-if="calculating" class="loading-spinner small"></span>
+                  <i v-else class="fas fa-calculator"></i>
+                  {{ calculating ? 'Berechne...' : 'Sparpotenzial berechnen' }}
+                </button>
+                
+                <div v-if="savingsResult" class="savings-result">
+                  <div class="savings-amount">
+                    <span class="amount">{{ savingsResult.savings }}€</span>
+                    <span class="label">Jährliche Ersparnis möglich</span>
+                  </div>
+                  <router-link to="/comparison" class="btn btn-success w-full mt-4">
+                    <i class="fas fa-arrow-right"></i>
+                    Detaillierten Vergleich starten
+                  </router-link>
+                </div>
+              </form>
             </div>
           </div>
         </div>
@@ -143,13 +150,13 @@
     <!-- How it works -->
     <section class="how-it-works py-16">
       <div class="container">
-        <h2 class="text-center text-3xl font-bold mb-8">So einfach geht's</h2>
+        <h2 class="text-center text-3xl font-bold mb-8">So funktioniert's</h2>
         <div class="steps">
           <div class="step">
             <div class="step-number">1</div>
             <div class="step-content">
-              <h3>Daten eingeben</h3>
-              <p>Geben Sie Ihren Jahresverbrauch und weitere Details ein</p>
+              <h3>Verbrauch eingeben</h3>
+              <p>Geben Sie Ihren Jahresverbrauch und Ihre Postleitzahl ein</p>
             </div>
           </div>
           
@@ -157,15 +164,15 @@
             <div class="step-number">2</div>
             <div class="step-content">
               <h3>Tarife vergleichen</h3>
-              <p>Sehen Sie alle verfügbaren Tarife übersichtlich sortiert</p>
+              <p>Wir zeigen Ihnen alle verfügbaren Tarife sortiert nach Preis</p>
             </div>
           </div>
           
           <div class="step">
             <div class="step-number">3</div>
             <div class="step-content">
-              <h3>Besten Tarif wählen</h3>
-              <p>Entscheiden Sie sich für den Tarif, der am besten zu Ihnen passt</p>
+              <h3>Anbieter wechseln</h3>
+              <p>Wählen Sie Ihren Wunschtarif und wechseln Sie direkt online</p>
             </div>
           </div>
         </div>

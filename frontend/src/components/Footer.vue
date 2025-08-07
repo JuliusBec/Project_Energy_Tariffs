@@ -5,55 +5,32 @@
         <div class="footer-section">
           <div class="logo">
             <i class="fas fa-bolt"></i>
-            <span>EnergyCompare</span>
+            <span>Stromtarif Vergleich</span>
           </div>
-          <p>Ihr unabhängiger Stromtarifvergleich</p>
-          <div class="social-links">
-            <a href="#" class="social-link">
-              <i class="fab fa-twitter"></i>
-            </a>
-            <a href="#" class="social-link">
-              <i class="fab fa-facebook"></i>
-            </a>
-            <a href="#" class="social-link">
-              <i class="fab fa-linkedin"></i>
-            </a>
-          </div>
+          <p>Einfach, schnell und kostenlos Stromtarife vergleichen</p>
         </div>
         
         <div class="footer-section">
-          <h4>Service</h4>
+          <h4>Navigation</h4>
           <ul>
+            <li><router-link to="/">Startseite</router-link></li>
             <li><router-link to="/comparison">Tarifrechner</router-link></li>
-            <li><router-link to="/market">Marktdaten</router-link></li>
             <li><router-link to="/tips">Spartipps</router-link></li>
-            <li><a href="#">FAQ</a></li>
           </ul>
         </div>
         
         <div class="footer-section">
-          <h4>Unternehmen</h4>
+          <h4>Information</h4>
           <ul>
-            <li><a href="#">Über uns</a></li>
-            <li><a href="#">Karriere</a></li>
-            <li><a href="#">Presse</a></li>
-            <li><a href="#">Partner</a></li>
-          </ul>
-        </div>
-        
-        <div class="footer-section">
-          <h4>Rechtliches</h4>
-          <ul>
-            <li><a href="#">Impressum</a></li>
             <li><a href="#">Datenschutz</a></li>
-            <li><a href="#">AGB</a></li>
+            <li><a href="#">Hilfe & FAQ</a></li>
             <li><a href="#">Kontakt</a></li>
           </ul>
         </div>
       </div>
       
       <div class="footer-bottom">
-        <p>&copy; 2025 EnergyCompare. Alle Rechte vorbehalten.</p>
+        <p>&copy; 2025 Stromtarif Vergleich Tool</p>
         <p class="version">Version 1.0.0</p>
       </div>
     </div>
