@@ -30,8 +30,8 @@ plt.plot(training_data.index[-historical_periods:],
 
 # Create forecast dates
 last_date = training_data.index[-1]
-# Create date range for forecast (24 points per day * 7 days, at hourly intervals)
-forecast_dates = pd.date_range(start=last_date, periods=24*7+1, freq='H')[1:]  # Skip first point
+# Create date range for forecast (24 points per day * 30 days, at hourly intervals)
+forecast_dates = pd.date_range(start=last_date, periods=24*30+1, freq='H')[1:]  # Skip first point
 
 # Create future exogenous variables for the forecast period
 future_exog = pd.DataFrame(index=forecast_dates)
@@ -48,8 +48,18 @@ avg_humidity_by_month = training_data.groupby(training_data.index.month)['relati
 future_exog['temperature'] = future_exog.index.month.map(avg_temp_by_month)
 future_exog['relative_humidity'] = future_exog.index.month.map(avg_humidity_by_month)
 
-# Now use these variables in your forecast
-forecast_result = loaded_model.get_forecast(steps=24*7, exog=future_exog[['temperature', 'relative_humidity', 'weekday', 'is_weekend']])
+# Now use these variables in the forecast
+forecast_result = loaded_model.get_forecast(steps=24*30, exog=future_exog[['temperature', 'relative_humidity', 'weekday', 'is_weekend']])
+
+# Save the forecast result to a CSV file
+forecast_df = pd.DataFrame({
+    'datetime': forecast_dates,
+    'predicted_mean': forecast_result.predicted_mean,
+    'lower_ci': forecast_result.conf_int().iloc[:, 0],
+    'upper_ci': forecast_result.conf_int().iloc[:, 1]
+})
+forecast_df.set_index('datetime', inplace=True)
+forecast_df.to_csv('data/forecast_30days.csv')
 
 # Plot validation data for the same timeframe as the forecast
 validation_start = forecast_dates[0]
