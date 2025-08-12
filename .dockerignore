@@ -1,1 +1,4 @@
 data/prediction_models/
+__pycache__/
+*.pkl
+*.ipynb

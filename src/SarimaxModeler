@@ -1,7 +1,7 @@
 import time
 import pandas as pd
 from statsmodels.tsa.statespace.sarimax import SARIMAX
-import energy_prices
+import EnergyPrices as energy_prices
 import os
 import pickle
 

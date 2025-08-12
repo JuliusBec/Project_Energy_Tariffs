@@ -2,7 +2,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import time
 from statsmodels.tsa.statespace.sarimax import SARIMAX
-import energy_prices
+import EnergyPrices as energy_prices
 import pickle
 import os
 
@@ -22,7 +22,7 @@ loaded_model = pickle.load(open('data/prediction_models/sarimax_model_2years', '
 
 plt.figure(figsize=(12, 6))
 # Define number of periods to show for historical data (e.g., last 10 days)
-historical_periods = 24 * 10
+historical_periods = 24 * 10  # 10 days of hourly data
 # Plot historical data
 plt.plot(training_data.index[-historical_periods:], 
          training_data['market_price'][-historical_periods:], 
@@ -30,8 +30,8 @@ plt.plot(training_data.index[-historical_periods:],
 
 # Create forecast dates
 last_date = training_data.index[-1]
-# Create date range for forecast (24 points per day * 30 days, at hourly intervals)
-forecast_dates = pd.date_range(start=last_date, periods=24*30+1, freq='H')[1:]  # Skip first point
+# Create date range for forecast (24 points per day * 90 days, at hourly intervals)
+forecast_dates = pd.date_range(start=last_date, periods=24*90+1, freq='H')[1:]  # Skip first point
 
 # Create future exogenous variables for the forecast period
 future_exog = pd.DataFrame(index=forecast_dates)
@@ -49,7 +49,7 @@ future_exog['temperature'] = future_exog.index.month.map(avg_temp_by_month)
 future_exog['relative_humidity'] = future_exog.index.month.map(avg_humidity_by_month)
 
 # Now use these variables in the forecast
-forecast_result = loaded_model.get_forecast(steps=24*30, exog=future_exog[['temperature', 'relative_humidity', 'weekday', 'is_weekend']])
+forecast_result = loaded_model.get_forecast(steps=24*90, exog=future_exog[['temperature', 'relative_humidity', 'weekday', 'is_weekend']])
 
 # Save the forecast result to a CSV file
 forecast_df = pd.DataFrame({
@@ -59,7 +59,7 @@ forecast_df = pd.DataFrame({
     'upper_ci': forecast_result.conf_int().iloc[:, 1]
 })
 forecast_df.set_index('datetime', inplace=True)
-forecast_df.to_csv('data/forecast_30days.csv')
+forecast_df.to_csv('data/forecast_90days.csv')
 
 # Plot validation data for the same timeframe as the forecast
 validation_start = forecast_dates[0]
@@ -75,5 +75,5 @@ plt.title('Energy Price Forecast')
 plt.legend()
 plt.tight_layout()
 plt.grid()
-plt.savefig('figures/forecast_plot_7days.png')
-print("Plot saved to figures/forecast_plot_7days.png")
+plt.savefig('figures/forecast_plot_90days.png')
+print("Plot saved to figures/forecast_plot_90days.png")
