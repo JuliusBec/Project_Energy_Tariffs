@@ -1,5 +1,5 @@
 import pandas as pd
-import energy_prices
+import EnergyPrices as energy_prices
 from statsmodels.tsa.statespace.sarimax import SARIMAX
 from statsmodels.tsa.stattools import adfuller
 from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
