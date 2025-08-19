@@ -1,6 +1,6 @@
 import pandas as pd
 from statsmodels.tsa.statespace.sarimax import SARIMAX
-import chronos_forecasting
+from Chronos import ChronosModel, TimeSeries
 import matplotlib.pyplot as plt
 
 class ChronosForecaster:
