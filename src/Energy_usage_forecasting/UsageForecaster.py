@@ -134,7 +134,8 @@ def forecast_chronos(df, pipeline=None, context_length=512, forecast_steps=168,
     
     
     print(f"\nWeekly forecast completed!")
-    
+    forecast_df.to_csv('data/usage_forecasting/user_data_14781_forecast_chronos.csv', index=False)
+
     return forecast_df
 
 def calculate_total_weekly_usage(forecast_df):
@@ -157,8 +158,8 @@ def forecast_prophet(df):
         daily_seasonality=True,
         yearly_seasonality=False,
         weekly_seasonality=True,
-        changepoint_prior_scale=0.01,
-        seasonality_prior_scale=10,
+        changepoint_prior_scale=0.5,
+        seasonality_prior_scale=20,
         interval_width=0.9
     )
 
@@ -181,5 +182,4 @@ def forecast_prophet(df):
 
 df = pd.read_csv('data/usage_forecasting/user_data_14781_training.csv')
 
-forecast_df = forecast_chronos(df, context_length=512, forecast_steps=168, rolling_window_size=62, num_samples=20)
-forecast_df.to_csv('data/usage_forecasting/user_data_14781_forecast_chronos.csv', index=False)
+forecast_df = forecast_chronos(df, context_length=512, forecast_steps=168, rolling_window_size=168, num_samples=20)
