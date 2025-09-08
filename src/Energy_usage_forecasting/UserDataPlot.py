@@ -61,8 +61,33 @@ def plot_usage(usage_df):
     plt.tight_layout()
     plt.show()
 
+
+def plot_usage_entirely(usage_df):
+    # Create a copy to avoid modifying original data
+    df = usage_df.copy()
+    
+    # Ensure datetime column is properly parsed
+    df['datetime'] = pd.to_datetime(df['datetime'])
+    
+    # Set datetime as index and resample to daily frequency
+    df = df.set_index('datetime')
+    daily_df = df.resample('D')['value'].mean().reset_index()
+    
+    plt.figure(figsize=(14, 8))
+    plt.plot(daily_df['datetime'], daily_df['value'], linewidth=1.5, color='blue', alpha=0.8)
+    plt.xlabel("Date")
+    plt.ylabel("Energy Usage (kWh)")
+    plt.title("Daily Energy Usage Over Time")
+    plt.grid(True, alpha=0.3)
+    
+    # Format x-axis for better readability
+    import matplotlib.dates as mdates
+    plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m'))
+    plt.gca().xaxis.set_major_locator(mdates.MonthLocator(interval=2))
+    plt.xticks(rotation=45)
+    
+    plt.tight_layout()
+    plt.show()
+
+plot_usage_entirely(usage_df)
 plot_usage(usage_df)
-
-chronos_forecast = pd.read_csv("data/usage_forecasting/user_data_" + str(user_id) + "_forecast_chronos.csv")
-
-plot_forecast(chronos_forecast)
