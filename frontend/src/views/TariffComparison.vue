@@ -66,7 +66,7 @@
                         type="file" 
                         ref="fileInput" 
                         @change="handleFileSelect" 
-                        accept=".csv,.xlsx,.xls"
+                        accept=".csv"
                         style="display: none"
                       >
                       
@@ -78,7 +78,7 @@
                           </button>
                         </p>
                         <div class="upload-hint">
-                          Unterstützte Formate: CSV, Excel (.xlsx, .xls)
+                          Unterstützte Formate: CSV
                         </div>
                       </div>
                       
@@ -146,93 +146,7 @@
                   </div>
                 </div>
 
-                <div class="form-group">
-                  <label class="form-label">Hauptverbrauchszeiten</label>
-                  <div class="time-grid">
-                    <label class="time-option">
-                      <input type="checkbox" v-model="formData.morningUsage">
-                      <span class="time-card">
-                        <i class="fas fa-sun"></i>
-                        <div>Morgens (6-10 Uhr)</div>
-                      </span>
-                    </label>
-                    <label class="time-option">
-                      <input type="checkbox" v-model="formData.dayUsage">
-                      <span class="time-card">
-                        <i class="fas fa-sun"></i>
-                        <div>Tags (10-18 Uhr)</div>
-                      </span>
-                    </label>
-                    <label class="time-option">
-                      <input type="checkbox" v-model="formData.eveningUsage">
-                      <span class="time-card">
-                        <i class="fas fa-moon"></i>
-                        <div>Abends (18-22 Uhr)</div>
-                      </span>
-                    </label>
-                    <label class="time-option">
-                      <input type="checkbox" v-model="formData.nightUsage">
-                      <span class="time-card">
-                        <i class="fas fa-moon"></i>
-                        <div>Nachts (22-6 Uhr)</div>
-                      </span>
-                    </label>
-                  </div>
-                  <div class="form-help">
-                    Wählen Sie die Zeiten aus, in denen Sie hauptsächlich Strom verbrauchen
-                  </div>
-                </div>
 
-                <div class="form-group">
-                  <label class="form-label">Hauptverbraucher im Haushalt</label>
-                  <div class="appliances-grid">
-                    <label class="appliance-option">
-                      <input type="checkbox" v-model="formData.hasElectricHeating">
-                      <span class="appliance-card">
-                        <i class="fas fa-thermometer-half"></i>
-                        <div>Elektroheizung</div>
-                      </span>
-                    </label>
-                    <label class="appliance-option">
-                      <input type="checkbox" v-model="formData.hasHeatPump">
-                      <span class="appliance-card">
-                        <i class="fas fa-wind"></i>
-                        <div>Wärmepumpe</div>
-                      </span>
-                    </label>
-                    <label class="appliance-option">
-                      <input type="checkbox" v-model="formData.hasElectricCar">
-                      <span class="appliance-card">
-                        <i class="fas fa-car"></i>
-                        <div>E-Auto</div>
-                      </span>
-                    </label>
-                    <label class="appliance-option">
-                      <input type="checkbox" v-model="formData.hasSauna">
-                      <span class="appliance-card">
-                        <i class="fas fa-hot-tub"></i>
-                        <div>Sauna</div>
-                      </span>
-                    </label>
-                    <label class="appliance-option">
-                      <input type="checkbox" v-model="formData.hasPool">
-                      <span class="appliance-card">
-                        <i class="fas fa-swimmer"></i>
-                        <div>Pool/Pumpe</div>
-                      </span>
-                    </label>
-                    <label class="appliance-option">
-                      <input type="checkbox" v-model="formData.hasAirConditioning">
-                      <span class="appliance-card">
-                        <i class="fas fa-snowflake"></i>
-                        <div>Klimaanlage</div>
-                      </span>
-                    </label>
-                  </div>
-                  <div class="form-help">
-                    Große Verbraucher beeinflussen Ihren Stromverbrauch und die Tarifempfehlung
-                  </div>
-                </div>
               </div>
 
               <!-- Common fields for manual input only -->
@@ -288,54 +202,13 @@
                     min="0"
                   >
                   <div class="form-help">
-                    Für Ersparnis-Berechnung (optional)
+                    Für Ersparnis-Berechnung
                   </div>
                 </div>
 
-                <div class="form-group">
-                  <label class="form-label">Bevorzugte Verbrauchszeiten</label>
-                  <div class="checkbox-group">
-                    <label class="form-checkbox">
-                      <input type="checkbox" v-model="formData.nightUsage">
-                      <span>Hoher Nachtverbrauch (22:00 - 6:00)</span>
-                    </label>
-                  </div>
-                  <div class="checkbox-group">
-                    <label class="form-checkbox">
-                      <input type="checkbox" v-model="formData.weekendUsage">
-                      <span>Hoher Wochenendverbrauch</span>
-                    </label>
-                  </div>
-                  <div class="form-help">
-                    Diese Zeiten haben oft niedrigere Börsenpreise
-                  </div>
-                </div>
+              
+            
 
-                <div class="form-group">
-                  <label class="form-label">Preisvolatilität-Toleranz</label>
-                  <select v-model="formData.volatilityTolerance" class="form-select">
-                    <option value="low">Niedrig - Stabilere Preise bevorzugt</option>
-                    <option value="medium">Mittel - Moderate Schwankungen OK</option>
-                    <option value="high">Hoch - Maximale Ersparnisse trotz Schwankungen</option>
-                  </select>
-                  <div class="form-help">
-                    Dynamische Tarife schwanken täglich - wählen Sie Ihre Risikobereitschaft
-                  </div>
-                </div>
-
-                <div class="checkbox-group">
-                  <label class="form-checkbox">
-                    <input type="checkbox" v-model="formData.onlyDynamic">
-                    <span>Nur echte dynamische Tarife (stündliche Preisanpassung)</span>
-                  </label>
-                </div>
-
-                <div class="checkbox-group">
-                  <label class="form-checkbox">
-                    <input type="checkbox" v-model="formData.appIntegration">
-                    <span>App-Integration für Preisbenachrichtigungen erforderlich</span>
-                  </label>
-                </div>
               </div>
 
               <button type="submit" class="btn btn-primary w-full" :disabled="loading || formData.hasSmartMeter === null">
@@ -473,6 +346,16 @@
                       <li v-else>
                         <i class="fas fa-times text-red-600"></i>
                         Keine Smart Home Integration
+                      </li>
+                    </ul>
+                  </div>
+                  
+                  <div v-if="tariff.special_features" class="special-features">
+                    <h4><i class="fas fa-star"></i> Besondere Leistungen</h4>
+                    <ul>
+                      <li v-for="feature in tariff.special_features" :key="feature">
+                        <i class="fas fa-check text-green-600"></i>
+                        {{ feature }}
                       </li>
                     </ul>
                   </div>
@@ -615,91 +498,118 @@ export default {
     }
     
     const generateMockTariffs = () => {
-      const mockTariffs = [
+      const enbwTariffs = [
+        // EnBW Dynamische Tarife
         {
           id: 1,
-          name: "aWATTar HOURLY",
-          base_price: 8.90,
-          kwh_price: 0.245,
+          name: "EnBW mobility+ dynamic",
+          base_price: 14.90,
+          kwh_price: 0.00, // Börsenpreis + Aufschlag
           is_dynamic: true,
-          price_model: "Stündliche Börsenpreise + 0.245€/kWh",
+          price_model: "Börsenpreis + 2,0 ct/kWh Aufschlag + 14,90€/Monat Grundpreis",
           green_energy: true,
           contract_duration: 12,
-          description: "Echter dynamischer Tarif mit stündlicher Abrechnung nach Börsenpreis",
+          description: "Dynamischer Stromtarif mit stündlichen Börsenpreisen. Perfekt für flexible Verbraucher mit E-Auto oder Wärmepumpe.",
           app_available: true,
           price_forecast: true,
           automation_ready: true,
-          avg_savings: "15-25%",
-          volatility: "hoch"
+          avg_savings: "15-30%",
+          volatility: "hoch",
+          dynamic_markup: 0.02, // 2 ct/kWh Aufschlag auf Börsenpreis
+          special_features: ["E-Auto Ladetarif", "Smart Home Integration", "Preisalarm"]
         },
         {
           id: 2,
-          name: "Tibber Dynamic",
+          name: "EnBW easy dynamic",
           base_price: 9.90,
-          kwh_price: 0.235,
+          kwh_price: 0.00, // Börsenpreis + Aufschlag
           is_dynamic: true,
-          price_model: "Börsenpreis + 0.235€/kWh + 9.90€/Monat",
+          price_model: "Börsenpreis + 3,5 ct/kWh Aufschlag + 9,90€/Monat Grundpreis",
           green_energy: true,
           contract_duration: 12,
-          description: "Intelligenter Tarif mit KI-basierter Verbrauchsoptimierung",
+          description: "Einfacher dynamischer Tarif für den Einstieg in variable Strompreise.",
           app_available: true,
           price_forecast: true,
-          automation_ready: true,
-          avg_savings: "20-30%",
-          volatility: "mittel-hoch"
+          automation_ready: false,
+          avg_savings: "10-25%",
+          volatility: "mittel-hoch",
+          dynamic_markup: 0.035, // 3,5 ct/kWh Aufschlag auf Börsenpreis
+          special_features: ["Einfache App", "Tagesvorhersage"]
         },
+        
+        // EnBW Festpreis-Tarife
         {
           id: 3,
-          name: "Energy2market Flex",
-          base_price: 12.50,
-          kwh_price: 0.220,
-          is_dynamic: true,
-          price_model: "Day-Ahead Preise + 0.220€/kWh",
-          green_energy: false,
+          name: "EnBW mobility+ Zuhause",
+          base_price: 14.90,
+          kwh_price: 0.3280,
+          is_dynamic: false,
+          price_model: "Festpreis 32,80 ct/kWh + 14,90€/Monat Grundpreis",
+          green_energy: true,
           contract_duration: 12,
-          description: "Professioneller dynamischer Tarif für optimierte Haushalte",
+          description: "100% Ökostrom mit E-Mobilitäts-Fokus. Ideal für E-Auto-Besitzer.",
           app_available: true,
-          price_forecast: true,
+          price_forecast: false,
           automation_ready: true,
-          avg_savings: "18-28%",
-          volatility: "hoch"
+          avg_savings: "Stabile Preise",
+          volatility: "keine",
+          special_features: ["E-Auto Ladetarif", "Mobility+ Vorteile", "THG-Quote möglich"]
         },
         {
           id: 4,
-          name: "Octopus Energy Agile",
-          base_price: 11.90,
-          kwh_price: 0.255,
-          is_dynamic: true,
-          price_model: "30-min Intervalle basierend auf Börsenpreisen",
+          name: "EnBW easy+ Strom",
+          base_price: 9.90,
+          kwh_price: 0.3450,
+          is_dynamic: false,
+          price_model: "Festpreis 34,50 ct/kWh + 9,90€/Monat Grundpreis",
           green_energy: true,
           contract_duration: 12,
-          description: "Halbstündliche Preisanpassung mit grüner Energie",
+          description: "Günstiger Ökostrom-Tarif mit fairen Konditionen und kurzer Laufzeit.",
           app_available: true,
-          price_forecast: true,
+          price_forecast: false,
           automation_ready: false,
-          avg_savings: "12-22%",
-          volatility: "sehr hoch"
+          avg_savings: "Günstig & fair",
+          volatility: "keine",
+          special_features: ["12 Monate Preisgarantie", "Online-Service"]
         },
         {
           id: 5,
-          name: "ENTEGA Vario Smart",
-          base_price: 15.90,
-          kwh_price: 0.275,
+          name: "EnBW Basis Strom",
+          base_price: 12.90,
+          kwh_price: 0.3180,
           is_dynamic: false,
-          price_model: "Variable Preise mit Preisgarantie-Puffern",
-          green_energy: true,
+          price_model: "Festpreis 31,80 ct/kWh + 12,90€/Monat Grundpreis",
+          green_energy: false,
           contract_duration: 24,
-          description: "Halb-dynamischer Tarif mit Preisschutz nach oben",
+          description: "Klassischer Stromtarif mit bewährten Konditionen und längerer Preissicherheit.",
           app_available: false,
           price_forecast: false,
           automation_ready: false,
-          avg_savings: "5-15%",
-          volatility: "niedrig-mittel"
+          avg_savings: "Bewährt & sicher",
+          volatility: "keine",
+          special_features: ["24 Monate Preisgarantie", "Persönlicher Service"]
+        },
+        {
+          id: 6,
+          name: "EnBW Komfort Strom",
+          base_price: 15.90,
+          kwh_price: 0.2980,
+          is_dynamic: false,
+          price_model: "Festpreis 29,80 ct/kWh + 15,90€/Monat Grundpreis",
+          green_energy: true,
+          contract_duration: 24,
+          description: "Premium Ökostrom-Tarif mit bestem Service und zusätzlichen Leistungen.",
+          app_available: true,
+          price_forecast: false,
+          automation_ready: true,
+          avg_savings: "Premium Service",
+          volatility: "keine",
+          special_features: ["24h Hotline", "Smart Home Paket", "Energieberatung"]
         }
       ]
       
       // Filter based on user preferences
-      let filteredTariffs = mockTariffs
+      let filteredTariffs = enbwTariffs
       
       if (formData.value.onlyDynamic) {
         filteredTariffs = filteredTariffs.filter(t => t.is_dynamic)
@@ -711,32 +621,45 @@ export default {
       
       // Calculate costs and add optimization potential based on flexibility
       results.value = filteredTariffs.map(tariff => {
-        const baseAnnualCost = (tariff.base_price * 12) + (formData.value.annualKwh * tariff.kwh_price)
+        let baseAnnualCost
+        
+        if (tariff.is_dynamic) {
+          // Für dynamische Tarife: Durchschnittlicher Börsenpreis (ca. 10 ct/kWh) + Aufschlag
+          const avgSpotPrice = 0.10 // 10 ct/kWh durchschnittlicher Börsenpreis 2024
+          const totalKwhPrice = avgSpotPrice + tariff.dynamic_markup
+          baseAnnualCost = (tariff.base_price * 12) + (formData.value.annualKwh * totalKwhPrice)
+        } else {
+          // Für Festpreis-Tarife
+          baseAnnualCost = (tariff.base_price * 12) + (formData.value.annualKwh * tariff.kwh_price)
+        }
         
         // Calculate dynamic savings based on user profile
         let dynamicSavingsFactor = 1.0
         
         if (tariff.is_dynamic) {
           // Flexibility bonus
-          if (formData.value.flexibility === 'high') dynamicSavingsFactor *= 0.85
-          else if (formData.value.flexibility === 'medium') dynamicSavingsFactor *= 0.92
+          if (formData.value.flexibility === 'high') dynamicSavingsFactor *= 0.80
+          else if (formData.value.flexibility === 'medium') dynamicSavingsFactor *= 0.90
           
           // Smart home bonus
-          if (formData.value.smartHome === 'advanced') dynamicSavingsFactor *= 0.90
-          else if (formData.value.smartHome === 'basic') dynamicSavingsFactor *= 0.95
+          if (formData.value.smartHome === 'advanced') dynamicSavingsFactor *= 0.85
+          else if (formData.value.smartHome === 'basic') dynamicSavingsFactor *= 0.92
           
-          // Night usage bonus
-          if (formData.value.nightUsage) dynamicSavingsFactor *= 0.93
-          
-          // Weekend usage bonus  
-          if (formData.value.weekendUsage) dynamicSavingsFactor *= 0.97
+          // Time-based usage bonus (approximated)
+          if (formData.value.nightUsage) dynamicSavingsFactor *= 0.88
+          if (formData.value.weekendUsage) dynamicSavingsFactor *= 0.95
         }
         
         const optimizedAnnualCost = baseAnnualCost * dynamicSavingsFactor
         const monthly_cost = optimizedAnnualCost / 12
         
+        // Für dynamische Tarife: zeige durchschnittlichen kWh-Preis
+        const displayKwhPrice = tariff.is_dynamic ? 
+          (0.10 + tariff.dynamic_markup) : tariff.kwh_price
+        
         return {
           ...tariff,
+          kwh_price: displayKwhPrice,
           annual_cost: Math.round(optimizedAnnualCost * 100) / 100,
           base_annual_cost: Math.round(baseAnnualCost * 100) / 100,
           monthly_cost: Math.round(monthly_cost * 100) / 100,
@@ -781,15 +704,15 @@ export default {
     const processFile = async (file) => {
       fileError.value = ''
       
-      // Validate file type
-      const allowedTypes = ['text/csv', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']
-      const allowedExtensions = ['.csv', '.xlsx', '.xls']
+      // Validate file type - only CSV allowed
+      const allowedTypes = ['text/csv']
+      const allowedExtensions = ['.csv']
       
       const hasValidType = allowedTypes.includes(file.type) || 
                           allowedExtensions.some(ext => file.name.toLowerCase().endsWith(ext))
       
       if (!hasValidType) {
-        fileError.value = 'Bitte wählen Sie eine CSV- oder Excel-Datei (.csv, .xlsx, .xls)'
+        fileError.value = 'Bitte wählen Sie eine CSV-Datei (.csv)'
         return
       }
       
@@ -802,15 +725,10 @@ export default {
       uploadedFile.value = file
       
       try {
-        if (file.name.toLowerCase().endsWith('.csv')) {
-          await parseCSV(file)
-        } else {
-          fileError.value = 'Excel-Dateien werden noch nicht unterstützt. Bitte verwenden Sie CSV-Format.'
-          uploadedFile.value = null
-        }
+        await parseCSV(file)
       } catch (error) {
         console.error('Error parsing file:', error)
-        fileError.value = 'Fehler beim Verarbeiten der Datei. Bitte überprüfen Sie das Format.'
+        fileError.value = 'Fehler beim Verarbeiten der CSV-Datei. Bitte überprüfen Sie das Format.'
         uploadedFile.value = null
       }
     }
@@ -1681,6 +1599,39 @@ export default {
 }
 
 .dynamic-features li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  font-size: 0.85rem;
+  color: #374151;
+}
+
+.special-features {
+  background: #fef3c7;
+  border: 1px solid #fcd34d;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-top: 1rem;
+}
+
+.special-features h4 {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #92400e;
+  margin-bottom: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.special-features ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.special-features li {
   display: flex;
   align-items: center;
   gap: 0.5rem;
