@@ -49,6 +49,10 @@ export default {
   margin-bottom: 2rem;
 }
 
+.footer-section:last-child {
+  text-align: right;
+}
+
 .footer-section .logo {
   display: flex;
   align-items: center;
