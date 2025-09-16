@@ -27,44 +27,34 @@
             <form @submit.prevent="calculateTariffs">
               <!-- Smart Meter Selection -->
               <div class="form-group">
-                <label class="form-label">Verfügen Sie über einen Smart Meter?</label>
+                <label class="form-label">Verfügen Sie über einen Smart Meter? *</label>
                 <div class="meter-selection">
-                  <label class="meter-option" :class="{ active: formData.hasSmartMeter }">
+                  <label class="meter-option" :class="{ active: formData.hasSmartMeter === true }">
                     <input type="radio" v-model="formData.hasSmartMeter" :value="true">
                     <div class="meter-card">
                       <i class="fas fa-wifi"></i>
                       <h4>Smart Meter vorhanden</h4>
                       <p>Ich kann meine Verbrauchsdaten hochladen</p>
-                      <div class="meter-benefits">
-                        <span><i class="fas fa-check"></i> Präzise Analyse</span>
-                        <span><i class="fas fa-check"></i> Optimale Tarife</span>
-                      </div>
                     </div>
                   </label>
                   
-                  <label class="meter-option" :class="{ active: !formData.hasSmartMeter }">
+                  <label class="meter-option" :class="{ active: formData.hasSmartMeter === false }">
                     <input type="radio" v-model="formData.hasSmartMeter" :value="false">
                     <div class="meter-card">
                       <i class="fas fa-calculator"></i>
                       <h4>Kein Smart Meter</h4>
                       <p>Ich gebe meine Daten manuell ein</p>
-                      <div class="meter-benefits">
-                        <span><i class="fas fa-check"></i> Einfach</span>
-                        <span><i class="fas fa-check"></i> Schnell</span>
-                      </div>
                     </div>
                   </label>
+                </div>
+                <div v-if="formData.hasSmartMeter === null" class="form-help text-red-600">
+                  Bitte wählen Sie eine Option aus
                 </div>
               </div>
 
               <!-- Smart Meter Section -->
-              <div v-if="formData.hasSmartMeter" class="smart-meter-section">
-                <div class="section-header">
-                  <i class="fas fa-upload"></i>
-                  <h3>Smart Meter Daten hochladen</h3>
-                  <p>Laden Sie Ihre Verbrauchsdaten für eine präzise Analyse hoch</p>
-                </div>
-
+              <div v-if="formData.hasSmartMeter === true" class="smart-meter-section">
+               
                 <div class="form-group">
                   <label class="form-label">Verbrauchsdaten hochladen *</label>
                   <div class="upload-section">
@@ -124,7 +114,7 @@
               </div>
 
               <!-- Manual Input Section -->
-              <div v-else class="manual-input-section">
+              <div v-else-if="formData.hasSmartMeter === false" class="manual-input-section">
                 <div class="section-header">
                   <i class="fas fa-edit"></i>
                   <h3>Verbrauchsdaten eingeben</h3>
@@ -252,7 +242,7 @@
               </div>
 
               <!-- Common fields for manual input only -->
-              <div v-if="!formData.hasSmartMeter">
+              <div v-if="formData.hasSmartMeter === false">
                 <div class="form-group">
                   <label class="form-label">Flexibilität Ihres Verbrauchs</label>
                   <select v-model="formData.flexibility" class="form-select">
@@ -363,10 +353,10 @@
                 </div>
               </div>
 
-              <button type="submit" class="btn btn-primary w-full" :disabled="loading">
+              <button type="submit" class="btn btn-primary w-full" :disabled="loading || formData.hasSmartMeter === null">
                 <span v-if="loading" class="loading-spinner small"></span>
                 <i v-else class="fas fa-chart-line"></i>
-                {{ loading ? 'Analysiere Tarife...' : 'Dynamische Tarife finden' }}
+                {{ loading ? 'Analysiere Tarife...' : formData.hasSmartMeter === null ? 'Bitte Smart Meter Auswahl treffen' : 'Dynamische Tarife finden' }}
               </button>
             </form>
           </div>
@@ -549,7 +539,7 @@ export default {
   name: 'TariffComparison',
   setup() {
     const formData = ref({
-      hasSmartMeter: false,
+      hasSmartMeter: null, // Start with null to force user selection
       annualKwh: 3500,
       zipCode: '',
       currentProvider: '',
@@ -1734,5 +1724,14 @@ export default {
   border-top: 2px solid white;
   border-radius: 50%;
   animation: spin 1s linear infinite;
+}
+
+.text-red-600 {
+  color: #dc2626;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 </style>
