@@ -18,15 +18,6 @@
             <li><router-link to="/tips">Spartipps</router-link></li>
           </ul>
         </div>
-        
-        <div class="footer-section">
-          <h4>Information</h4>
-          <ul>
-            <li><a href="#">Datenschutz</a></li>
-            <li><a href="#">Hilfe & FAQ</a></li>
-            <li><a href="#">Kontakt</a></li>
-          </ul>
-        </div>
       </div>
       
       <div class="footer-bottom">
