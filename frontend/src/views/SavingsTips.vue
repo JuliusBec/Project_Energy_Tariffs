@@ -6,62 +6,7 @@
         <p>Reduzieren Sie Ihren Stromverbrauch und sparen Sie Geld</p>
       </div>
 
-      <!-- Savings Calculator -->
-      <section class="savings-calculator mb-8">
-        <div class="card">
-          <div class="card-header">
-            <h2 class="card-title">
-              <i class="fas fa-calculator text-green-600"></i>
-              Sparpotenzial-Rechner
-            </h2>
-            <p>Berechnen Sie, wie viel Sie durch verschiedene Maßnahmen sparen können</p>
-          </div>
-          
-          <div class="calculator-grid">
-            <div class="calculator-form">
-              <div class="form-group">
-                <label class="form-label">Ihr aktueller Jahresverbrauch (kWh)</label>
-                <input 
-                  type="number" 
-                  v-model="calculator.annualKwh" 
-                  class="form-input"
-                  placeholder="z.B. 3500"
-                  min="1000"
-                  max="20000"
-                  @input="calculateSavings"
-                >
-              </div>
-              
-              <div class="form-group">
-                <label class="form-label">Aktueller Strompreis (€/kWh)</label>
-                <input 
-                  type="number" 
-                  v-model="calculator.currentPrice" 
-                  class="form-input"
-                  placeholder="z.B. 0.32"
-                  step="0.01"
-                  min="0"
-                  max="1"
-                  @input="calculateSavings"
-                >
-              </div>
-            </div>
-            
-            <div class="savings-result" v-if="totalSavings > 0">
-              <div class="total-savings">
-                <div class="savings-amount">{{ totalSavings }}€</div>
-                <div class="savings-label">Jährliches Sparpotenzial</div>
-              </div>
-              <div class="savings-breakdown">
-                <div class="breakdown-item" v-for="tip in activeTips" :key="tip.id">
-                  <span class="breakdown-name">{{ tip.category }}</span>
-                  <span class="breakdown-amount">{{ tip.calculatedSavings }}€</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
+    
 
       <!-- Tips Categories -->
       <section class="tips-categories mb-8">
@@ -85,7 +30,6 @@
           v-for="tip in filteredTips" 
           :key="tip.id"
           class="tip-card"
-          :class="{ active: activeTipIds.includes(tip.id) }"
         >
           <div class="tip-header">
             <div class="tip-icon" :style="{ backgroundColor: tip.color }">
@@ -96,16 +40,6 @@
               <div class="tip-difficulty" :class="tip.difficulty">
                 {{ getDifficultyText(tip.difficulty) }}
               </div>
-            </div>
-            <div class="tip-toggle">
-              <label class="switch">
-                <input 
-                  type="checkbox" 
-                  :checked="activeTipIds.includes(tip.id)"
-                  @change="toggleTip(tip.id)"
-                >
-                <span class="slider"></span>
-              </label>
             </div>
           </div>
           
@@ -143,44 +77,6 @@
         </div>
       </section>
 
-      <!-- Energy Monitor Recommendation -->
-      <section class="monitor-recommendation py-8 bg-gray-50">
-        <div class="container">
-          <div class="recommendation-content">
-            <div class="recommendation-info">
-              <h2>Empfehlung: Energieverbrauchs-Monitor</h2>
-              <p>
-                Mit einem intelligenten Energiemonitor können Sie Ihren Verbrauch in Echtzeit überwachen 
-                und weitere Einsparpotenziale identifizieren.
-              </p>
-              <ul class="benefits-list">
-                <li><i class="fas fa-check text-green-600"></i> Echtzeit Verbrauchsanzeige</li>
-                <li><i class="fas fa-check text-green-600"></i> Automatische Geräteerkennung</li>
-                <li><i class="fas fa-check text-green-600"></i> Detaillierte Verbrauchsanalyse</li>
-                <li><i class="fas fa-check text-green-600"></i> Smartphone App inklusive</li>
-              </ul>
-            </div>
-            
-            <div class="recommendation-card">
-              <div class="product-image">
-                <i class="fas fa-plug fa-4x text-emerald-600"></i>
-              </div>
-              <h3>Smart Energy Monitor</h3>
-              <div class="price">ab 89€</div>
-              <div class="savings-potential">
-                Sparpotenzial: bis zu 200€/Jahr
-              </div>
-              <button class="btn btn-primary w-full">
-                <i class="fas fa-external-link-alt"></i>
-                Mehr erfahren
-              </button>
-            </div>
-          </div>
-        </div>
-      </section>
-    </div>
-  </div>
-</template>
 
 <script>
 import { ref, computed, onMounted } from 'vue'
@@ -189,13 +85,7 @@ import { apiService } from '../services/api'
 export default {
   name: 'SavingsTips',
   setup() {
-    const calculator = ref({
-      annualKwh: 3500,
-      currentPrice: 0.32
-    })
-    
     const selectedCategory = ref('all')
-    const activeTipIds = ref([])
     
     const categories = ref([
       { id: 'all', name: 'Alle', icon: 'fas fa-th-large' },
@@ -371,35 +261,6 @@ export default {
       return tips.value.filter(tip => tip.categoryId === selectedCategory.value)
     })
     
-    const activeTips = computed(() => {
-      return tips.value.filter(tip => activeTipIds.value.includes(tip.id))
-    })
-    
-    const totalSavings = computed(() => {
-      return activeTips.value.reduce((total, tip) => {
-        return total + (tip.calculatedSavings || 0)
-      }, 0)
-    })
-    
-    const calculateSavings = () => {
-      if (!calculator.value.annualKwh || !calculator.value.currentPrice) return
-      
-      tips.value.forEach(tip => {
-        const annualCost = calculator.value.annualKwh * calculator.value.currentPrice
-        const potentialSaving = (annualCost * tip.reduction) / 100
-        tip.calculatedSavings = Math.round(potentialSaving)
-      })
-    }
-    
-    const toggleTip = (tipId) => {
-      const index = activeTipIds.value.indexOf(tipId)
-      if (index > -1) {
-        activeTipIds.value.splice(index, 1)
-      } else {
-        activeTipIds.value.push(tipId)
-      }
-    }
-    
     const getDifficultyText = (difficulty) => {
       switch (difficulty) {
         case 'easy': return 'Einfach'
@@ -423,21 +284,14 @@ export default {
     }
     
     onMounted(() => {
-      calculateSavings()
       loadTips()
     })
     
     return {
-      calculator,
       selectedCategory,
-      activeTipIds,
       categories,
       tips,
       filteredTips,
-      activeTips,
-      totalSavings,
-      calculateSavings,
-      toggleTip,
       getDifficultyText
     }
   }
@@ -460,92 +314,6 @@ export default {
 .page-header p {
   font-size: 1.1rem;
   color: #6b7280;
-}
-
-.savings-calculator {
-  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-  border-radius: 16px;
-  overflow: hidden;
-}
-
-.savings-calculator .card {
-  background: transparent;
-  border: none;
-  box-shadow: none;
-}
-
-.savings-calculator .card-header {
-  background: rgba(255, 255, 255, 0.1);
-  color: white;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-.savings-calculator .card-title {
-  color: white;
-}
-
-.calculator-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 2rem;
-  align-items: start;
-}
-
-.calculator-form .form-label {
-  color: rgba(255, 255, 255, 0.9);
-}
-
-.calculator-form .form-input {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  color: white;
-}
-
-.calculator-form .form-input::placeholder {
-  color: rgba(255, 255, 255, 0.6);
-}
-
-.savings-result {
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(10px);
-  border-radius: 12px;
-  padding: 1.5rem;
-  color: white;
-}
-
-.total-savings {
-  text-align: center;
-  margin-bottom: 1rem;
-}
-
-.savings-amount {
-  font-size: 2.5rem;
-  font-weight: 700;
-  margin-bottom: 0.5rem;
-}
-
-.savings-label {
-  opacity: 0.9;
-}
-
-.savings-breakdown {
-  border-top: 1px solid rgba(255, 255, 255, 0.2);
-  padding-top: 1rem;
-}
-
-.breakdown-item {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 0.5rem;
-  font-size: 0.9rem;
-}
-
-.breakdown-name {
-  opacity: 0.8;
-}
-
-.breakdown-amount {
-  font-weight: 600;
 }
 
 .category-tabs {
@@ -600,11 +368,6 @@ export default {
 .tip-card:hover {
   transform: translateY(-2px);
   box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
-}
-
-.tip-card.active {
-  border-color: #10b981;
-  box-shadow: 0 0 0 1px #10b981;
 }
 
 .tip-header {
@@ -662,51 +425,6 @@ export default {
   align-items: center;
 }
 
-.switch {
-  position: relative;
-  display: inline-block;
-  width: 48px;
-  height: 24px;
-}
-
-.switch input {
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
-
-.slider {
-  position: absolute;
-  cursor: pointer;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: #d1d5db;
-  transition: 0.2s;
-  border-radius: 24px;
-}
-
-.slider:before {
-  position: absolute;
-  content: "";
-  height: 18px;
-  width: 18px;
-  left: 3px;
-  bottom: 3px;
-  background-color: white;
-  transition: 0.2s;
-  border-radius: 50%;
-}
-
-input:checked + .slider {
-  background-color: #10b981;
-}
-
-input:checked + .slider:before {
-  transform: translateX(24px);
-}
-
 .tip-title {
   font-size: 1.25rem;
   font-weight: 600;
@@ -762,87 +480,9 @@ input:checked + .slider:before {
   margin-bottom: 0.25rem;
 }
 
-.monitor-recommendation {
-  border-radius: 16px;
-  margin-top: 3rem;
-}
-
-.recommendation-content {
-  display: grid;
-  grid-template-columns: 2fr 1fr;
-  gap: 3rem;
-  align-items: center;
-}
-
-.recommendation-info h2 {
-  font-size: 1.75rem;
-  font-weight: 700;
-  color: #1f2937;
-  margin-bottom: 1rem;
-}
-
-.recommendation-info p {
-  color: #6b7280;
-  line-height: 1.6;
-  margin-bottom: 1.5rem;
-}
-
-.benefits-list {
-  list-style: none;
-}
-
-.benefits-list li {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  margin-bottom: 0.75rem;
-  color: #374151;
-}
-
-.recommendation-card {
-  background: white;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  padding: 2rem;
-  text-align: center;
-}
-
-.product-image {
-  margin-bottom: 1rem;
-}
-
-.recommendation-card h3 {
-  font-size: 1.25rem;
-  font-weight: 600;
-  color: #1f2937;
-  margin-bottom: 0.5rem;
-}
-
-.price {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: #2563eb;
-  margin-bottom: 0.5rem;
-}
-
-.savings-potential {
-  color: #10b981;
-  font-weight: 500;
-  margin-bottom: 1rem;
-}
-
-.w-full {
-  width: 100%;
-}
-
 @media (max-width: 1024px) {
-  .calculator-grid {
-    grid-template-columns: 1fr;
-  }
-  
-  .recommendation-content {
-    grid-template-columns: 1fr;
-    gap: 2rem;
+  .tips-grid {
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   }
 }
 
