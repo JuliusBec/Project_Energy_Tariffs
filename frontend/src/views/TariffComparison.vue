@@ -115,12 +115,6 @@
 
               <!-- Manual Input Section -->
               <div v-else-if="formData.hasSmartMeter === false" class="manual-input-section">
-                <div class="section-header">
-                  <i class="fas fa-edit"></i>
-                  <h3>Verbrauchsdaten eingeben</h3>
-                  <p>Geben Sie Ihre Verbrauchsinformationen manuell ein</p>
-                </div>
-
                 <div class="form-group">
                   <label class="form-label">Jahresverbrauch (kWh) *</label>
                   <input 
@@ -281,16 +275,7 @@
                     Für regionale Tarifverfügbarkeit (optional)
                   </div>
                 </div>
-
-                <div class="form-group">
-                  <label class="form-label">Aktueller Anbieter (optional)</label>
-                  <input 
-                    type="text" 
-                    v-model="formData.currentProvider" 
-                    class="form-input"
-                    placeholder="z.B. Stadtwerke München"
-                  >
-                </div>
+                
 
                 <div class="form-group">
                   <label class="form-label">Aktuelle Jahreskosten (€)</label>
