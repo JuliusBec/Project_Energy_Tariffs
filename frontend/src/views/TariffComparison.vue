@@ -11,144 +11,356 @@
       </div>
 
       <div class="comparison-grid">
-        <!-- Calculator Form -->
-        <div class="calculator-section">
-          <div class="card">
-            <div class="card-header">
-              <h2 class="card-title">
-                <i class="fas fa-chart-line text-green-600"></i>
-                Verbrauchsprofil für dynamische Tarife
-              </h2>
-              <p class="card-subtitle">
-                Optimieren Sie Ihre Ersparnisse durch intelligentes Lastmanagement
-              </p>
-            </div>
+        <!-- Calculator Form - Full Width -->
+        <div class="calculator-section-full">
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">
+              <i class="fas fa-chart-line text-green-600"></i>
+              Verbrauchsprofil für dynamische Tarife
+            </h2>
+            <p class="card-subtitle">
+              Optimieren Sie Ihre Ersparnisse durch intelligentes Lastmanagement
+            </p>
+          </div>
 
             <form @submit.prevent="calculateTariffs">
+              <!-- Smart Meter Selection -->
               <div class="form-group">
-                <label class="form-label">Jahresverbrauch (kWh) *</label>
-                <input 
-                  type="number" 
-                  v-model="formData.annualKwh" 
-                  class="form-input"
-                  placeholder="z.B. 3500"
-                  min="1000"
-                  max="20000"
-                  step="100"
-                  required
-                >
-                <div class="form-help">
-                  Durchschnittswerte: 1-Person: 2.000 kWh | 2-Personen: 3.500 kWh | 4-Personen: 4.500 kWh
-                </div>
-              </div>
-
-              <div class="form-group">
-                <label class="form-label">Flexibilität Ihres Verbrauchs</label>
-                <select v-model="formData.flexibility" class="form-select">
-                  <option value="low">Niedrig - Fester Tagesablauf</option>
-                  <option value="medium">Mittel - Teilweise flexibel</option>
-                  <option value="high">Hoch - Sehr flexibel</option>
-                </select>
-                <div class="form-help">
-                  Höhere Flexibilität = größere Ersparnisse bei dynamischen Tarifen
-                </div>
-              </div>
-
-              <div class="form-group">
-                <label class="form-label">Smart Home Ausstattung</label>
-                <select v-model="formData.smartHome" class="form-select">
-                  <option value="none">Keine Smart Home Geräte</option>
-                  <option value="basic">Grundausstattung (Smart Thermostat, etc.)</option>
-                  <option value="advanced">Erweitert (Home Energy Management)</option>
-                </select>
-                <div class="form-help">
-                  Smart Home hilft bei der automatischen Optimierung des Verbrauchs
-                </div>
-              </div>
-
-              <div class="form-group">
-                <label class="form-label">Postleitzahl</label>
-                <input 
-                  type="text" 
-                  v-model="formData.zipCode" 
-                  class="form-input"
-                  placeholder="z.B. 80331"
-                  pattern="[0-9]{5}"
-                  maxlength="5"
-                >
-                <div class="form-help">
-                  Für regionale Tarifverfügbarkeit (optional)
-                </div>
-              </div>
-
-              <div class="form-group">
-                <label class="form-label">Aktueller Anbieter (optional)</label>
-                <input 
-                  type="text" 
-                  v-model="formData.currentProvider" 
-                  class="form-input"
-                  placeholder="z.B. Stadtwerke München"
-                >
-              </div>
-
-              <div class="form-group">
-                <label class="form-label">Aktuelle Jahreskosten (€)</label>
-                <input 
-                  type="number" 
-                  v-model="formData.currentCost" 
-                  class="form-input"
-                  placeholder="z.B. 1200"
-                  step="0.01"
-                  min="0"
-                >
-                <div class="form-help">
-                  Für Ersparnis-Berechnung (optional)
-                </div>
-              </div>
-
-              <div class="form-group">
-                <label class="form-label">Bevorzugte Verbrauchszeiten</label>
-                <div class="checkbox-group">
-                  <label class="form-checkbox">
-                    <input type="checkbox" v-model="formData.nightUsage">
-                    <span>Hoher Nachtverbrauch (22:00 - 6:00)</span>
+                <label class="form-label">Verfügen Sie über einen Smart Meter?</label>
+                <div class="meter-selection">
+                  <label class="meter-option" :class="{ active: formData.hasSmartMeter }">
+                    <input type="radio" v-model="formData.hasSmartMeter" :value="true">
+                    <div class="meter-card">
+                      <i class="fas fa-wifi"></i>
+                      <h4>Smart Meter vorhanden</h4>
+                      <p>Ich kann meine Verbrauchsdaten hochladen</p>
+                      <div class="meter-benefits">
+                        <span><i class="fas fa-check"></i> Präzise Analyse</span>
+                        <span><i class="fas fa-check"></i> Optimale Tarife</span>
+                      </div>
+                    </div>
+                  </label>
+                  
+                  <label class="meter-option" :class="{ active: !formData.hasSmartMeter }">
+                    <input type="radio" v-model="formData.hasSmartMeter" :value="false">
+                    <div class="meter-card">
+                      <i class="fas fa-calculator"></i>
+                      <h4>Kein Smart Meter</h4>
+                      <p>Ich gebe meine Daten manuell ein</p>
+                      <div class="meter-benefits">
+                        <span><i class="fas fa-check"></i> Einfach</span>
+                        <span><i class="fas fa-check"></i> Schnell</span>
+                      </div>
+                    </div>
                   </label>
                 </div>
+              </div>
+
+              <!-- Smart Meter Section -->
+              <div v-if="formData.hasSmartMeter" class="smart-meter-section">
+                <div class="section-header">
+                  <i class="fas fa-upload"></i>
+                  <h3>Smart Meter Daten hochladen</h3>
+                  <p>Laden Sie Ihre Verbrauchsdaten für eine präzise Analyse hoch</p>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label">Verbrauchsdaten hochladen *</label>
+                  <div class="upload-section">
+                    <div class="upload-area" :class="{ 'dragover': isDragOver, 'has-file': uploadedFile }" 
+                         @drop="handleFileDrop" 
+                         @dragover.prevent="isDragOver = true" 
+                         @dragleave="isDragOver = false">
+                      <input 
+                        type="file" 
+                        ref="fileInput" 
+                        @change="handleFileSelect" 
+                        accept=".csv,.xlsx,.xls"
+                        style="display: none"
+                      >
+                      
+                      <div v-if="!uploadedFile" class="upload-placeholder">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                        <p>CSV-Datei hier ablegen oder 
+                          <button type="button" @click="$refs.fileInput.click()" class="upload-link">
+                            durchsuchen
+                          </button>
+                        </p>
+                        <div class="upload-hint">
+                          Unterstützte Formate: CSV, Excel (.xlsx, .xls)
+                        </div>
+                      </div>
+                      
+                      <div v-else class="file-info">
+                        <div class="file-details">
+                          <i class="fas fa-file-csv"></i>
+                          <div>
+                            <div class="file-name">{{ uploadedFile.name }}</div>
+                            <div class="file-size">{{ formatFileSize(uploadedFile.size) }}</div>
+                            <div v-if="csvData" class="file-preview">
+                              {{ csvData.length }} Datensätze erkannt
+                              <span v-if="formData.annualKwh"> | {{ formData.annualKwh }} kWh/Jahr</span>
+                            </div>
+                          </div>
+                        </div>
+                        <button type="button" @click="removeFile" class="remove-file">
+                          <i class="fas fa-times"></i>
+                        </button>
+                      </div>
+                    </div>
+                    
+                    <div v-if="fileError" class="file-error">
+                      <i class="fas fa-exclamation-triangle"></i>
+                      {{ fileError }}
+                    </div>
+                    
+                    <div class="form-help">
+                      Upload Ihrer stündlichen/täglichen Verbrauchsdaten für präzisere Tarifempfehlungen. 
+                      <br>Erwartetes Format: Datum, Uhrzeit, Verbrauch (kWh)
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Manual Input Section -->
+              <div v-else class="manual-input-section">
+                <div class="section-header">
+                  <i class="fas fa-edit"></i>
+                  <h3>Verbrauchsdaten eingeben</h3>
+                  <p>Geben Sie Ihre Verbrauchsinformationen manuell ein</p>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label">Jahresverbrauch (kWh) *</label>
+                  <input 
+                    type="number" 
+                    v-model="formData.annualKwh" 
+                    class="form-input"
+                    placeholder="z.B. 3500"
+                    min="1000"
+                    max="20000"
+                    step="100"
+                    required
+                  >
+                  <div class="form-help">
+                    Durchschnittswerte: 1-Person: 2.000 kWh | 2-Personen: 3.500 kWh | 4-Personen: 4.500 kWh
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label">Haushaltstyp</label>
+                  <select v-model="formData.householdType" class="form-select" @change="updateConsumptionFromHousehold">
+                    <option value="">Bitte wählen</option>
+                    <option value="single">1-Person Haushalt</option>
+                    <option value="couple">2-Personen Haushalt</option>
+                    <option value="family-small">3-Personen Haushalt</option>
+                    <option value="family-large">4+ Personen Haushalt</option>
+                  </select>
+                  <div class="form-help">
+                    Automatische Schätzung des Jahresverbrauchs basierend auf Ihrem Haushaltstyp
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label">Hauptverbrauchszeiten</label>
+                  <div class="time-grid">
+                    <label class="time-option">
+                      <input type="checkbox" v-model="formData.morningUsage">
+                      <span class="time-card">
+                        <i class="fas fa-sun"></i>
+                        <div>Morgens (6-10 Uhr)</div>
+                      </span>
+                    </label>
+                    <label class="time-option">
+                      <input type="checkbox" v-model="formData.dayUsage">
+                      <span class="time-card">
+                        <i class="fas fa-sun"></i>
+                        <div>Tags (10-18 Uhr)</div>
+                      </span>
+                    </label>
+                    <label class="time-option">
+                      <input type="checkbox" v-model="formData.eveningUsage">
+                      <span class="time-card">
+                        <i class="fas fa-moon"></i>
+                        <div>Abends (18-22 Uhr)</div>
+                      </span>
+                    </label>
+                    <label class="time-option">
+                      <input type="checkbox" v-model="formData.nightUsage">
+                      <span class="time-card">
+                        <i class="fas fa-moon"></i>
+                        <div>Nachts (22-6 Uhr)</div>
+                      </span>
+                    </label>
+                  </div>
+                  <div class="form-help">
+                    Wählen Sie die Zeiten aus, in denen Sie hauptsächlich Strom verbrauchen
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label">Hauptverbraucher im Haushalt</label>
+                  <div class="appliances-grid">
+                    <label class="appliance-option">
+                      <input type="checkbox" v-model="formData.hasElectricHeating">
+                      <span class="appliance-card">
+                        <i class="fas fa-thermometer-half"></i>
+                        <div>Elektroheizung</div>
+                      </span>
+                    </label>
+                    <label class="appliance-option">
+                      <input type="checkbox" v-model="formData.hasHeatPump">
+                      <span class="appliance-card">
+                        <i class="fas fa-wind"></i>
+                        <div>Wärmepumpe</div>
+                      </span>
+                    </label>
+                    <label class="appliance-option">
+                      <input type="checkbox" v-model="formData.hasElectricCar">
+                      <span class="appliance-card">
+                        <i class="fas fa-car"></i>
+                        <div>E-Auto</div>
+                      </span>
+                    </label>
+                    <label class="appliance-option">
+                      <input type="checkbox" v-model="formData.hasSauna">
+                      <span class="appliance-card">
+                        <i class="fas fa-hot-tub"></i>
+                        <div>Sauna</div>
+                      </span>
+                    </label>
+                    <label class="appliance-option">
+                      <input type="checkbox" v-model="formData.hasPool">
+                      <span class="appliance-card">
+                        <i class="fas fa-swimmer"></i>
+                        <div>Pool/Pumpe</div>
+                      </span>
+                    </label>
+                    <label class="appliance-option">
+                      <input type="checkbox" v-model="formData.hasAirConditioning">
+                      <span class="appliance-card">
+                        <i class="fas fa-snowflake"></i>
+                        <div>Klimaanlage</div>
+                      </span>
+                    </label>
+                  </div>
+                  <div class="form-help">
+                    Große Verbraucher beeinflussen Ihren Stromverbrauch und die Tarifempfehlung
+                  </div>
+                </div>
+              </div>
+
+              <!-- Common fields for manual input only -->
+              <div v-if="!formData.hasSmartMeter">
+                <div class="form-group">
+                  <label class="form-label">Flexibilität Ihres Verbrauchs</label>
+                  <select v-model="formData.flexibility" class="form-select">
+                    <option value="low">Niedrig - Fester Tagesablauf</option>
+                    <option value="medium">Mittel - Teilweise flexibel</option>
+                    <option value="high">Hoch - Sehr flexibel</option>
+                  </select>
+                  <div class="form-help">
+                    Höhere Flexibilität = größere Ersparnisse bei dynamischen Tarifen
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label">Smart Home Ausstattung</label>
+                  <select v-model="formData.smartHome" class="form-select">
+                    <option value="none">Keine Smart Home Geräte</option>
+                    <option value="basic">Grundausstattung (Smart Thermostat, etc.)</option>
+                    <option value="advanced">Erweitert (Home Energy Management)</option>
+                  </select>
+                  <div class="form-help">
+                    Smart Home hilft bei der automatischen Optimierung des Verbrauchs
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label">Postleitzahl</label>
+                  <input 
+                    type="text" 
+                    v-model="formData.zipCode" 
+                    class="form-input"
+                    placeholder="z.B. 80331"
+                    pattern="[0-9]{5}"
+                    maxlength="5"
+                  >
+                  <div class="form-help">
+                    Für regionale Tarifverfügbarkeit (optional)
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label">Aktueller Anbieter (optional)</label>
+                  <input 
+                    type="text" 
+                    v-model="formData.currentProvider" 
+                    class="form-input"
+                    placeholder="z.B. Stadtwerke München"
+                  >
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label">Aktuelle Jahreskosten (€)</label>
+                  <input 
+                    type="number" 
+                    v-model="formData.currentCost" 
+                    class="form-input"
+                    placeholder="z.B. 1200"
+                    step="0.01"
+                    min="0"
+                  >
+                  <div class="form-help">
+                    Für Ersparnis-Berechnung (optional)
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label">Bevorzugte Verbrauchszeiten</label>
+                  <div class="checkbox-group">
+                    <label class="form-checkbox">
+                      <input type="checkbox" v-model="formData.nightUsage">
+                      <span>Hoher Nachtverbrauch (22:00 - 6:00)</span>
+                    </label>
+                  </div>
+                  <div class="checkbox-group">
+                    <label class="form-checkbox">
+                      <input type="checkbox" v-model="formData.weekendUsage">
+                      <span>Hoher Wochenendverbrauch</span>
+                    </label>
+                  </div>
+                  <div class="form-help">
+                    Diese Zeiten haben oft niedrigere Börsenpreise
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label">Preisvolatilität-Toleranz</label>
+                  <select v-model="formData.volatilityTolerance" class="form-select">
+                    <option value="low">Niedrig - Stabilere Preise bevorzugt</option>
+                    <option value="medium">Mittel - Moderate Schwankungen OK</option>
+                    <option value="high">Hoch - Maximale Ersparnisse trotz Schwankungen</option>
+                  </select>
+                  <div class="form-help">
+                    Dynamische Tarife schwanken täglich - wählen Sie Ihre Risikobereitschaft
+                  </div>
+                </div>
+
                 <div class="checkbox-group">
                   <label class="form-checkbox">
-                    <input type="checkbox" v-model="formData.weekendUsage">
-                    <span>Hoher Wochenendverbrauch</span>
+                    <input type="checkbox" v-model="formData.onlyDynamic">
+                    <span>Nur echte dynamische Tarife (stündliche Preisanpassung)</span>
                   </label>
                 </div>
-                <div class="form-help">
-                  Diese Zeiten haben oft niedrigere Börsenpreise
+
+                <div class="checkbox-group">
+                  <label class="form-checkbox">
+                    <input type="checkbox" v-model="formData.appIntegration">
+                    <span>App-Integration für Preisbenachrichtigungen erforderlich</span>
+                  </label>
                 </div>
-              </div>
-
-              <div class="form-group">
-                <label class="form-label">Preisvolatilität-Toleranz</label>
-                <select v-model="formData.volatilityTolerance" class="form-select">
-                  <option value="low">Niedrig - Stabilere Preise bevorzugt</option>
-                  <option value="medium">Mittel - Moderate Schwankungen OK</option>
-                  <option value="high">Hoch - Maximale Ersparnisse trotz Schwankungen</option>
-                </select>
-                <div class="form-help">
-                  Dynamische Tarife schwanken täglich - wählen Sie Ihre Risikobereitschaft
-                </div>
-              </div>
-
-              <div class="checkbox-group">
-                <label class="form-checkbox">
-                  <input type="checkbox" v-model="formData.onlyDynamic">
-                  <span>Nur echte dynamische Tarife (stündliche Preisanpassung)</span>
-                </label>
-              </div>
-
-              <div class="checkbox-group">
-                <label class="form-checkbox">
-                  <input type="checkbox" v-model="formData.appIntegration">
-                  <span>App-Integration für Preisbenachrichtigungen erforderlich</span>
-                </label>
               </div>
 
               <button type="submit" class="btn btn-primary w-full" :disabled="loading">
@@ -159,10 +371,11 @@
             </form>
           </div>
         </div>
+      </div>
 
-        <!-- Results Section -->
-        <div class="results-section">
-          <!-- Loading State -->
+      <!-- Results Section -->
+      <div class="results-section">
+        <!-- Loading State -->
           <div v-if="loading" class="loading">
             <div class="loading-spinner"></div>
             <p>Tarife werden berechnet...</p>
@@ -323,21 +536,6 @@
             </div>
           </div>
 
-          <!-- Initial State -->
-          <div v-else class="initial-state">
-            <div class="initial-content">
-              <i class="fas fa-calculator"></i>
-              <h3>Bereit für den Vergleich?</h3>
-              <p>Geben Sie Ihre Verbrauchsdaten ein und finden Sie den besten Stromtarif.</p>
-              <ul class="benefits">
-                <li><i class="fas fa-check"></i> Aktuelle Marktpreise</li>
-                <li><i class="fas fa-check"></i> Alle Anbieter inklusive</li>
-                <li><i class="fas fa-check"></i> Transparente Kostenaufstellung</li>
-                <li><i class="fas fa-check"></i> Sofortige Ergebnisse</li>
-              </ul>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   </div>
@@ -351,6 +549,7 @@ export default {
   name: 'TariffComparison',
   setup() {
     const formData = ref({
+      hasSmartMeter: false,
       annualKwh: 3500,
       zipCode: '',
       currentProvider: '',
@@ -361,13 +560,30 @@ export default {
       weekendUsage: false,
       volatilityTolerance: 'medium',
       onlyDynamic: true,
-      appIntegration: false
+      appIntegration: false,
+      // Manual input fields
+      householdType: '',
+      morningUsage: false,
+      dayUsage: false,
+      eveningUsage: false,
+      hasElectricHeating: false,
+      hasHeatPump: false,
+      hasElectricCar: false,
+      hasSauna: false,
+      hasPool: false,
+      hasAirConditioning: false
     })
     
     const loading = ref(false)
     const results = ref([])
     const searchPerformed = ref(false)
     const sortBy = ref('annual_cost')
+    
+    // File upload functionality
+    const uploadedFile = ref(null)
+    const csvData = ref(null)
+    const fileError = ref('')
+    const isDragOver = ref(false)
     
     const sortedResults = computed(() => {
       const sorted = [...results.value]
@@ -569,6 +785,139 @@ export default {
       alert(`Tariff Details für "${tariff.name}":\n\nGrundpreis: ${tariff.base_price}€/Monat\nArbeitspreis: ${tariff.kwh_price}€/kWh\nLaufzeit: ${tariff.contract_duration} Monate\nÖkostrom: ${tariff.green_energy ? 'Ja' : 'Nein'}\n\n${tariff.description}`)
     }
     
+    // File upload functions
+    const handleFileSelect = (event) => {
+      const file = event.target.files[0]
+      if (file) {
+        processFile(file)
+      }
+    }
+    
+    const handleFileDrop = (event) => {
+      event.preventDefault()
+      isDragOver.value = false
+      
+      const file = event.dataTransfer.files[0]
+      if (file) {
+        processFile(file)
+      }
+    }
+    
+    const processFile = async (file) => {
+      fileError.value = ''
+      
+      // Validate file type
+      const allowedTypes = ['text/csv', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']
+      const allowedExtensions = ['.csv', '.xlsx', '.xls']
+      
+      const hasValidType = allowedTypes.includes(file.type) || 
+                          allowedExtensions.some(ext => file.name.toLowerCase().endsWith(ext))
+      
+      if (!hasValidType) {
+        fileError.value = 'Bitte wählen Sie eine CSV- oder Excel-Datei (.csv, .xlsx, .xls)'
+        return
+      }
+      
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        fileError.value = 'Die Datei ist zu groß. Maximale Größe: 5MB'
+        return
+      }
+      
+      uploadedFile.value = file
+      
+      try {
+        if (file.name.toLowerCase().endsWith('.csv')) {
+          await parseCSV(file)
+        } else {
+          fileError.value = 'Excel-Dateien werden noch nicht unterstützt. Bitte verwenden Sie CSV-Format.'
+          uploadedFile.value = null
+        }
+      } catch (error) {
+        console.error('Error parsing file:', error)
+        fileError.value = 'Fehler beim Verarbeiten der Datei. Bitte überprüfen Sie das Format.'
+        uploadedFile.value = null
+      }
+    }
+    
+    const parseCSV = (file) => {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        
+        reader.onload = (e) => {
+          try {
+            const text = e.target.result
+            const lines = text.split('\n')
+            const data = []
+            
+            // Skip header row and parse data
+            for (let i = 1; i < lines.length; i++) {
+              const line = lines[i].trim()
+              if (line) {
+                const columns = line.split(',')
+                if (columns.length >= 3) {
+                  data.push({
+                    date: columns[0],
+                    time: columns[1],
+                    consumption: parseFloat(columns[2])
+                  })
+                }
+              }
+            }
+            
+            if (data.length === 0) {
+              fileError.value = 'Keine gültigen Daten in der CSV-Datei gefunden'
+              uploadedFile.value = null
+              reject(new Error('No valid data found'))
+              return
+            }
+            
+            csvData.value = data
+            
+            // Calculate annual consumption from CSV data
+            const totalConsumption = data.reduce((sum, row) => sum + (row.consumption || 0), 0)
+            if (totalConsumption > 0) {
+              formData.value.annualKwh = Math.round(totalConsumption)
+            }
+            
+            resolve(data)
+          } catch (error) {
+            reject(error)
+          }
+        }
+        
+        reader.onerror = () => reject(new Error('File reading error'))
+        reader.readAsText(file)
+      })
+    }
+    
+    const removeFile = () => {
+      uploadedFile.value = null
+      csvData.value = null
+      fileError.value = ''
+    }
+    
+    const formatFileSize = (bytes) => {
+      if (bytes === 0) return '0 Bytes'
+      const k = 1024
+      const sizes = ['Bytes', 'KB', 'MB', 'GB']
+      const i = Math.floor(Math.log(bytes) / Math.log(k))
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+    }
+    
+    const updateConsumptionFromHousehold = () => {
+      const consumptionMap = {
+        'single': 2000,
+        'couple': 3500,
+        'family-small': 4500,
+        'family-large': 5500
+      }
+      
+      if (formData.value.householdType && consumptionMap[formData.value.householdType]) {
+        formData.value.annualKwh = consumptionMap[formData.value.householdType]
+      }
+    }
+    
     // Load URL parameters if any
     onMounted(() => {
       const urlParams = new URLSearchParams(window.location.search)
@@ -585,10 +934,19 @@ export default {
       searchPerformed,
       sortBy,
       sortedResults,
+      uploadedFile,
+      csvData,
+      fileError,
+      isDragOver,
       calculateTariffs,
       sortResults,
       selectTariff,
-      showTariffDetails
+      showTariffDetails,
+      handleFileSelect,
+      handleFileDrop,
+      removeFile,
+      formatFileSize,
+      updateConsumptionFromHousehold
     }
   }
 }
@@ -626,15 +984,22 @@ export default {
 }
 
 .comparison-grid {
-  display: grid;
-  grid-template-columns: 400px 1fr;
-  gap: 2rem;
-  align-items: start;
+  display: flex;
+  flex-direction: column;
+  gap: 3rem;
+  align-items: center;
 }
 
-.calculator-section {
-  position: sticky;
-  top: 100px;
+.calculator-section-full {
+  width: 100%;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.results-section {
+  width: 100%;
+  max-width: 1000px;
+  margin: 0 auto;
 }
 
 .checkbox-group {
@@ -898,14 +1263,339 @@ export default {
   width: 100%;
 }
 
+/* File Upload Styles */
+.upload-section {
+  margin-top: 0.5rem;
+}
+
+.upload-area {
+  border: 2px dashed #d1d5db;
+  border-radius: 8px;
+  padding: 2rem;
+  text-align: center;
+  background: #f9fafb;
+  transition: all 0.2s;
+  cursor: pointer;
+}
+
+.upload-area:hover,
+.upload-area.dragover {
+  border-color: #059669;
+  background: #f0fdf4;
+}
+
+.upload-area.has-file {
+  border-style: solid;
+  border-color: #059669;
+  background: #f0fdf4;
+}
+
+.upload-placeholder i {
+  font-size: 2rem;
+  color: #9ca3af;
+  margin-bottom: 1rem;
+}
+
+.upload-placeholder p {
+  color: #6b7280;
+  margin-bottom: 0.5rem;
+}
+
+.upload-link {
+  color: #059669;
+  text-decoration: underline;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.upload-link:hover {
+  color: #047857;
+}
+
+.upload-hint {
+  font-size: 0.8rem;
+  color: #9ca3af;
+}
+
+.file-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  text-align: left;
+}
+
+.file-details {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.file-details i {
+  font-size: 1.5rem;
+  color: #059669;
+}
+
+.file-name {
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 0.25rem;
+}
+
+.file-size {
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
+.file-preview {
+  font-size: 0.8rem;
+  color: #059669;
+  font-weight: 500;
+}
+
+.remove-file {
+  background: #fee2e2;
+  border: 1px solid #fecaca;
+  color: #dc2626;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.remove-file:hover {
+  background: #fecaca;
+  border-color: #f87171;
+}
+
+.file-error {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #dc2626;
+  background: #fee2e2;
+  border: 1px solid #fecaca;
+  padding: 0.75rem;
+  border-radius: 6px;
+  margin-top: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.file-error i {
+  color: #dc2626;
+}
+
+/* Smart Meter Selection Styles */
+.meter-selection {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.meter-option {
+  cursor: pointer;
+}
+
+.meter-option input[type="radio"] {
+  display: none;
+}
+
+.meter-card {
+  border: 2px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 1.5rem;
+  text-align: center;
+  transition: all 0.2s;
+  background: white;
+}
+
+.meter-option.active .meter-card {
+  border-color: #059669;
+  background: #f0fdf4;
+}
+
+.meter-card i {
+  font-size: 2rem;
+  color: #059669;
+  margin-bottom: 1rem;
+}
+
+.meter-card h4 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 0.5rem;
+}
+
+.meter-card p {
+  color: #6b7280;
+  font-size: 0.9rem;
+  margin-bottom: 1rem;
+}
+
+.meter-benefits {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.meter-benefits span {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.8rem;
+  color: #059669;
+}
+
+.meter-benefits i {
+  font-size: 0.7rem;
+}
+
+/* Section Headers */
+.section-header {
+  text-align: center;
+  margin-bottom: 2rem;
+  padding: 1.5rem;
+  background: #f8fafc;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+}
+
+.section-header i {
+  font-size: 2rem;
+  color: #059669;
+  margin-bottom: 0.5rem;
+}
+
+.section-header h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 0.5rem;
+}
+
+.section-header p {
+  color: #6b7280;
+  font-size: 0.9rem;
+}
+
+/* Time Selection Grid */
+.time-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.time-option {
+  cursor: pointer;
+}
+
+.time-option input[type="checkbox"] {
+  display: none;
+}
+
+.time-card {
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 1rem;
+  text-align: center;
+  transition: all 0.2s;
+  background: white;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.time-option input:checked + .time-card {
+  border-color: #059669;
+  background: #f0fdf4;
+  color: #059669;
+}
+
+.time-card i {
+  font-size: 1.2rem;
+  color: #6b7280;
+}
+
+.time-option input:checked + .time-card i {
+  color: #059669;
+}
+
+.time-card div {
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+/* Appliances Grid */
+.appliances-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.appliance-option {
+  cursor: pointer;
+}
+
+.appliance-option input[type="checkbox"] {
+  display: none;
+}
+
+.appliance-card {
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 1rem;
+  text-align: center;
+  transition: all 0.2s;
+  background: white;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 80px;
+  justify-content: center;
+}
+
+.appliance-option input:checked + .appliance-card {
+  border-color: #059669;
+  background: #f0fdf4;
+  color: #059669;
+}
+
+.appliance-card i {
+  font-size: 1.2rem;
+  color: #6b7280;
+}
+
+.appliance-option input:checked + .appliance-card i {
+  color: #059669;
+}
+
+.appliance-card div {
+  font-size: 0.8rem;
+  font-weight: 500;
+  text-align: center;
+}
+
 @media (max-width: 1024px) {
-  .comparison-grid {
-    grid-template-columns: 1fr;
-    gap: 2rem;
+  .calculator-section-full {
+    max-width: 100%;
+    padding: 0 1rem;
   }
   
-  .calculator-section {
-    position: static;
+  .results-section {
+    max-width: 100%;
+    padding: 0 1rem;
   }
 }
 

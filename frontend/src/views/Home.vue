@@ -100,8 +100,23 @@ export default {
 }
 
 .btn-large {
-  padding: 1rem 2rem;
-  font-size: 1.1rem;
+  padding: 1.5rem 3rem;
+  font-size: 1.3rem;
+  font-weight: 600;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+  border: none;
+  color: white;
+  box-shadow: 0 8px 24px rgba(249, 115, 22, 0.3);
+  transform: translateY(0);
+  transition: all 0.3s ease;
+}
+
+.btn-large:hover {
+  background: linear-gradient(135deg, #ea580c 0%, #dc2626 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 32px rgba(249, 115, 22, 0.4);
+  color: white;
 }
 
 .hero-stats {

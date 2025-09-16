@@ -50,7 +50,9 @@ export default {
 }
 
 .footer-section:last-child {
-  text-align: right;
+  text-align: left;
+  justify-self: end;
+  padding-right: 10rem;
 }
 
 .footer-section .logo {
