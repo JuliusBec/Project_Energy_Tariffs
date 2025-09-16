@@ -32,114 +32,6 @@
       </div>
     </section>
 
-    <!-- Features Section -->
-    <section class="features py-16">
-      <div class="container">
-        <h2 class="text-center text-3xl font-bold mb-8">Warum unsere Vergleichsplattform nutzen?</h2>
-        <div class="grid grid-auto">
-          <div class="feature-card">
-            <div class="feature-icon">
-              <i class="fas fa-search"></i>
-            </div>
-            <h3>Schneller Vergleich</h3>
-            <p>Vergleichen Sie verschiedene Stromtarife schnell und übersichtlich</p>
-          </div>
-          
-          <div class="feature-card">
-            <div class="feature-icon">
-              <i class="fas fa-euro-sign"></i>
-            </div>
-            <h3>Geld sparen</h3>
-            <p>Finden Sie günstigere Tarife und sparen Sie bei Ihren Stromkosten</p>
-          </div>
-          
-          <div class="feature-card">
-            <div class="feature-icon">
-              <i class="fas fa-bolt"></i>
-            </div>
-            <h3>Dynamische Tarife</h3>
-            <p>Speziell optimiert für flexible und dynamische Stromtarife</p>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Quick Calculator -->
-    <section class="quick-calc py-16 bg-gray-50">
-      <div class="container">
-        <div class="quick-calc-content">
-          <div class="quick-calc-info">
-            <h2>Berechnen Sie Ihr Sparpotenzial</h2>
-            <p>Geben Sie Ihren aktuellen Verbrauch ein und sehen Sie, wie viel Sie sparen können.</p>
-            
-            <ul class="benefits-list">
-              <li>
-                <i class="fas fa-check text-emerald-600"></i>
-                Kostenlose Berechnung
-              </li>
-              <li>
-                <i class="fas fa-check text-emerald-600"></i>
-                Keine Verpflichtungen
-              </li>
-              <li>
-                <i class="fas fa-check text-emerald-600"></i>
-                Sofortiges Ergebnis
-              </li>
-            </ul>
-          </div>
-          
-          <div class="card">
-            <div class="card-header">
-              <h3 class="card-title">
-                <i class="fas fa-calculator text-emerald-600"></i>
-                Ihr Sparpotenzial
-              </h3>
-            </div>
-            
-            <form @submit.prevent="calculateSavings">
-              <div class="form-group">
-                <label class="form-label">Jahresverbrauch (kWh)</label>
-                <input 
-                  type="number" 
-                  v-model="quickCalc.annualKwh" 
-                  class="form-input" 
-                  placeholder="z.B. 3500"
-                  min="1"
-                  required
-                >
-              </div>
-              
-              <div class="form-group">
-                <label class="form-label">Aktuelle Jahreskosten (€)</label>
-                <input 
-                  type="number" 
-                  v-model="quickCalc.currentCost" 
-                  class="form-input" 
-                  placeholder="z.B. 1200"
-                  min="1"
-                  step="0.01"
-                  required
-                >
-              </div>
-              
-              <button type="submit" :disabled="calculating" class="btn btn-primary w-full">
-                <span v-if="calculating" class="loading-spinner small"></span>
-                <i v-else class="fas fa-calculator"></i>
-                {{ calculating ? 'Berechne...' : 'Sparpotenzial berechnen' }}
-              </button>
-            </form>
-            
-            <div v-if="savingsResult" class="savings-result">
-              <div class="savings-amount">
-                <span class="amount">{{ savingsResult.savings }}€</span>
-                <span class="label">mögliche Ersparnis pro Jahr</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
     <!-- How it works -->
     <section class="how-it-works py-16">
       <div class="container">
@@ -149,7 +41,7 @@
             <div class="step-number">1</div>
             <div class="step-content">
               <h3>Daten eingeben</h3>
-              <p>Geben Sie Ihren Jahresverbrauch und weitere Details ein</p>
+              <p>Geben Sie Details, wie Ihren Jahresverbrauch, ein oder laden Sie Diesen in einer CSV-Datei hoch.</p>
             </div>
           </div>
           
@@ -175,46 +67,8 @@
 </template>
 
 <script>
-import { ref } from 'vue'
-
 export default {
-  name: 'Home',
-  setup() {
-    const quickCalc = ref({
-      annualKwh: 3500,
-      currentCost: null
-    })
-    
-    const calculating = ref(false)
-    const savingsResult = ref(null)
-    
-    const calculateSavings = async () => {
-      if (!quickCalc.value.currentCost || !quickCalc.value.annualKwh) {
-        return
-      }
-      
-      calculating.value = true
-      
-      // Simulate calculation
-      setTimeout(() => {
-        const estimatedOptimalCost = quickCalc.value.annualKwh * 0.28 + (120 * 12)
-        const savings = Math.max(0, quickCalc.value.currentCost - estimatedOptimalCost)
-        
-        savingsResult.value = {
-          savings: Math.round(savings)
-        }
-        
-        calculating.value = false
-      }, 1000)
-    }
-    
-    return {
-      quickCalc,
-      calculating,
-      savingsResult,
-      calculateSavings
-    }
-  }
+  name: 'Home'
 }
 </script>
 
@@ -277,108 +131,6 @@ export default {
   opacity: 0.8;
 }
 
-.feature-card {
-  text-align: center;
-  padding: 2rem;
-  border-radius: 12px;
-  background: white;
-  border: 1px solid #e5e7eb;
-  transition: all 0.2s;
-}
-
-.feature-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
-}
-
-.feature-icon {
-  width: 64px;
-  height: 64px;
-  background: linear-gradient(135deg, #059669 0%, #047857 100%);
-  border-radius: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin: 0 auto 1rem;
-  color: white;
-  font-size: 1.5rem;
-}
-
-.feature-card h3 {
-  font-size: 1.25rem;
-  font-weight: 600;
-  margin-bottom: 0.5rem;
-  color: #1f2937;
-}
-
-.feature-card p {
-  color: #6b7280;
-  line-height: 1.6;
-}
-
-.quick-calc-content {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 3rem;
-  align-items: center;
-}
-
-.quick-calc-info h2 {
-  font-size: 2.5rem;
-  font-weight: 700;
-  margin-bottom: 1rem;
-  color: #1f2937;
-}
-
-.quick-calc-info p {
-  font-size: 1.1rem;
-  color: #6b7280;
-  margin-bottom: 2rem;
-}
-
-.benefits-list {
-  list-style: none;
-}
-
-.benefits-list li {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  margin-bottom: 0.75rem;
-  font-weight: 500;
-  color: #374151;
-}
-
-.savings-result {
-  background: #f0fdf4;
-  border: 1px solid #bbf7d0;
-  border-radius: 8px;
-  padding: 1.5rem;
-  text-align: center;
-  margin-top: 1rem;
-}
-
-.savings-amount .amount {
-  display: block;
-  font-size: 2rem;
-  font-weight: 700;
-  color: #059669;
-}
-
-.savings-amount .label {
-  color: #065f46;
-  font-size: 0.9rem;
-}
-
-.loading-spinner.small {
-  width: 16px;
-  height: 16px;
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  border-top: 2px solid white;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-}
-
 .steps {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
@@ -421,10 +173,6 @@ export default {
   line-height: 1.6;
 }
 
-.w-full {
-  width: 100%;
-}
-
 @media (max-width: 768px) {
   .hero-content h1 {
     font-size: 2rem;
@@ -438,11 +186,6 @@ export default {
   .hero-stats {
     grid-template-columns: 1fr;
     gap: 1rem;
-  }
-  
-  .quick-calc-content {
-    grid-template-columns: 1fr;
-    gap: 2rem;
   }
   
   .steps {
