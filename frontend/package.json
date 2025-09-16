@@ -1,7 +1,7 @@
 {
-  "name": "energy-tariff-frontend",
+  "name": "dynergy-frontend",
   "version": "1.0.0",
-  "description": "Vue.js frontend for energy tariff comparison",
+  "description": "DYNERGY - Vue.js frontend for dynamic energy tariff comparison",
   "main": "src/main.js",
   "scripts": {
     "dev": "vite",
