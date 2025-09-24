@@ -1,11 +1,7 @@
 import pandas as pd
+import EnergyTariff
 
-print("Hello, World!")
-
-df = pd.DataFrame({
-    'A': [1, 2, 3],
-    'B': [4, 5, 6],
-    'C': [7, 8, 9]
-})
-
-print(df)
+def calculate_tariff_costs(usage_data, tariff: EnergyTariff,):
+    # Example function to calculate costs based on usage data and tariff
+    costs = usage_data * tariff.rate_per_kwh
+    return costs.sum()
