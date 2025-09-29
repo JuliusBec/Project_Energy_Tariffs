@@ -26,7 +26,7 @@ class FixedTariff(EnergyTariff):
     """
 
     def __init__(self, name: str, base_price: float, kwh_rate: float, start_date: datetime, provider: Optional[str] = None, 
-                 min_duration: Optional[int] = None):
+                 min_duration: Optional[int] = None, is_dynamic: bool = False):
         """
         Initialize the fixed tariff with base price and kWh rate.
         """
@@ -49,7 +49,7 @@ class DynamicTariff(EnergyTariff):
     Represents a dynamic energy tariff.
     """
 
-    def __init__(self, name: str, base_price: float, start_date: datetime, provider: Optional[str] = None):
+    def __init__(self, name: str, base_price: float, start_date: datetime, provider: Optional[str] = None, is_dynamic: bool = True):
         """
         Initialize the dynamic tariff with base price and kWh rate.
         """

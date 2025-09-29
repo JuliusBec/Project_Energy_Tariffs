@@ -5,7 +5,6 @@ import pandas as pd
 from datetime import datetime, timedelta
 from prophet import Prophet
 
-user_id = input("Enter user ID for forecasting: ")
 
 def forecast_chronos(df, pipeline=None, context_length=512, forecast_steps=168, 
                          rolling_window_size=62, num_samples=20, use_single_shot=False):
@@ -205,7 +204,7 @@ def calculate_total_weekly_usage(forecast_df):
     weekly_usage = forecast_df.set_index("datetime").resample("W").sum()
     return weekly_usage
 
-def forecast_prophet(df):
+def forecast_prophet(df, days=30):
     df["datetime"] = pd.to_datetime(df["datetime"], format='%m/%d/%y %H:%M')
 
     prophet_df = df.copy()
@@ -224,7 +223,7 @@ def forecast_prophet(df):
 
     prophet_model.fit(prophet_df)
 
-    future = prophet_model.make_future_dataframe(periods=4*24*90, freq='15min')
+    future = prophet_model.make_future_dataframe(periods=24*days, freq='h')
 
     forecast = prophet_model.predict(future)
 
@@ -235,11 +234,4 @@ def forecast_prophet(df):
     forecast['yhat_upper'] = forecast['yhat_upper'].clip(lower=0)
     print(f"Negative values after clipping: yhat={sum(forecast['yhat'] < 0)}, yhat_lower={sum(forecast['yhat_lower'] < 0)}, yhat_upper={sum(forecast['yhat_upper'] < 0)}")
     
-    forecast.to_csv('data/usage_forecasting/user_data_' + str(user_id) + '_forecast_prophet.csv', index=False)
-
-
-df = pd.read_csv('data/usage_forecasting/user_data_' + str(user_id) + '_training.csv')
-
-
-forecast_prophet(df)
-forecast_chronos(df, use_single_shot=True)
+    return forecast
