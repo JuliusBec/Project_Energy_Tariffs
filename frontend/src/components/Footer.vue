@@ -5,9 +5,9 @@
         <div class="footer-section">
           <div class="logo">
             <i class="fas fa-bolt"></i>
-            <span>Stromtarif Vergleich</span>
+            <span>DYNERGY</span>
           </div>
-          <p>Einfach, schnell und kostenlos Stromtarife vergleichen</p>
+          <p>Dynamische Stromtarife intelligent vergleichen</p>
         </div>
         
         <div class="footer-section">
@@ -21,7 +21,7 @@
       </div>
       
       <div class="footer-bottom">
-        <p>&copy; 2025 Stromtarif Vergleich Tool</p>
+        <p>&copy; 2025 DYNERGY</p>
         <p class="version">Version 1.0.0</p>
       </div>
     </div>

@@ -192,17 +192,17 @@
                 
 
                 <div class="form-group">
-                  <label class="form-label">Aktuelle Jahreskosten (€)</label>
+                  <label class="form-label">Aktuelle Monatskosten (€)</label>
                   <input 
                     type="number" 
                     v-model="formData.currentCost" 
                     class="form-input"
-                    placeholder="z.B. 1200"
+                    placeholder="z.B. 100"
                     step="0.01"
                     min="0"
                   >
                   <div class="form-help">
-                    Für Ersparnis-Berechnung
+                    Für Ersparnis-Berechnung (monatliche Stromkosten)
                   </div>
                 </div>
 
@@ -214,7 +214,7 @@
               <button type="submit" class="btn btn-primary w-full" :disabled="loading || formData.hasSmartMeter === null">
                 <span v-if="loading" class="loading-spinner small"></span>
                 <i v-else class="fas fa-chart-line"></i>
-                {{ loading ? 'Analysiere Tarife...' : formData.hasSmartMeter === null ? 'Bitte Smart Meter Auswahl treffen' : 'Dynamische Tarife finden' }}
+                {{ loading ? 'Analysiere Tarife...' : formData.hasSmartMeter === null ? 'Bitte Smart Meter Auswahl treffen' : 'Tarife finden' }}
               </button>
             </form>
           </div>
@@ -235,13 +235,14 @@
               <h3>{{ results.length }} Tarife gefunden</h3>
               <p class="results-summary">
                 Für {{ formData.annualKwh }} kWh Jahresverbrauch
-                <span v-if="formData.currentCost"> | Aktuelle Kosten: {{ formData.currentCost }}€</span>
+                <span v-if="formData.currentCost"> | Aktuelle Kosten: {{ formData.currentCost }}€/Monat</span>
               </p>
               
               <div class="sort-controls">
                 <label>Sortieren nach:</label>
                 <select v-model="sortBy" @change="sortResults" class="form-select">
-                  <option value="annual_cost">Gesamtkosten (niedrig → hoch)</option>
+                  <option value="monthly_cost">Monatskosten (niedrig → hoch)</option>
+                  <option value="annual_cost">Jahreskosten (niedrig → hoch)</option>
                   <option value="kwh_price">kWh-Preis (niedrig → hoch)</option>
                   <option value="base_price">Grundpreis (niedrig → hoch)</option>
                   <option value="green_energy">Ökostrom zuerst</option>
@@ -290,8 +291,8 @@
                   </div>
 
                   <div class="tariff-price">
-                    <div class="annual-cost">{{ tariff.annual_cost }}€</div>
-                    <div class="monthly-cost">{{ tariff.monthly_cost }}€/Monat</div>
+                    <div class="monthly-cost-main">{{ tariff.monthly_cost }}€/Monat</div>
+                    <div class="annual-cost-small">{{ tariff.annual_cost }}€/Jahr</div>
                   </div>
                 </div>
 
@@ -401,7 +402,7 @@
 
 <script>
 import { ref, computed, onMounted } from 'vue'
-import { apiService } from '../services/api'
+// import { apiService } from '../services/api' // Deactivated for frontend-only mode
 
 export default {
   name: 'TariffComparison',
@@ -435,7 +436,7 @@ export default {
     const loading = ref(false)
     const results = ref([])
     const searchPerformed = ref(false)
-    const sortBy = ref('annual_cost')
+    const sortBy = ref('monthly_cost')
     
     // File upload functionality
     const uploadedFile = ref(null)
@@ -447,6 +448,8 @@ export default {
       const sorted = [...results.value]
       
       switch (sortBy.value) {
+        case 'monthly_cost':
+          return sorted.sort((a, b) => a.monthly_cost - b.monthly_cost)
         case 'annual_cost':
           return sorted.sort((a, b) => a.annual_cost - b.annual_cost)
         case 'kwh_price':
@@ -457,7 +460,7 @@ export default {
           return sorted.sort((a, b) => {
             if (a.green_energy && !b.green_energy) return -1
             if (!a.green_energy && b.green_energy) return 1
-            return a.annual_cost - b.annual_cost
+            return a.monthly_cost - b.monthly_cost
           })
         default:
           return sorted
@@ -469,29 +472,11 @@ export default {
       searchPerformed.value = true
       
       try {
-        const response = await apiService.calculateTariffs({
-          annual_kwh: formData.value.annualKwh,
-          zip_code: formData.value.zipCode,
-          green_only: formData.value.greenEnergyOnly,
-          max_price: formData.value.maxPrice,
-          short_term_only: formData.value.shortTermOnly
-        })
-        
-        results.value = response.data.results.map(tariff => ({
-          ...tariff,
-          savings_vs_current: formData.value.currentCost ? 
-            Math.max(0, formData.value.currentCost - tariff.annual_cost) : 0
-        }))
-        
-        // Filter by contract duration if needed
-        if (formData.value.shortTermOnly) {
-          results.value = results.value.filter(t => t.contract_duration <= 12)
-        }
+        // Using mock data instead of API calls for frontend-only mode
+        generateMockTariffs()
         
       } catch (error) {
-        console.error('Error calculating tariffs:', error)
-        // Generate mock data if API fails
-        generateMockTariffs()
+        console.error('Error generating tariffs:', error)
       } finally {
         loading.value = false
       }
@@ -611,9 +596,7 @@ export default {
       // Filter based on user preferences
       let filteredTariffs = enbwTariffs
       
-      if (formData.value.onlyDynamic) {
-        filteredTariffs = filteredTariffs.filter(t => t.is_dynamic)
-      }
+      // Removed onlyDynamic filter to show all tariffs
       
       if (formData.value.appIntegration) {
         filteredTariffs = filteredTariffs.filter(t => t.app_available)
@@ -665,7 +648,7 @@ export default {
           monthly_cost: Math.round(monthly_cost * 100) / 100,
           potential_savings: Math.round((baseAnnualCost - optimizedAnnualCost) * 100) / 100,
           savings_vs_current: formData.value.currentCost ? 
-            Math.max(0, formData.value.currentCost - optimizedAnnualCost) : 0,
+            Math.max(0, (formData.value.currentCost * 12) - optimizedAnnualCost) : 0,
           optimization_score: Math.round((1 - dynamicSavingsFactor) * 100)
         }
       })
@@ -1040,6 +1023,18 @@ export default {
 
 .tariff-price {
   text-align: right;
+}
+
+.monthly-cost-main {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1f2937;
+  margin-bottom: 0.25rem;
+}
+
+.annual-cost-small {
+  color: #6b7280;
+  font-size: 0.9rem;
 }
 
 .annual-cost {

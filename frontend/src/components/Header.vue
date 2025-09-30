@@ -4,7 +4,7 @@
       <div class="header-content">
         <router-link to="/" class="logo">
           <i class="fas fa-bolt"></i>
-          <span>Stromtarif Vergleich</span>
+          <span>DYNERGY</span> <!-- Updated brand name -->
         </router-link>
         
         <nav class="nav">
