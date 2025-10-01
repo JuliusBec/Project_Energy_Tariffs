@@ -40,7 +40,7 @@ class FixedTariff(EnergyTariff):
         
         total_base_price = self.base_price * self.min_duration if self.min_duration else 0
 
-        total_energy_cost = self.kwh_rate * consumption_data['Wert'].sum() * 0.25  # Assuming 'Wert' is in kW and we convert to kWh for 15-minute intervals
+        total_energy_cost = self.kwh_rate * consumption_data['value'].sum() * 0.25  # Assuming 'value' is in kW and we convert to kWh for 15-minute intervals
 
         return total_base_price + total_energy_cost
 
@@ -73,11 +73,11 @@ class DynamicTariff(EnergyTariff):
         if last_year in consumption_data.index:
             # If data from the same time last year is available, use it
             last_year_data = consumption_data.loc[last_year : end_of_month]
-            return sum(last_year_data['Wert']) * 0.25
+            return sum(last_year_data['value']) * 0.25
         else:
             # If not, use recent trends to calculate expected energy usage
             last_month_data = consumption_data.loc[consumption_data.index[-(30*24*4)]:]
-            return sum(last_month_data['Wert']) * 0.25
+            return sum(last_month_data['value']) * 0.25
 
     def calculate_cost(self, consumption_data: pd.DataFrame, price_data: pd.DataFrame) -> float:
         """
@@ -91,7 +91,7 @@ dynamic_test_tariff = DynamicTariff(name="Dynamic Test Tariff", base_price=15.0,
 fixed_test_tariff = FixedTariff(name="Fixed Test Tariff", base_price=10.0, kwh_rate=0.3, min_duration=12, start_date=datetime.today())
 
 # Only load the first two columns of the Excel file
-user_data = pd.read_csv("data/single_user_data.csv")
+user_data = pd.read_csv("data/household_data/synthetic_1_person_household.csv")
 
 dynamic_test_tariff.calculate_energy_consumption(user_data)
 
