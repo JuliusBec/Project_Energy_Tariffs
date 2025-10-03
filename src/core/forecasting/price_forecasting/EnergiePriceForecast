@@ -267,47 +267,53 @@ def plot_forecast_analysis(model: Prophet, forecast: pd.DataFrame, actual_data: 
         # Create figure with multiple subplots
         fig = plt.figure(figsize=(20, 16))  # Larger figure for more detail
     
-    # Plot 1: Actual vs Predicted with confidence intervals
-    ax1 = plt.subplot(3, 1, 1)
-    ax1.plot(actual_data['ds'], actual_data['price_eur_per_mwh'], 
-             label='Actual', color='blue', alpha=0.5)
-    ax1.plot(forecast['ds'], forecast['yhat'], 
-             label='Forecast', color='red', linestyle='--')
-    ax1.fill_between(forecast['ds'], forecast['yhat_lower'], forecast['yhat_upper'],
-                     color='red', alpha=0.1, label='95% Confidence Interval')
-    ax1.set_title('Energy Price Forecast with Confidence Intervals')
-    ax1.set_xlabel('Date')
-    ax1.set_ylabel('Price (EUR/MWh)')
-    ax1.legend()
-    
-    # Plot 2: Components
-    if 'trend' in forecast.columns:
-        ax2 = plt.subplot(3, 1, 2)
-        ax2.plot(forecast['ds'], forecast['trend'], label='Trend')
-        if 'weekly' in forecast.columns:
-            ax2.plot(forecast['ds'], forecast['weekly'], label='Weekly Pattern')
-        if 'daily' in forecast.columns:
-            ax2.plot(forecast['ds'], forecast['daily'], label='Daily Pattern')
-        ax2.set_title('Forecast Components')
-        ax2.set_xlabel('Date')
-        ax2.set_ylabel('Effect on Price')
-        ax2.legend()
-    
-    # Plot 3: Error Analysis (for historical data only)
-    historical_forecast = forecast[forecast['ds'].isin(actual_data['ds'])]
-    historical_actual = actual_data[actual_data['ds'].isin(historical_forecast['ds'])]
-    
-    errors = historical_actual['price_eur_per_mwh'].values - historical_forecast['yhat'].values
-    
-    ax3 = plt.subplot(3, 1, 3)
-    ax3.hist(errors, bins=50, edgecolor='black')
-    ax3.set_title('Forecast Error Distribution')
-    ax3.set_xlabel('Error (EUR/MWh)')
-    ax3.set_ylabel('Frequency')
-    
-    plt.tight_layout()
-    plt.savefig('forecast_analysis.png', dpi=300, bbox_inches='tight')
-    plt.close()
+        # Plot 1: Actual vs Predicted with confidence intervals
+        ax1 = plt.subplot(3, 1, 1)
+        ax1.plot(actual_data['ds'], actual_data['price_eur_per_mwh'], 
+                 label='Actual', color='blue', alpha=0.5)
+        ax1.plot(forecast['ds'], forecast['yhat'], 
+                 label='Forecast', color='red', linestyle='--')
+        ax1.fill_between(forecast['ds'], forecast['yhat_lower'], forecast['yhat_upper'],
+                         color='red', alpha=0.1, label='95% Confidence Interval')
+        ax1.set_title('Energy Price Forecast with Confidence Intervals')
+        ax1.set_xlabel('Date')
+        ax1.set_ylabel('Price (EUR/MWh)')
+        ax1.legend()
+        
+        # Plot 2: Components
+        if 'trend' in forecast.columns:
+            ax2 = plt.subplot(3, 1, 2)
+            ax2.plot(forecast['ds'], forecast['trend'], label='Trend')
+            if 'weekly' in forecast.columns:
+                ax2.plot(forecast['ds'], forecast['weekly'], label='Weekly Pattern')
+            if 'daily' in forecast.columns:
+                ax2.plot(forecast['ds'], forecast['daily'], label='Daily Pattern')
+            ax2.set_title('Forecast Components')
+            ax2.set_xlabel('Date')
+            ax2.set_ylabel('Effect on Price')
+            ax2.legend()
+        
+        # Plot 3: Error Analysis (for historical data only)
+        historical_forecast = forecast[forecast['ds'].isin(actual_data['ds'])]
+        historical_actual = actual_data[actual_data['ds'].isin(historical_forecast['ds'])]
+        
+        errors = historical_actual['price_eur_per_mwh'].values - historical_forecast['yhat'].values
+        
+        ax3 = plt.subplot(3, 1, 3)
+        ax3.hist(errors, bins=50, edgecolor='black')
+        ax3.set_title('Forecast Error Distribution')
+        ax3.set_xlabel('Error (EUR/MWh)')
+        ax3.set_ylabel('Frequency')
+        
+        plt.tight_layout()
+        plt.savefig('forecast_analysis.png', dpi=300, bbox_inches='tight')
+        plt.close()
+        
+        logging.info("Forecast analysis plots created successfully")
+        
+    except Exception as e:
+        logging.error(f"Error creating forecast analysis plots: {str(e)}")
+        raise
 
 def calculate_required_chunks(target_days):
     """
