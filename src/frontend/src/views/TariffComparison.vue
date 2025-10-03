@@ -65,6 +65,7 @@
                       <input 
                         type="file" 
                         ref="fileInput" 
+                        id="csv-file-input"
                         @change="handleFileSelect" 
                         accept=".csv"
                         style="display: none"
@@ -120,6 +121,7 @@
                   <input 
                     type="number" 
                     v-model="formData.annualKwh" 
+                    id="annual-consumption"
                     class="form-input"
                     placeholder="z.B. 3500"
                     min="1000"
@@ -134,7 +136,7 @@
 
                 <div class="form-group">
                   <label class="form-label">Haushaltstyp</label>
-                  <select v-model="formData.householdType" class="form-select" @change="updateConsumptionFromHousehold">
+                  <select v-model="formData.householdType" id="household-size" class="form-select" @change="updateConsumptionFromHousehold">
                     <option value="">Bitte wählen</option>
                     <option value="single">1-Person Haushalt</option>
                     <option value="couple">2-Personen Haushalt</option>
@@ -211,7 +213,7 @@
 
               </div>
 
-              <button type="submit" class="btn btn-primary w-full" :disabled="loading || formData.hasSmartMeter === null">
+              <button type="submit" id="csv-upload-btn" class="btn btn-primary w-full" :disabled="loading || formData.hasSmartMeter === null">
                 <span v-if="loading" class="loading-spinner small"></span>
                 <i v-else class="fas fa-chart-line"></i>
                 {{ loading ? 'Analysiere Tarife...' : formData.hasSmartMeter === null ? 'Bitte Smart Meter Auswahl treffen' : 'Tarife finden' }}
@@ -223,6 +225,12 @@
 
       <!-- Results Section -->
       <div class="results-section">
+        <!-- Results Container for API responses -->
+        <div id="results-container"></div>
+        
+        <!-- Error Container for API errors -->
+        <div id="error-container"></div>
+        
         <!-- Loading State -->
           <div v-if="loading" class="loading">
             <div class="loading-spinner"></div>
@@ -472,13 +480,140 @@ export default {
       searchPerformed.value = true
       
       try {
-        // Using mock data instead of API calls for frontend-only mode
-        generateMockTariffs()
+        // Clear previous API results
+        const resultsContainer = document.getElementById('results-container')
+        const errorContainer = document.getElementById('error-container')
+        if (resultsContainer) resultsContainer.innerHTML = ''
+        if (errorContainer) errorContainer.innerHTML = ''
+        
+        if (formData.value.hasSmartMeter && uploadedFile.value) {
+          // Call API for CSV upload
+          await handleCSVUpload(uploadedFile.value, parseInt(formData.value.householdType) || 2)
+        } else if (!formData.value.hasSmartMeter) {
+          // Call API for basic calculation
+          const userData = {
+            household_size: parseInt(formData.value.householdType) || 2,
+            annual_consumption: formData.value.annualKwh,
+            has_smart_meter: false
+          }
+          await calculateBasic(userData)
+        } else {
+          // Fallback to mock data if no API integration
+          generateMockTariffs()
+        }
         
       } catch (error) {
-        console.error('Error generating tariffs:', error)
+        console.error('Error calculating tariffs:', error)
+        showError(`Error calculating tariffs: ${error.message}`)
       } finally {
         loading.value = false
+      }
+    }
+    
+    // API Functions
+    const API_BASE_URL = 'http://localhost:8000'
+    
+    const handleCSVUpload = async (file, householdSize = 2) => {
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('household_size', householdSize)
+
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/calculate-with-csv`, {
+          method: 'POST',
+          body: formData
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json()
+          throw new Error(errorData.detail || 'Upload failed')
+        }
+
+        const data = await response.json()
+        displayAPIResults(data.results, 'CSV Data')
+        return data
+      } catch (error) {
+        console.error('Error uploading CSV:', error)
+        showError(`Error processing file: ${error.message}`)
+        throw error
+      }
+    }
+
+    const calculateBasic = async (userData) => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/calculate-basic`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(userData)
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json()
+          throw new Error(errorData.detail || 'Calculation failed')
+        }
+
+        const data = await response.json()
+        displayAPIResults(data.results, 'Estimated Data')
+        return data
+      } catch (error) {
+        console.error('Error calculating basic:', error)
+        showError(`Error calculating costs: ${error.message}`)
+        throw error
+      }
+    }
+
+    const displayAPIResults = (results, dataSource) => {
+      const resultsContainer = document.getElementById('results-container')
+      
+      if (!resultsContainer) {
+        console.error('Results container not found')
+        return
+      }
+
+      // Clear previous results
+      resultsContainer.innerHTML = ''
+
+      // Create results HTML
+      const resultsHTML = `
+        <div class="results-section">
+          <h3>Tariff Comparison Results (${dataSource})</h3>
+          <div class="tariff-grid">
+            ${results.map(tariff => `
+              <div class="tariff-card ${tariff.tariff_type}">
+                <h4>${tariff.tariff_name}</h4>
+                <p class="tariff-type">${tariff.tariff_type.toUpperCase()}</p>
+                <div class="cost-info">
+                  <p><strong>Monthly Cost:</strong> €${tariff.monthly_cost.toFixed(2)}</p>
+                  <p><strong>Annual Cost:</strong> €${tariff.annual_cost.toFixed(2)}</p>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `
+
+      resultsContainer.innerHTML = resultsHTML
+    }
+
+    const showError = (message) => {
+      const errorContainer = document.getElementById('error-container') || 
+                            document.createElement('div')
+      
+      errorContainer.id = 'error-container'
+      errorContainer.className = 'error-message'
+      errorContainer.innerHTML = `
+        <div class="alert alert-error">
+          <span class="close-btn" onclick="this.parentElement.parentElement.style.display='none'">&times;</span>
+          ${message}
+        </div>
+      `
+      
+      // Insert at the top of the results section
+      const resultsSection = document.querySelector('.results-section')
+      if (resultsSection) {
+        resultsSection.insertBefore(errorContainer, resultsSection.firstChild)
       }
     }
     
@@ -1664,5 +1799,49 @@ export default {
 .btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+/* API Results Styles */
+.tariff-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.tariff-card.fixed {
+  border-color: #2196F3;
+}
+
+.tariff-card.dynamic {
+  border-color: #FF9800;
+}
+
+.cost-info {
+  margin-top: 1rem;
+}
+
+.error-message {
+  margin: 1rem 0;
+}
+
+.alert {
+  padding: 1rem;
+  border-radius: 4px;
+  position: relative;
+}
+
+.alert-error {
+  background-color: #ffebee;
+  border: 1px solid #f44336;
+  color: #c62828;
+}
+
+.close-btn {
+  position: absolute;
+  top: 0.5rem;
+  right: 1rem;
+  cursor: pointer;
+  font-size: 1.2rem;
 }
 </style>

@@ -11,5 +11,74 @@
   <body>
     <div id="app"></div>
     <script type="module" src="/src/main.js"></script>
+    <script src="js/api.js"></script>
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+    
+    // CSV Upload Handler
+    const csvUploadBtn = document.getElementById('csv-upload-btn');
+    const csvFileInput = document.getElementById('csv-file-input');
+    const householdSizeSelect = document.getElementById('household-size');
+
+    if (csvUploadBtn && csvFileInput) {
+        csvUploadBtn.addEventListener('click', function() {
+            const file = csvFileInput.files[0];
+            
+            if (!file) {
+                showError('Please select a CSV file first');
+                return;
+            }
+
+            if (!file.name.endsWith('.csv')) {
+                showError('Please upload a CSV file');
+                return;
+            }
+
+            const householdSize = householdSizeSelect ? parseInt(householdSizeSelect.value) : 2;
+            
+            // Show loading state
+            csvUploadBtn.textContent = 'Processing...';
+            csvUploadBtn.disabled = true;
+
+            handleCSVUpload(file, householdSize)
+                .finally(() => {
+                    csvUploadBtn.textContent = 'Calculate with CSV';
+                    csvUploadBtn.disabled = false;
+                });
+        });
+    }
+
+    // Basic Calculation Handler (for users without smart meters)
+    const basicCalculateBtn = document.getElementById('basic-calculate-btn');
+    const basicHouseholdSize = document.getElementById('basic-household-size');
+    const annualConsumption = document.getElementById('annual-consumption');
+
+    if (basicCalculateBtn) {
+        basicCalculateBtn.addEventListener('click', function() {
+            const userData = {
+                household_size: parseInt(basicHouseholdSize.value) || 2,
+                annual_consumption: annualConsumption ? parseFloat(annualConsumption.value) : null,
+                has_smart_meter: false
+            };
+
+            // Show loading state
+            basicCalculateBtn.textContent = 'Calculating...';
+            basicCalculateBtn.disabled = true;
+
+            calculateBasic(userData)
+                .finally(() => {
+                    basicCalculateBtn.textContent = 'Calculate Costs';
+                    basicCalculateBtn.disabled = false;
+                });
+        });
+    }
+
+    // Load available tariffs on page load
+    getAvailableTariffs().then(tariffs => {
+        console.log('Available tariffs:', tariffs);
+    });
+});
+</script>
+    
   </body>
 </html>
