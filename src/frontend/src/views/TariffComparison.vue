@@ -138,10 +138,9 @@
                   <label class="form-label">Haushaltstyp</label>
                   <select v-model="formData.householdType" id="household-size" class="form-select" @change="updateConsumptionFromHousehold">
                     <option value="">Bitte wählen</option>
-                    <option value="single">1-Person Haushalt</option>
-                    <option value="couple">2-Personen Haushalt</option>
-                    <option value="family-small">3-Personen Haushalt</option>
-                    <option value="family-large">4+ Personen Haushalt</option>
+                    <option value="1">1-Person Haushalt</option>
+                    <option value="2">2-Personen Haushalt</option>
+                    <option value="3">3+ Personen Haushalt</option>
                   </select>
                   <div class="form-help">
                     Automatische Schätzung des Jahresverbrauchs basierend auf Ihrem Haushaltstyp
@@ -476,6 +475,11 @@ export default {
     })
     
     const calculateTariffs = async () => {
+      console.log('calculateTariffs called')
+      console.log('formData.value:', formData.value)
+      console.log('hasSmartMeter:', formData.value.hasSmartMeter)
+      console.log('uploadedFile:', uploadedFile.value)
+      
       loading.value = true
       searchPerformed.value = true
       
@@ -487,17 +491,23 @@ export default {
         if (errorContainer) errorContainer.innerHTML = ''
         
         if (formData.value.hasSmartMeter && uploadedFile.value) {
+          console.log('Calling CSV upload API')
+          const householdSize = parseInt(formData.value.householdType) || 2
+          console.log('CSV upload - household size:', householdSize)
           // Call API for CSV upload
-          await handleCSVUpload(uploadedFile.value, parseInt(formData.value.householdType) || 2)
+          await handleCSVUpload(uploadedFile.value, householdSize)
         } else if (!formData.value.hasSmartMeter) {
+          console.log('Calling basic calculation API')
           // Call API for basic calculation
           const userData = {
             household_size: parseInt(formData.value.householdType) || 2,
             annual_consumption: formData.value.annualKwh,
             has_smart_meter: false
           }
+          console.log('userData:', userData)
           await calculateBasic(userData)
         } else {
+          console.log('Falling back to mock data')
           // Fallback to mock data if no API integration
           generateMockTariffs()
         }
@@ -540,7 +550,9 @@ export default {
     }
 
     const calculateBasic = async (userData) => {
+      console.log('calculateBasic called with:', userData)
       try {
+        console.log('Making fetch request to:', `${API_BASE_URL}/api/calculate-basic`)
         const response = await fetch(`${API_BASE_URL}/api/calculate-basic`, {
           method: 'POST',
           headers: {
@@ -549,12 +561,18 @@ export default {
           body: JSON.stringify(userData)
         })
 
+        console.log('Response received:', response)
+        console.log('Response status:', response.status)
+        console.log('Response ok:', response.ok)
+
         if (!response.ok) {
           const errorData = await response.json()
+          console.error('API Error Response:', errorData)
           throw new Error(errorData.detail || 'Calculation failed')
         }
 
         const data = await response.json()
+        console.log('Success! API Response data:', data)
         displayAPIResults(data.results, 'Estimated Data')
         return data
       } catch (error) {

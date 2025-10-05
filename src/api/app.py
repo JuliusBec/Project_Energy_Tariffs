@@ -1,4 +1,4 @@
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, HTTPException, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
@@ -17,7 +17,7 @@ app = FastAPI(title="DYNERGY API", description="Backend for Dynamic Energy Tarif
 # CORS middleware to allow frontend requests
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["*"],  # Allow all origins for development
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -103,7 +103,7 @@ async def root():
 @app.post("/api/calculate-with-csv")
 async def calculate_with_csv(
     file: UploadFile = File(...),
-    household_size: int = 2
+    household_size: int = Form(2)  # Use Form() to properly handle form data
 ):
     """
     For users WITH smart meters - they upload their CSV data
@@ -173,21 +173,28 @@ async def calculate_basic(user_data: BasicUserData):
         tariffs = create_enbw_tariffs()
         results = []
         
+        print(f"Created {len(tariffs)} tariffs")
+        
         for tariff in tariffs:
+            print(f"Processing tariff: {tariff.name}, is_dynamic: {tariff.is_dynamic}")
             try:
-                # For basic users, we only calculate fixed tariffs using synthetic data
-                if not tariff.is_dynamic:
-                    # Fixed tariffs handle household_size internally through synthetic data
-                    cost = tariff.calculate_cost(None)
-                    
-                    results.append(TariffCalculationResponse(
-                        tariff_name=tariff.name,
-                        monthly_cost=cost,
-                        annual_cost=cost * 12,
-                        tariff_type="fixed" if not tariff.is_dynamic else "dynamic"
-                    ))
+                print(f"Calculating cost for tariff: {tariff.name}")
+                # Calculate cost for both fixed and dynamic tariffs
+                cost = tariff.calculate_cost(user_data.annual_consumption or 3500)
+                
+                print(f"Cost calculated: {cost}")
+                
+                results.append(TariffCalculationResponse(
+                    tariff_name=tariff.name,
+                    monthly_cost=cost,
+                    annual_cost=cost * 12,
+                    tariff_type="fixed" if not tariff.is_dynamic else "dynamic"
+                ))
             except Exception as e:
+                print(f"Error calculating cost for {tariff.name}: {str(e)}")
                 continue
+        
+        print(f"Final results: {len(results)} tariffs calculated")
         
         return {
             "results": results, 

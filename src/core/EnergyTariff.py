@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
-from datetime import datetime, time  
+from datetime import datetime, time, timedelta
 from typing import Optional
 import pandas as pd
-import forecasting.usage_forecasting.UsageForecaster as UsageForecaster
+from .forecasting.usage_forecasting.UsageForecaster import forecast_prophet
 
 class EnergyTariff(ABC):
     """
@@ -36,22 +36,40 @@ class FixedTariff(EnergyTariff):
         super().__init__(name=name, base_price=base_price, is_dynamic=False, start_date=start_date,
                          kwh_rate=kwh_rate, provider=provider, min_duration=min_duration)
 
-    def calculate_cost(self, consumption_data: Optional[pd.DataFrame]) -> float:
+    def calculate_cost(self, data) -> float:
         """
         Calculate the total cost for a given consumption in kWh.
         """
         
         # load consumption data if provided, else use default synthetic data
-        if consumption_data is not None:
+        if isinstance(data, pd.DataFrame):
+            # Process uploaded consumption data
+            consumption_data = data.copy()
             consumption_data['datetime'] = pd.to_datetime(consumption_data['datetime'])
             consumption_data = consumption_data.resample('H', on='datetime').sum().reset_index()
-            future_consumption = UsageForecaster.forecast_prophet(consumption_data)
-        else:
-            consumption_data = pd.read_csv("data/household_data/synthetic_1_person_household.csv")
+            future_consumption = forecast_prophet(consumption_data)
+        elif isinstance(data, (int, float)):
+            # load synthetic data
+            yearly_usage = data
+            consumption_data = pd.read_csv("data/household_data/synthetic_household.csv")
             consumption_data['datetime'] = pd.to_datetime(consumption_data['datetime'])
+            current_yearly_usage = consumption_data['value'].sum()
+            adjustment_factor = yearly_usage / current_yearly_usage if current_yearly_usage > 0 else 1
+            consumption_data['value'] = consumption_data['value'] * adjustment_factor
+            
             future_consumption = slice_seasonal_data(consumption_data, self.start_date, days=30)
-
-        total_cost = future_consumption['yhat'].sum() * self.kwh_rate + self.base_price
+        else:
+            raise ValueError("Input data must be a pandas DataFrame or a numeric yearly usage value.")
+            
+        # For fixed tariffs, we use 'value' column (from slice_seasonal_data) or 'yhat' column (from Prophet forecast)
+        if 'yhat' in future_consumption.columns:
+            total_consumption = future_consumption['yhat'].sum()
+        elif 'value' in future_consumption.columns:
+            total_consumption = future_consumption['value'].sum()
+        else:
+            raise ValueError("Expected 'yhat' or 'value' column in consumption data")
+            
+        total_cost = total_consumption * self.kwh_rate + self.base_price
         
         return total_cost
 
@@ -66,20 +84,30 @@ class DynamicTariff(EnergyTariff):
         """
         super().__init__(name, base_price=base_price, start_date=start_date, provider=provider, is_dynamic=True)
 
-    def calculate_cost(self, consumption_data: Optional[pd.DataFrame]) -> float:
+    def calculate_cost(self, data) -> float:
         """
         Calculate the total cost for a given consumption in kWh.
         """
         # load consumption data if provided, else use default synthetic data
-        if consumption_data is not None:
+        if isinstance(data, pd.DataFrame):
+            # Process uploaded consumption data
+            consumption_data = data.copy()
             consumption_data['datetime'] = pd.to_datetime(consumption_data['datetime'])
             consumption_data = consumption_data.resample('H', on='datetime').sum().reset_index()
-            future_consumption = UsageForecaster.forecast_prophet(consumption_data)
-        else:
-            consumption_data = pd.read_csv("data/household_data/synthetic_1_person_household.csv")
+            future_consumption = forecast_prophet(consumption_data)
+        elif isinstance(data, (int, float)):
+            # load synthetic data
+            yearly_usage = data
+            consumption_data = pd.read_csv("data/household_data/synthetic_household.csv")
             consumption_data['datetime'] = pd.to_datetime(consumption_data['datetime'])
+            current_yearly_usage = consumption_data['value'].sum()
+            adjustment_factor = yearly_usage / current_yearly_usage if current_yearly_usage > 0 else 1
+            consumption_data['value'] = consumption_data['value'] * adjustment_factor
+            
             future_consumption = slice_seasonal_data(consumption_data, self.start_date, days=30)
-
+        else:
+            raise ValueError("Input data must be a pandas DataFrame or a numeric yearly usage value.")
+        
         # load price data
         future_prices = pd.read_csv("data/forecast_90days.csv")
         future_prices['datetime'] = pd.to_datetime(future_prices['datetime'])
@@ -87,8 +115,15 @@ class DynamicTariff(EnergyTariff):
         # merge consumption and price data
         future_data = future_consumption.merge(future_prices, on='datetime', how='left')
         
-        # calculate total cost
-        total_cost = future_data.apply(lambda row: row['yhat'] * row['price_per_kwh'], axis=1).sum() + self.base_price
+        # calculate total cost - handle both 'yhat' and 'value' columns
+        if 'yhat' in future_data.columns:
+            consumption_column = 'yhat'
+        elif 'value' in future_data.columns:
+            consumption_column = 'value'
+        else:
+            raise ValueError("Expected 'yhat' or 'value' column in consumption data")
+            
+        total_cost = future_data.apply(lambda row: row[consumption_column] * row['predicted_mean'], axis=1).sum() + self.base_price
         
         return total_cost
 
@@ -121,7 +156,7 @@ def slice_seasonal_data(df: pd.DataFrame, start_date: datetime, days: int = 30) 
             result_data.append(day_data[['datetime', 'value']])
         
         # Move to next day
-        current_date += datetime.timedelta(days=1)
+        current_date += timedelta(days=1)
     
     if result_data:
         return pd.concat(result_data, ignore_index=True)
