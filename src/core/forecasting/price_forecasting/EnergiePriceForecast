@@ -10,7 +10,40 @@ import argparse
 import json
 import logging
 import os
+import subprocess
+import sys
 from datetime import datetime, timedelta
+
+def check_and_install_requirements():
+    """Check and install required packages if they're missing"""
+    required_packages = {
+        'pandas': '2.1.3',
+        'matplotlib': '3.9.2',
+        'numpy': '1.26.4',
+        'prophet': '1.1.4',
+        'requests': '2.32.5',
+        'seaborn': '0.13.2'
+    }
+    
+    missing_packages = []
+    
+    for package, version in required_packages.items():
+        try:
+            __import__(package)
+        except ImportError:
+            missing_packages.append(f"{package}=={version}")
+    
+    if missing_packages:
+        print("Installing missing packages...")
+        subprocess.check_call([sys.executable, "-m", "pip", "install"] + missing_packages)
+        print("Required packages installed successfully!")
+        print("Please restart the script for the changes to take effect.")
+        sys.exit(0)
+
+# Check and install requirements before importing
+check_and_install_requirements()
+
+# Now import the required packages
 import pandas as pd
 import requests
 import numpy as np
@@ -229,14 +262,7 @@ def make_future_and_predict(model: Prophet,
             include_history=True
         )
         
-        # Add timezone information
-        future["ds"] = future["ds"].dt.tz_localize(
-            tz,
-            nonexistent="shift_forward",
-            ambiguous="NaT"
-        )
-        
-        # Make predictions
+        # Make predictions (Prophet doesn't support timezones)
         forecast = model.predict(future)
         
         if return_components:
@@ -258,11 +284,11 @@ def plot_forecast_analysis(model: Prophet, forecast: pd.DataFrame, actual_data: 
     """Create detailed forecast analysis plots with long-term trend analysis"""
     try:
         logging.info("Creating forecast analysis plots...")
-        plt.style.use('seaborn')
+        plt.style.use('default')  # Using default style instead of seaborn
         
-        # Create output directory if it doesn't exist
-        output_dir = os.path.join(os.getcwd(), 'output')
-        os.makedirs(output_dir, exist_ok=True)
+        # Create figures directory if it doesn't exist
+        figures_dir = '/workspaces/Project_Energy_Tariffs/figures'
+        os.makedirs(figures_dir, exist_ok=True)
         
         # Create figure with multiple subplots
         fig = plt.figure(figsize=(20, 16))  # Larger figure for more detail
@@ -294,10 +320,16 @@ def plot_forecast_analysis(model: Prophet, forecast: pd.DataFrame, actual_data: 
             ax2.legend()
         
         # Plot 3: Error Analysis (for historical data only)
-        historical_forecast = forecast[forecast['ds'].isin(actual_data['ds'])]
-        historical_actual = actual_data[actual_data['ds'].isin(historical_forecast['ds'])]
+        # Get overlapping dates and create a merged dataframe
+        merged_df = pd.merge(
+            forecast[['ds', 'yhat']], 
+            actual_data[['ds', 'price_eur_per_mwh']], 
+            on='ds', 
+            how='inner'
+        )
         
-        errors = historical_actual['price_eur_per_mwh'].values - historical_forecast['yhat'].values
+        # Calculate errors
+        errors = merged_df['price_eur_per_mwh'].values - merged_df['yhat'].values
         
         ax3 = plt.subplot(3, 1, 3)
         ax3.hist(errors, bins=50, edgecolor='black')
@@ -306,10 +338,11 @@ def plot_forecast_analysis(model: Prophet, forecast: pd.DataFrame, actual_data: 
         ax3.set_ylabel('Frequency')
         
         plt.tight_layout()
-        plt.savefig('forecast_analysis.png', dpi=300, bbox_inches='tight')
+        save_path = os.path.join('/workspaces/Project_Energy_Tariffs/figures', 'forecast_analysis.png')
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
         plt.close()
         
-        logging.info("Forecast analysis plots created successfully")
+        logging.info(f"Forecast analysis plots saved to {save_path}")
         
     except Exception as e:
         logging.error(f"Error creating forecast analysis plots: {str(e)}")
