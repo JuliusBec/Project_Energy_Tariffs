@@ -226,12 +226,17 @@ def forecast_prophet(df, days=30):
     future = prophet_model.make_future_dataframe(periods=24*days, freq='h')
 
     forecast = prophet_model.predict(future)
+    
+    # Only return future predictions (exclude historical data)
+    # The last 24*days rows are the future predictions
+    future_only = forecast.tail(24*days).copy()
+    print(f"Prophet forecast: {len(forecast)} total rows, returning {len(future_only)} future-only rows")
 
     # Clip negative values to zero (energy usage cannot be negative)
-    print(f"Negative values before clipping: yhat={sum(forecast['yhat'] < 0)}, yhat_lower={sum(forecast['yhat_lower'] < 0)}, yhat_upper={sum(forecast['yhat_upper'] < 0)}")
-    forecast['yhat'] = forecast['yhat'].clip(lower=0)
-    forecast['yhat_lower'] = forecast['yhat_lower'].clip(lower=0)
-    forecast['yhat_upper'] = forecast['yhat_upper'].clip(lower=0)
-    print(f"Negative values after clipping: yhat={sum(forecast['yhat'] < 0)}, yhat_lower={sum(forecast['yhat_lower'] < 0)}, yhat_upper={sum(forecast['yhat_upper'] < 0)}")
+    print(f"Negative values before clipping: yhat={sum(future_only['yhat'] < 0)}, yhat_lower={sum(future_only['yhat_lower'] < 0)}, yhat_upper={sum(future_only['yhat_upper'] < 0)}")
+    future_only['yhat'] = future_only['yhat'].clip(lower=0)
+    future_only['yhat_lower'] = future_only['yhat_lower'].clip(lower=0)
+    future_only['yhat_upper'] = future_only['yhat_upper'].clip(lower=0)
+    print(f"Negative values after clipping: yhat={sum(future_only['yhat'] < 0)}, yhat_lower={sum(future_only['yhat_lower'] < 0)}, yhat_upper={sum(future_only['yhat_upper'] < 0)}")
     
-    return forecast
+    return future_only

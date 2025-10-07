@@ -130,7 +130,7 @@
                     required
                   >
                   <div class="form-help">
-                    Durchschnittswerte: 1-Person: 2.000 kWh | 2-Personen: 3.500 kWh | 4-Personen: 4.500 kWh
+                    Durchschnittswerte: 1-Person: 2.000 kWh | 2-Personen: 3.500 kWh | 3-Personen: 4.500 kWh | 4+ Personen: 5.500 kWh
                   </div>
                 </div>
 
@@ -140,7 +140,8 @@
                     <option value="">Bitte wählen</option>
                     <option value="1">1-Person Haushalt</option>
                     <option value="2">2-Personen Haushalt</option>
-                    <option value="3">3+ Personen Haushalt</option>
+                    <option value="3">3-Personen Haushalt</option>
+                    <option value="4">4+ Personen Haushalt</option>
                   </select>
                   <div class="form-help">
                     Automatische Schätzung des Jahresverbrauchs basierend auf Ihrem Haushaltstyp
@@ -316,7 +317,7 @@
                     </div>
                     <div class="detail-item">
                       <i class="fas fa-bolt"></i>
-                      <span>Aufschlag: {{ tariff.kwh_price }}€/kWh</span>
+                      <span>Aufschlag: {{ tariff.kwh_price.toFixed(2) }}€/kWh</span>
                     </div>
                     <div class="detail-item">
                       <i class="fas fa-calendar"></i>
@@ -492,10 +493,8 @@ export default {
         
         if (formData.value.hasSmartMeter && uploadedFile.value) {
           console.log('Calling CSV upload API')
-          const householdSize = parseInt(formData.value.householdType) || 2
-          console.log('CSV upload - household size:', householdSize)
-          // Call API for CSV upload
-          await handleCSVUpload(uploadedFile.value, householdSize)
+          // Call API for CSV upload (no household size needed for actual data)
+          await handleCSVUpload(uploadedFile.value)
         } else if (!formData.value.hasSmartMeter) {
           console.log('Calling basic calculation API')
           // Call API for basic calculation
@@ -507,14 +506,16 @@ export default {
           console.log('userData:', userData)
           await calculateBasic(userData)
         } else {
-          console.log('Falling back to mock data')
-          // Fallback to mock data if no API integration
-          generateMockTariffs()
+          console.log('Smart meter selected but no file uploaded')
+          showError('Bitte laden Sie eine CSV-Datei hoch oder wählen Sie "Kein Smart Meter"')
+          return
         }
         
       } catch (error) {
         console.error('Error calculating tariffs:', error)
-        showError(`Error calculating tariffs: ${error.message}`)
+        showError(`Error calculating tariffs: ${error.message}. Using fallback calculations.`)
+        // Only use mock data as absolute fallback
+        generateMockTariffs()
       } finally {
         loading.value = false
       }
@@ -523,10 +524,10 @@ export default {
     // API Functions
     const API_BASE_URL = 'http://localhost:8000'
     
-    const handleCSVUpload = async (file, householdSize = 2) => {
+    const handleCSVUpload = async (file) => {
       const formData = new FormData()
       formData.append('file', file)
-      formData.append('household_size', householdSize)
+      // Note: household_size not needed for CSV upload since we use actual data
 
       try {
         const response = await fetch(`${API_BASE_URL}/api/calculate-with-csv`, {
@@ -540,7 +541,8 @@ export default {
         }
 
         const data = await response.json()
-        displayAPIResults(data.results, 'CSV Data')
+        console.log('Success! API Response data:', data)
+        populateVueResults(data.results, 'CSV Data')
         return data
       } catch (error) {
         console.error('Error uploading CSV:', error)
@@ -573,7 +575,7 @@ export default {
 
         const data = await response.json()
         console.log('Success! API Response data:', data)
-        displayAPIResults(data.results, 'Estimated Data')
+        populateVueResults(data.results, 'Estimated Data')
         return data
       } catch (error) {
         console.error('Error calculating basic:', error)
@@ -613,6 +615,67 @@ export default {
       `
 
       resultsContainer.innerHTML = resultsHTML
+    }
+
+    const populateVueResults = (apiResults, dataSource) => {
+      console.log('=== Populating Vue results ===')
+      console.log('API Results received:', apiResults)
+      console.log('Data source:', dataSource)
+      console.log('Number of API results:', apiResults?.length)
+      
+      if (!apiResults || apiResults.length === 0) {
+        console.error('No API results to populate')
+        showError('No tariff data received from API')
+        return
+      }
+      
+      // Transform API results to Vue results format
+      results.value = apiResults.map((tariff, index) => {
+        console.log(`Processing tariff ${index + 1}:`, tariff)
+        
+        const isFixed = tariff.tariff_type === 'fixed'
+        const estimatedBasePrice = isFixed ? 12.0 : 10.0 // Rough estimate for base price
+        // Use actual avg_kwh_price from API instead of hardcoded estimates
+        const actualKwhPrice = tariff.avg_kwh_price || (isFixed ? 0.35 : 0.27)
+        
+        const transformedTariff = {
+          id: index + 1,
+          name: tariff.tariff_name,
+          provider: "EnBW",
+          base_price: estimatedBasePrice,
+          kwh_price: actualKwhPrice,
+          is_dynamic: !isFixed,
+          price_model: isFixed ? 
+            `Festpreis ${(actualKwhPrice * 100).toFixed(1)} ct/kWh + ~${estimatedBasePrice}€/Monat Grundpreis` :
+            `Durchschnitt ${(actualKwhPrice * 100).toFixed(1)} ct/kWh + ~${estimatedBasePrice}€/Monat Grundpreis`,
+          green_energy: true,
+          contract_duration: 12,
+          description: isFixed ? 
+            "Klassischer Festpreis-Tarif mit stabilen Kosten." :
+            "Dynamischer Stromtariff mit stündlichen Börsenpreisen.",
+          app_available: true,
+          price_forecast: !isFixed,
+          automation_ready: !isFixed,
+          avg_savings: isFixed ? "Stabile Preise" : "15-30%",
+          volatility: isFixed ? "keine" : "mittel-hoch",
+          monthly_cost: Math.round(tariff.monthly_cost * 100) / 100,
+          annual_cost: Math.round(tariff.annual_cost * 100) / 100,
+          potential_savings: 0,
+          savings_vs_current: formData.value.currentCost ? 
+            Math.max(0, (formData.value.currentCost * 12) - tariff.annual_cost) : 0,
+          optimization_score: isFixed ? 0 : 15,
+          special_features: isFixed ? 
+            ["Preisgarantie", "Persönlicher Service"] :
+            ["Smart Home Integration", "Preisalarm", "Mobile App"]
+        }
+        
+        console.log(`Transformed tariff ${index + 1}:`, transformedTariff)
+        return transformedTariff
+      })
+      
+      console.log('=== Vue results populated ===')
+      console.log('Final results array:', results.value)
+      console.log('Results length:', results.value.length)
     }
 
     const showError = (message) => {
@@ -936,10 +999,10 @@ export default {
     
     const updateConsumptionFromHousehold = () => {
       const consumptionMap = {
-        'single': 2000,
-        'couple': 3500,
-        'family-small': 4500,
-        'family-large': 5500
+        '1': 2000,
+        '2': 3500, 
+        '3': 4500,
+        '4': 5500
       }
       
       if (formData.value.householdType && consumptionMap[formData.value.householdType]) {

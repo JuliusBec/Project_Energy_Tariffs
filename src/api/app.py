@@ -34,29 +34,30 @@ class TariffCalculationResponse(BaseModel):
     monthly_cost: float
     annual_cost: float
     tariff_type: str  # "fixed" or "dynamic"
+    avg_kwh_price: float  # Average price per kWh for the forecasted period
     
 # EnBW tariffs as EnergyTariff instances
 def create_enbw_tariffs():
     """Create EnBW tariffs using EnergyTariff classes"""
-    start_date = datetime.now()
+    start_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
     
     return [
         DynamicTariff(
-            name="mobility+ dynamic",
+            name="EnBW mobility+ dynamic",
             provider="EnBW",
             base_price=14.90,
             start_date=start_date,
             is_dynamic=True
         ),
         DynamicTariff(
-            name="easy dynamic", 
+            name="EnBW easy dynamic", 
             provider="EnBW",
             base_price=9.90,
             start_date=start_date,
             is_dynamic=True
         ),
         FixedTariff(
-            name="mobility+ Zuhause",
+            name="EnBW mobility+ Zuhause",
             provider="EnBW", 
             base_price=14.90,
             kwh_rate=0.3299,
@@ -65,7 +66,7 @@ def create_enbw_tariffs():
             is_dynamic=False
         ),
         FixedTariff(
-            name="easy+",
+            name="EnBW easy+",
             provider="EnBW",
             base_price=9.90, 
             kwh_rate=0.3499,
@@ -74,7 +75,7 @@ def create_enbw_tariffs():
             is_dynamic=False
         ),
         FixedTariff(
-            name="Basis",
+            name="EnBW Basis",
             provider="EnBW",
             base_price=12.90,
             kwh_rate=0.3699,
@@ -102,11 +103,11 @@ async def root():
 
 @app.post("/api/calculate-with-csv")
 async def calculate_with_csv(
-    file: UploadFile = File(...),
-    household_size: int = Form(2)  # Use Form() to properly handle form data
+    file: UploadFile = File(...)
 ):
     """
     For users WITH smart meters - they upload their CSV data
+    Note: household_size is not needed since we use actual consumption data
     """
     # Validate file type
     if not file.filename.endswith('.csv'):
@@ -129,23 +130,40 @@ async def calculate_with_csv(
         
         # Calculate costs for each tariff using user's actual data
         tariffs = create_enbw_tariffs()
+        print(f"Created {len(tariffs)} tariffs")
         results = []
         
         for tariff in tariffs:
             try:
-                # Pass only the consumption data (DataFrame or None)
-                cost = tariff.calculate_cost(df)
+                print(f"Processing tariff: {tariff.name}, is_dynamic: {tariff.is_dynamic}")
+                
+                if tariff.is_dynamic:
+                    # For dynamic tariffs, use the breakdown method to get average price
+                    result = tariff.calculate_cost_with_breakdown(df)
+                    cost = result['total_cost']
+                    avg_kwh_price = result['avg_kwh_price']
+                    print(f"Dynamic tariff - Cost: {cost}, Avg kWh price: {avg_kwh_price:.4f}")
+                else:
+                    # For fixed tariffs, use regular calculation and get kwh_rate directly
+                    cost = tariff.calculate_cost(df)
+                    avg_kwh_price = tariff.kwh_rate
+                    print(f"Fixed tariff - Cost: {cost}, kWh rate: {avg_kwh_price}")
                 
                 results.append(TariffCalculationResponse(
                     tariff_name=tariff.name,
                     monthly_cost=cost,
                     annual_cost=cost * 12,
-                    tariff_type="dynamic" if tariff.is_dynamic else "fixed"
+                    tariff_type="dynamic" if tariff.is_dynamic else "fixed",
+                    avg_kwh_price=avg_kwh_price
                 ))
             except Exception as e:
-                # Skip tariffs that can't be calculated
+                # Log the error instead of silently skipping
+                print(f"ERROR calculating tariff {tariff.name}: {str(e)}")
+                import traceback
+                traceback.print_exc()
                 continue
         
+        print(f"Final results: {len(results)} tariffs calculated")
         return {"results": results, "data_source": "uploaded_csv"}
         
     except Exception as e:
@@ -156,6 +174,13 @@ async def calculate_basic(user_data: BasicUserData):
     """
     For users WITHOUT smart meters - use synthetic data
     """
+    import os
+    
+    # Get the project root directory (go up from src/api to project root)
+    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    print(f"Project root directory: {project_root}")
+    print(f"Current working directory: {os.getcwd()}")
+    
     if user_data.has_smart_meter:
         raise HTTPException(
             status_code=400, 
@@ -179,8 +204,16 @@ async def calculate_basic(user_data: BasicUserData):
             print(f"Processing tariff: {tariff.name}, is_dynamic: {tariff.is_dynamic}")
             try:
                 print(f"Calculating cost for tariff: {tariff.name}")
-                # Calculate cost for both fixed and dynamic tariffs
-                cost = tariff.calculate_cost(user_data.annual_consumption or 3500)
+                
+                if tariff.is_dynamic:
+                    # For dynamic tariffs, use the breakdown method
+                    result = tariff.calculate_cost_with_breakdown(user_data.annual_consumption or 3500)
+                    cost = result['total_cost']
+                    avg_kwh_price = result['avg_kwh_price']
+                else:
+                    # For fixed tariffs, use regular calculation and get kwh_rate directly
+                    cost = tariff.calculate_cost(user_data.annual_consumption or 3500)
+                    avg_kwh_price = tariff.kwh_rate
                 
                 print(f"Cost calculated: {cost}")
                 
@@ -188,13 +221,27 @@ async def calculate_basic(user_data: BasicUserData):
                     tariff_name=tariff.name,
                     monthly_cost=cost,
                     annual_cost=cost * 12,
-                    tariff_type="fixed" if not tariff.is_dynamic else "dynamic"
+                    tariff_type="fixed" if not tariff.is_dynamic else "dynamic",
+                    avg_kwh_price=avg_kwh_price
                 ))
             except Exception as e:
                 print(f"Error calculating cost for {tariff.name}: {str(e)}")
+                # Add a fallback calculation for failed tariffs
+                fallback_cost = tariff.base_price + (user_data.annual_consumption or 3500) * 0.30 / 12  # Rough estimate
+                fallback_kwh_price = 0.30 if tariff.is_dynamic else (tariff.kwh_rate if hasattr(tariff, 'kwh_rate') else 0.30)
+                results.append(TariffCalculationResponse(
+                    tariff_name=f"{tariff.name} (estimated)",
+                    monthly_cost=fallback_cost,
+                    annual_cost=fallback_cost * 12,
+                    tariff_type="fixed" if not tariff.is_dynamic else "dynamic",
+                    avg_kwh_price=fallback_kwh_price
+                ))
                 continue
         
         print(f"Final results: {len(results)} tariffs calculated")
+        
+        if not results:
+            raise HTTPException(status_code=500, detail="No tariffs could be calculated")
         
         return {
             "results": results, 
@@ -203,6 +250,7 @@ async def calculate_basic(user_data: BasicUserData):
         }
         
     except Exception as e:
+        print(f"General error in calculate_basic: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error calculating costs: {str(e)}")
 
 @app.get("/api/tariffs")
