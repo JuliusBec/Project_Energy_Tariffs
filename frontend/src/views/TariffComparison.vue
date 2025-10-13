@@ -238,6 +238,15 @@
                 <span v-if="formData.currentCost"> | Aktuelle Kosten: {{ formData.currentCost }}€/Monat</span>
               </p>
               
+              <!-- Backend Connection Indicator -->
+              <div class="api-status">
+                <div class="status-indicator success">
+                  <i class="fas fa-server"></i>
+                  <span>Live-Daten vom DYNERGY Backend</span>
+                  <div class="status-dot"></div>
+                </div>
+              </div>
+              
               <div class="sort-controls">
                 <label>Sortieren nach:</label>
                 <select v-model="sortBy" @change="sortResults" class="form-select">
@@ -386,6 +395,83 @@
             </div>
           </div>
 
+          <!-- Prognose und Vorhersage Sektion -->
+          <div v-if="results.length > 0 && !loading" class="forecast-section">
+            <div class="forecast-cards">
+              <!-- Ersparnisvorhersage -->
+              <div class="forecast-card">
+                <div class="forecast-header">
+                  <h4>
+                    <i class="fas fa-chart-line"></i>
+                    KI-basierte Ersparnisvorhersage
+                  </h4>
+                </div>
+                <div class="forecast-content">
+                  <div v-if="savingsPrediction" class="prediction-result">
+                    <div class="prediction-main">
+                      <span class="prediction-percentage">{{ savingsPrediction.percentage }}%</span>
+                      <span class="prediction-label">Einsparpotential</span>
+                    </div>
+                    <div class="prediction-details">
+                      <div class="prediction-item">
+                        <span class="label">Monatlich:</span>
+                        <span class="value">{{ savingsPrediction.monthly_euro }}€</span>
+                      </div>
+                      <div class="prediction-item">
+                        <span class="label">Jährlich:</span>
+                        <span class="value">{{ savingsPrediction.annual_euro }}€</span>
+                      </div>
+                    </div>
+                    <div class="prediction-recommendations">
+                      <h5>Empfehlungen:</h5>
+                      <ul>
+                        <li v-for="rec in savingsPrediction.recommendations" :key="rec">{{ rec }}</li>
+                      </ul>
+                    </div>
+                  </div>
+                  <div v-else class="loading-prediction">
+                    <div class="loading-spinner small"></div>
+                    <span>Berechne Einsparpotential...</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Preisvorhersage -->
+              <div class="forecast-card">
+                <div class="forecast-header">
+                  <h4>
+                    <i class="fas fa-crystal-ball"></i>
+                    7-Tage Strompreis-Prognose
+                  </h4>
+                </div>
+                <div class="forecast-content">
+                  <div v-if="priceForecast" class="price-forecast">
+                    <div class="forecast-chart">
+                      <div v-for="day in priceForecast.slice(0, 5)" :key="day.date" class="day-forecast">
+                        <div class="day-name">{{ getDayName(day.day_name) }}</div>
+                        <div class="price-range">
+                          <span class="min-price">{{ (day.min_price * 100).toFixed(1) }}ct</span>
+                          <div class="price-bar">
+                            <div class="price-fill" :style="{ width: getPriceBarWidth(day) + '%' }"></div>
+                          </div>
+                          <span class="max-price">{{ (day.max_price * 100).toFixed(1) }}ct</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="forecast-summary">
+                      <p><strong>Beste Zeiten:</strong> Nachts 23:00-06:00 Uhr</p>
+                      <p><strong>Teuerste Zeiten:</strong> Abends 17:00-20:00 Uhr</p>
+                    </div>
+                  </div>
+                  <div v-else class="loading-forecast">
+                    <div class="loading-spinner small"></div>
+                    <span>Lade Preisprognose...</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <!-- No Results -->
           <div v-else-if="!loading && searchPerformed" class="no-results">
             <div class="no-results-content">
@@ -444,6 +530,10 @@ export default {
     const fileError = ref('')
     const isDragOver = ref(false)
     
+    // Prognose and prediction data
+    const savingsPrediction = ref(null)
+    const priceForecast = ref(null)
+    
     const sortedResults = computed(() => {
       const sorted = [...results.value]
       
@@ -472,13 +562,128 @@ export default {
       searchPerformed.value = true
       
       try {
-        // Using mock data instead of API calls for frontend-only mode
-        generateMockTariffs()
+        // Fetch tariffs from backend API
+        console.log('Fetching tariffs from backend...')
+        const response = await fetch('http://localhost:8000/api/tariffs')
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`)
+        }
+        
+        const backendTariffs = await response.json()
+        console.log('Backend tariffs received:', backendTariffs)
+        
+        // Calculate costs for each tariff using the backend
+        const calculatedTariffs = []
+        
+        for (const tariff of backendTariffs) {
+          try {
+            const calculationData = {
+              tariff_id: tariff.id,
+              annual_kwh: formData.value.annualKwh,
+              has_smart_meter: formData.value.hasSmartMeter,
+              usage_pattern: formData.value.hasSmartMeter ? 'uploaded' : 'manual'
+            }
+            
+            console.log('Calculating costs for tariff:', tariff.name, calculationData)
+            
+            const calcResponse = await fetch('http://localhost:8000/api/calculate', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(calculationData)
+            })
+            
+            if (calcResponse.ok) {
+              const calculation = await calcResponse.json()
+              console.log('Calculation result:', calculation)
+              
+              calculatedTariffs.push({
+                ...tariff,
+                annual_cost: Math.round(calculation.annual_cost),
+                monthly_cost: Math.round(calculation.annual_cost / 12),
+                savings_potential: calculation.savings_potential || 0,
+                cost_breakdown: calculation.cost_breakdown || {}
+              })
+            } else {
+              // Fallback to basic calculation if API call fails
+              const basicCost = (tariff.base_price * 12) + (formData.value.annualKwh * (tariff.kwh_price || 0.30))
+              calculatedTariffs.push({
+                ...tariff,
+                annual_cost: Math.round(basicCost),
+                monthly_cost: Math.round(basicCost / 12),
+                savings_potential: 0
+              })
+            }
+          } catch (calcError) {
+            console.error('Error calculating tariff:', tariff.name, calcError)
+            // Fallback calculation
+            const basicCost = (tariff.base_price * 12) + (formData.value.annualKwh * (tariff.kwh_price || 0.30))
+            calculatedTariffs.push({
+              ...tariff,
+              annual_cost: Math.round(basicCost),
+              monthly_cost: Math.round(basicCost / 12),
+              savings_potential: 0
+            })
+          }
+        }
+        
+        results.value = calculatedTariffs
+        console.log('Final calculated tariffs:', calculatedTariffs)
+        
+        // Fetch predictions and forecasts after tariffs are loaded
+        fetchSavingsPrediction()
+        fetchPriceForecast()
         
       } catch (error) {
-        console.error('Error generating tariffs:', error)
+        console.error('Error fetching tariffs from backend:', error)
+        console.log('Falling back to mock data...')
+        // Fallback to mock data if backend is not available
+        generateMockTariffs()
       } finally {
         loading.value = false
+      }
+    }
+    
+    // Fetch savings prediction from backend
+    const fetchSavingsPrediction = async () => {
+      try {
+        console.log('Fetching savings prediction...')
+        const response = await fetch('http://localhost:8000/api/predict-savings', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            annual_kwh: formData.value.annualKwh,
+            has_smart_meter: formData.value.hasSmartMeter
+          })
+        })
+        
+        if (response.ok) {
+          const data = await response.json()
+          savingsPrediction.value = data.savings_potential
+          console.log('Savings prediction received:', data)
+        }
+      } catch (error) {
+        console.error('Error fetching savings prediction:', error)
+      }
+    }
+    
+    // Fetch price forecast from backend
+    const fetchPriceForecast = async () => {
+      try {
+        console.log('Fetching price forecast...')
+        const response = await fetch('http://localhost:8000/api/forecast')
+        
+        if (response.ok) {
+          const data = await response.json()
+          priceForecast.value = data.forecast
+          console.log('Price forecast received:', data)
+        }
+      } catch (error) {
+        console.error('Error fetching price forecast:', error)
       }
     }
     
@@ -794,6 +999,26 @@ export default {
       }
     }
     
+    // Helper functions for forecast display
+    const getDayName = (dayName) => {
+      const dayNames = {
+        'Monday': 'Mo',
+        'Tuesday': 'Di', 
+        'Wednesday': 'Mi',
+        'Thursday': 'Do',
+        'Friday': 'Fr',
+        'Saturday': 'Sa',
+        'Sunday': 'So'
+      }
+      return dayNames[dayName] || dayName.substring(0, 2)
+    }
+    
+    const getPriceBarWidth = (day) => {
+      // Calculate width based on price range (0-40ct)
+      const maxPrice = Math.min(day.max_price * 100, 40)
+      return (maxPrice / 40) * 100
+    }
+    
     // Load URL parameters if any
     onMounted(() => {
       const urlParams = new URLSearchParams(window.location.search)
@@ -814,6 +1039,8 @@ export default {
       csvData,
       fileError,
       isDragOver,
+      savingsPrediction,
+      priceForecast,
       calculateTariffs,
       sortResults,
       selectTariff,
@@ -822,7 +1049,9 @@ export default {
       handleFileDrop,
       removeFile,
       formatFileSize,
-      updateConsumptionFromHousehold
+      updateConsumptionFromHousehold,
+      getDayName,
+      getPriceBarWidth
     }
   }
 }
@@ -1664,5 +1893,254 @@ export default {
 .btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+/* API Status Indicator */
+.api-status {
+  margin: 1rem 0;
+}
+
+.status-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.status-indicator.success {
+  background-color: #f0fdf4;
+  color: #15803d;
+  border: 1px solid #bbf7d0;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #22c55e;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* Forecast Section Styles */
+.forecast-section {
+  margin-top: 2rem;
+  padding-top: 2rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+.forecast-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  margin-top: 1rem;
+}
+
+.forecast-card {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.forecast-header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 1rem;
+}
+
+.forecast-header h4 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.forecast-content {
+  padding: 1.5rem;
+}
+
+/* Savings Prediction Styles */
+.prediction-result {
+  text-align: center;
+}
+
+.prediction-main {
+  margin-bottom: 1rem;
+}
+
+.prediction-percentage {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: #059669;
+  display: block;
+}
+
+.prediction-label {
+  font-size: 0.9rem;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.prediction-details {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin: 1rem 0;
+  padding: 1rem;
+  background: #f9fafb;
+  border-radius: 8px;
+}
+
+.prediction-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.prediction-item .label {
+  font-size: 0.8rem;
+  color: #6b7280;
+  margin-bottom: 0.25rem;
+}
+
+.prediction-item .value {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #059669;
+}
+
+.prediction-recommendations {
+  margin-top: 1rem;
+  text-align: left;
+}
+
+.prediction-recommendations h5 {
+  font-size: 0.9rem;
+  color: #374151;
+  margin-bottom: 0.5rem;
+}
+
+.prediction-recommendations ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.prediction-recommendations li {
+  font-size: 0.85rem;
+  color: #6b7280;
+  padding: 0.25rem 0;
+  display: flex;
+  align-items: start;
+  gap: 0.5rem;
+}
+
+.prediction-recommendations li:before {
+  content: "→";
+  color: #059669;
+  font-weight: 600;
+}
+
+/* Price Forecast Styles */
+.price-forecast {
+  text-align: center;
+}
+
+.forecast-chart {
+  margin-bottom: 1rem;
+}
+
+.day-forecast {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.day-name {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #374151;
+  min-width: 25px;
+}
+
+.price-range {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+}
+
+.min-price, .max-price {
+  font-size: 0.75rem;
+  color: #6b7280;
+  min-width: 35px;
+  font-weight: 500;
+}
+
+.price-bar {
+  flex: 1;
+  height: 8px;
+  background: #e5e7eb;
+  border-radius: 4px;
+  overflow: hidden;
+  position: relative;
+}
+
+.price-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #10b981, #f59e0b, #ef4444);
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.forecast-summary {
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-top: 1rem;
+}
+
+.forecast-summary p {
+  margin: 0.25rem 0;
+  font-size: 0.85rem;
+  color: #0369a1;
+}
+
+.loading-prediction, .loading-forecast {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  color: #6b7280;
+  font-size: 0.9rem;
+  padding: 2rem 0;
+}
+
+/* Responsive Forecast Cards */
+@media (max-width: 768px) {
+  .forecast-cards {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+  
+  .prediction-details {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

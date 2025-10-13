@@ -152,6 +152,87 @@ async def get_market_prices():
         ]
     }
 
+@app.get("/api/forecast")
+async def get_price_forecast():
+    """Get price forecast for the next 7 days"""
+    import random
+    from datetime import datetime, timedelta
+    
+    forecast_data = []
+    base_date = datetime.now()
+    
+    for day in range(7):
+        current_date = base_date + timedelta(days=day)
+        daily_prices = []
+        
+        # Simulate realistic hourly price patterns
+        for hour in range(24):
+            # Lower prices at night (23-6h), higher during peak times (17-20h)
+            if 23 <= hour or hour <= 6:  # Night hours
+                base_price = random.uniform(0.05, 0.12)
+            elif 17 <= hour <= 20:  # Peak hours
+                base_price = random.uniform(0.20, 0.35)
+            else:  # Regular hours
+                base_price = random.uniform(0.12, 0.22)
+            
+            # Add some volatility
+            price = base_price + random.uniform(-0.03, 0.03)
+            price = max(0.02, price)  # Minimum price
+            
+            daily_prices.append({
+                "hour": hour,
+                "price": round(price, 4),
+                "datetime": current_date.replace(hour=hour).isoformat()
+            })
+        
+        forecast_data.append({
+            "date": current_date.strftime("%Y-%m-%d"),
+            "day_name": current_date.strftime("%A"),
+            "hourly_prices": daily_prices,
+            "avg_price": round(sum(p["price"] for p in daily_prices) / 24, 4),
+            "min_price": round(min(p["price"] for p in daily_prices), 4),
+            "max_price": round(max(p["price"] for p in daily_prices), 4)
+        })
+    
+    return {
+        "forecast": forecast_data,
+        "generated_at": datetime.now().isoformat(),
+        "currency": "EUR/kWh"
+    }
+
+@app.post("/api/predict-savings")
+async def predict_savings(usage_data: dict):
+    """Predict potential savings with dynamic tariffs"""
+    annual_kwh = usage_data.get("annual_kwh", 3500)
+    has_smart_meter = usage_data.get("has_smart_meter", False)
+    
+    # Simulate ML-based predictions
+    if has_smart_meter:
+        # With smart meter, better optimization possible
+        base_savings = random.uniform(15, 35)
+        optimization_potential = random.uniform(5, 15)
+    else:
+        # Without smart meter, limited savings
+        base_savings = random.uniform(5, 20)
+        optimization_potential = random.uniform(2, 8)
+    
+    total_potential = base_savings + optimization_potential
+    monthly_savings = (annual_kwh * 0.30 * total_potential / 100) / 12  # Assuming 30ct average
+    
+    return {
+        "savings_potential": {
+            "percentage": round(total_potential, 1),
+            "monthly_euro": round(monthly_savings, 2),
+            "annual_euro": round(monthly_savings * 12, 2)
+        },
+        "recommendations": [
+            "Verbrauch in günstige Nachtstunden verschieben" if base_savings > 15 else "Grundlegende Optimierung möglich",
+            "Smart Home Integration empfohlen" if has_smart_meter else "Smart Meter Installation empfohlen",
+            "E-Auto Ladung zeitoptimiert" if annual_kwh > 5000 else "Haushaltsgeräte zeitgesteuert nutzen"
+        ],
+        "confidence": "85%" if has_smart_meter else "70%"
+    }
+
 @app.get("/api/usage-tips")
 async def get_usage_tips():
     """Get energy saving tips"""
