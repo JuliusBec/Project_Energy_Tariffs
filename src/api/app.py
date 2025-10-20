@@ -7,6 +7,7 @@ from datetime import datetime
 import pandas as pd
 import io
 from src.core.EnergyTariff import FixedTariff, DynamicTariff
+from src.core.forecasting.usage_forecasting.UsageForecaster import create_backtest
 
 import sys
 sys.path.append("../")
@@ -35,6 +36,11 @@ class TariffCalculationResponse(BaseModel):
     annual_cost: float
     tariff_type: str  # "fixed" or "dynamic"
     avg_kwh_price: float  # Average price per kWh for the forecasted period
+
+class BacktestDataResponse(BaseModel):
+    hourly_data: dict
+    daily_data: dict
+    metrics: dict
     
 # EnBW tariffs as EnergyTariff instances
 def create_enbw_tariffs():
@@ -270,6 +276,41 @@ async def get_available_tariffs():
             } for t in tariffs
         ]
     }
+
+@app.post("/api/backtest-data")
+async def get_backtest_data(file: UploadFile = File(...)):
+    """
+    Generate backtest data for visualization (returns JSON data instead of matplotlib plots)
+    """
+    # Validate file type
+    if not file.filename.endswith('.csv'):
+        raise HTTPException(status_code=400, detail="File must be a CSV")
+    
+    try:
+        # Read the uploaded CSV
+        contents = await file.read()
+        df = pd.read_csv(io.StringIO(contents.decode('utf-8')))
+        
+        # Validate CSV has required columns
+        if 'datetime' not in df.columns or 'value' not in df.columns:
+            raise HTTPException(
+                status_code=400, 
+                detail="CSV must have 'datetime' and 'value' columns"
+            )
+        
+        # Convert datetime column
+        df['datetime'] = pd.to_datetime(df['datetime'])
+        
+        # Generate backtest data
+        backtest_data = create_backtest(df, return_data=True)
+        
+        if backtest_data is None:
+            raise HTTPException(status_code=500, detail="Failed to generate backtest data")
+        
+        return BacktestDataResponse(**backtest_data)
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error processing backtest: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn

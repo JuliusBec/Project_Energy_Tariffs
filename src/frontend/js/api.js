@@ -65,6 +65,31 @@ async function getAvailableTariffs() {
     }
 }
 
+// Function to get backtest data
+async function getBacktestData(file) {
+    try {
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const response = await fetch(`${API_BASE_URL}/api/backtest-data`, {
+            method: 'POST',
+            body: formData
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.detail || 'Failed to generate backtest data');
+        }
+
+        const data = await response.json();
+        return data;
+    } catch (error) {
+        console.error('Error fetching backtest data:', error);
+        showError(`Error generating backtest: ${error.message}`);
+        throw error;
+    }
+}
+
 // Function to display results in HTML
 function displayResults(results, dataSource) {
     const resultsContainer = document.getElementById('results-container');

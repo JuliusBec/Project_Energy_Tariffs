@@ -3,6 +3,7 @@ from datetime import datetime, time, timedelta
 from typing import Optional
 import pandas as pd
 from .forecasting.usage_forecasting.UsageForecaster import forecast_prophet
+from calendar import monthrange
 
 class EnergyTariff(ABC):
     """
@@ -10,7 +11,7 @@ class EnergyTariff(ABC):
     """
 
     def __init__(self, name: str, base_price: float, is_dynamic: bool, start_date: datetime, kwh_rate: Optional[float] = None, 
-                 provider: Optional[str] = None, min_duration: Optional[int] = None, features: Optional[dict] = None):
+                 provider: Optional[str] = None, min_duration: Optional[int] = None, features: Optional[list] = None):
         """
         Initialize the energy tariff.
         """
@@ -21,7 +22,43 @@ class EnergyTariff(ABC):
         self.kwh_rate = kwh_rate
         self.start_date = start_date
         self.is_dynamic = is_dynamic
-        self.features = features if features else {}
+        self.features = features if features else []
+
+    def calculate_billing_period_days(self) -> int:
+        """
+        Calculate actual billing period in days based on German monthly billing practices.
+        Handles month-end adjustments and varying month lengths.
+        
+        Returns:
+            int: Number of days in the billing period
+        """
+
+        start_day = self.start_date.day
+        start_month = self.start_date.month
+        start_year = self.start_date.year
+        
+        # Determine next billing date following German energy contract standards
+        if start_month == 12:
+            next_month = 1
+            next_year = start_year + 1
+        else:
+            next_month = start_month + 1
+            next_year = start_year
+            
+        # Handle month-end billing adjustments
+        days_in_start_month = monthrange(start_year, start_month)[1]
+        days_in_next_month = monthrange(next_year, next_month)[1]
+        
+        if start_day == days_in_start_month:  # Started on last day of month
+            # Bill on last day of next month (German end-of-month rule)
+            next_billing_day = days_in_next_month
+        else:
+            # Bill on same day next month, adjust if day doesn't exist
+            next_billing_day = min(start_day, days_in_next_month)
+            
+        # Calculate actual billing period days
+        next_billing_date = datetime(next_year, next_month, next_billing_day)
+        return (next_billing_date - self.start_date).days
 
 class FixedTariff(EnergyTariff):
     """
@@ -41,6 +78,9 @@ class FixedTariff(EnergyTariff):
         Calculate the total cost for a given consumption in kWh.
         """
         import os
+        
+        # Calculate actual billing period based on German monthly billing practices
+        billing_period_days = self.calculate_billing_period_days()
         
         # Get the project root directory
         project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -62,7 +102,7 @@ class FixedTariff(EnergyTariff):
             adjustment_factor = yearly_usage / current_yearly_usage if current_yearly_usage > 0 else 1
             consumption_data['value'] = consumption_data['value'] * adjustment_factor
             
-            future_consumption = slice_seasonal_data(consumption_data, self.start_date, days=30)
+            future_consumption = slice_seasonal_data(consumption_data, self.start_date, days=billing_period_days)
         else:
             raise ValueError("Input data must be a pandas DataFrame or a numeric yearly usage value.")
             
@@ -95,6 +135,9 @@ class DynamicTariff(EnergyTariff):
         """
         import os
         print(f"DynamicTariff.calculate_cost() called with data: {type(data)}")
+        
+        # Calculate actual billing period based on German monthly billing practices
+        billing_period_days = self.calculate_billing_period_days()
         
         # Get the project root directory
         project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -139,7 +182,7 @@ class DynamicTariff(EnergyTariff):
             adjustment_factor = yearly_usage / current_yearly_usage if current_yearly_usage > 0 else 1
             consumption_data['value'] = consumption_data['value'] * adjustment_factor
             
-            future_consumption = slice_seasonal_data(consumption_data, self.start_date, days=30)
+            future_consumption = slice_seasonal_data(consumption_data, self.start_date, days=billing_period_days)
             print(f"Future consumption data shape: {future_consumption.shape}")
         else:
             raise ValueError("Input data must be a pandas DataFrame or a numeric yearly usage value.")
@@ -200,6 +243,9 @@ class DynamicTariff(EnergyTariff):
         """
         import os
         
+        # Calculate actual billing period based on German monthly billing practices
+        billing_period_days = self.calculate_billing_period_days()
+        
         # Get the project root directory
         project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         
@@ -235,7 +281,7 @@ class DynamicTariff(EnergyTariff):
             adjustment_factor = yearly_usage / current_yearly_usage if current_yearly_usage > 0 else 1
             consumption_data['value'] = consumption_data['value'] * adjustment_factor
             
-            future_consumption = slice_seasonal_data(consumption_data, self.start_date, days=30)
+            future_consumption = slice_seasonal_data(consumption_data, self.start_date, days=billing_period_days)
         else:
             raise ValueError("Input data must be a pandas DataFrame or a numeric yearly usage value.")
         

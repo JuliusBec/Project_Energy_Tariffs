@@ -56,6 +56,17 @@ export const apiService = {
   getUsageTips: () => {
     return api.get('/usage-tips')
   },
+
+  // Backtest data endpoints
+  getBacktestData: (file) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    return api.post('/backtest-data', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    })
+  },
   
   // Generic request method
   request: (method, url, data = null, config = {}) => {
