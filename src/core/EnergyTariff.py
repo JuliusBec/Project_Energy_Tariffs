@@ -59,6 +59,19 @@ class EnergyTariff(ABC):
         # Calculate actual billing period days
         next_billing_date = datetime(next_year, next_month, next_billing_day)
         return (next_billing_date - self.start_date).days
+    
+    @abstractmethod
+    def calculate_cost_split(self, total_consumption_kwh: float) -> dict:
+        """
+        Calculate the total cost breakdown for given consumption.
+        
+        Args:
+            total_consumption_kwh: Total energy consumption in kWh (from forecast or historical data)
+            
+        Returns:
+            dict: Breakdown of costs including base_price, variable_cost, total_cost, etc.
+        """
+        pass
 
 class FixedTariff(EnergyTariff):
     """
@@ -72,6 +85,33 @@ class FixedTariff(EnergyTariff):
         """
         super().__init__(name=name, base_price=base_price, is_dynamic=False, start_date=start_date,
                          kwh_rate=kwh_rate, provider=provider, min_duration=min_duration)
+
+    def calculate_cost_split(self, total_consumption_kwh: float) -> dict:
+        """
+        Calculate cost breakdown for fixed tariff.
+        Returns base price, variable cost, and total cost breakdown.
+        
+        Args:
+            total_consumption_kwh: Total energy consumption in kWh (from forecast or historical data)
+            
+        Returns:
+            dict: Breakdown of costs including base_price, variable_cost, total_cost, etc.
+        """
+        # Calculate actual billing period based on German monthly billing practices
+        billing_period_days = self.calculate_billing_period_days()
+        
+        # Calculate costs
+        variable_cost = total_consumption_kwh * self.kwh_rate
+        total_cost = variable_cost + self.base_price
+        
+        return {
+            "base_price": self.base_price,
+            "variable_cost": variable_cost,
+            "total_cost": total_cost,
+            "total_consumption_kwh": total_consumption_kwh,
+            "fixed_kwh_rate": self.kwh_rate,
+            "billing_period_days": billing_period_days
+        }
 
     def calculate_cost(self, data) -> float:
         """
@@ -118,6 +158,8 @@ class FixedTariff(EnergyTariff):
         
         return total_cost
 
+
+
 class DynamicTariff(EnergyTariff):
     """
     Represents a dynamic energy tariff.
@@ -128,6 +170,38 @@ class DynamicTariff(EnergyTariff):
         Initialize the dynamic tariff with base price and kWh rate.
         """
         super().__init__(name, base_price=base_price, start_date=start_date, provider=provider, is_dynamic=True)
+
+    def calculate_cost_split(self, total_consumption_kwh: float) -> dict:
+        """
+        Calculate cost breakdown for dynamic tariff.
+        For dynamic tariffs, this is a simplified version that doesn't include 
+        time-dependent pricing details since those require the actual consumption timeline.
+        
+        Args:
+            total_consumption_kwh: Total energy consumption in kWh
+            
+        Returns:
+            dict: Basic breakdown with estimated average price
+        """
+        # For dynamic tariffs, we can only provide a basic breakdown without timing data
+        # The actual cost calculation with time-dependent pricing is handled in calculate_cost
+        billing_period_days = self.calculate_billing_period_days()
+        
+        # Placeholder average price - in real implementation this would need market price forecast
+        estimated_avg_kwh_price = 0.25  # €/kWh - should be calculated from market data
+        
+        variable_cost = total_consumption_kwh * estimated_avg_kwh_price
+        total_cost = variable_cost + self.base_price
+        
+        return {
+            "base_price": self.base_price,
+            "variable_cost": variable_cost,
+            "total_cost": total_cost,
+            "total_consumption_kwh": total_consumption_kwh,
+            "estimated_avg_kwh_price": estimated_avg_kwh_price,
+            "billing_period_days": billing_period_days,
+            "note": "Dynamic tariff cost breakdown requires actual consumption timeline for accurate pricing"
+        }
 
     def calculate_cost(self, data) -> float:
         """
