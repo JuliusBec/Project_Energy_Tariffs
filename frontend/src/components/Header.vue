@@ -16,6 +16,10 @@
             <i class="fas fa-calculator"></i>
             <span>Tarifrechner</span>
           </router-link>
+          <router-link to="/price-info" class="nav-link">
+            <i class="fas fa-chart-pie"></i>
+            <span>Strompreise</span>
+          </router-link>
           <router-link to="/tips" class="nav-link">
             <i class="fas fa-lightbulb"></i>
             <span>Spartipps</span>
@@ -36,6 +40,10 @@
         <router-link to="/comparison" class="mobile-nav-link" @click="closeMobileMenu">
           <i class="fas fa-calculator"></i>
           <span>Tarifrechner</span>
+        </router-link>
+        <router-link to="/price-info" class="mobile-nav-link" @click="closeMobileMenu">
+          <i class="fas fa-chart-pie"></i>
+          <span>Strompreise</span>
         </router-link>
         <router-link to="/tips" class="mobile-nav-link" @click="closeMobileMenu">
           <i class="fas fa-lightbulb"></i>

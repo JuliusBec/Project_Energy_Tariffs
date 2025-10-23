@@ -24,9 +24,14 @@ class UsageData(BaseModel):
     preferredTimes: Optional[List[str]] = []
 
 class TariffRequest(BaseModel):
-    annualConsumption: float
-    hasSmartMeter: bool
+    annualConsumption: Optional[float] = None
+    hasSmartMeter: Optional[bool] = None
     zipCode: Optional[str] = "70173"
+    # Frontend compatibility
+    annual_kwh: Optional[float] = None
+    has_smart_meter: Optional[bool] = None
+    tariff_id: Optional[str] = None
+    usage_pattern: Optional[str] = None
 
 class TariffResult(BaseModel):
     name: str
@@ -96,45 +101,111 @@ async def root():
 @app.get("/api/tariffs")
 async def get_tariffs():
     """Get available tariffs"""
-    return ENBW_TARIFFS
+    # Convert backend format to frontend format
+    frontend_tariffs = []
+    for i, tariff in enumerate(ENBW_TARIFFS):
+        frontend_tariff = {
+            "id": tariff["name"].lower().replace(" ", "_").replace("+", "plus"),
+            "name": tariff["name"],
+            "provider": tariff["provider"],
+            "base_price": tariff["baseFee"],
+            "kwh_price": tariff["workingPrice"],
+            "is_dynamic": tariff["isDynamic"],
+            "features": tariff["features"],
+            "contract_duration": 12 if tariff["name"] == "Basis" else 1,
+            "green_energy": True,  # All EnBW tariffs are green
+            "description": f"{'Dynamischer' if tariff['isDynamic'] else 'Fester'} Stromtarif von {tariff['provider']}",
+            "type": "dynamic" if tariff["isDynamic"] else "fixed"
+        }
+        frontend_tariffs.append(frontend_tariff)
+    
+    return frontend_tariffs
 
 @app.post("/api/calculate")
 async def calculate_tariffs(request: TariffRequest):
     """Calculate tariff costs for given consumption"""
-    results = []
     
-    # Mock spot price for dynamic tariffs
-    spot_price = random.uniform(0.08, 0.15)  # €/kWh
+    # Handle both frontend and direct API formats
+    annual_consumption = request.annualConsumption or request.annual_kwh or 3500
+    has_smart_meter = request.hasSmartMeter if request.hasSmartMeter is not None else request.has_smart_meter
     
-    for tariff in ENBW_TARIFFS:
+    if request.tariff_id:
+        # Frontend sends specific tariff calculation
+        # Find the specific tariff
+        target_tariff = None
+        for tariff in ENBW_TARIFFS:
+            tariff_id = tariff["name"].lower().replace(" ", "_").replace("+", "plus")
+            if tariff_id == request.tariff_id:
+                target_tariff = tariff
+                break
+        
+        if not target_tariff:
+            target_tariff = ENBW_TARIFFS[0]  # fallback
+        
+        # Mock spot price for dynamic tariffs
+        spot_price = random.uniform(0.08, 0.15)  # €/kWh
+        
         # Calculate working price
-        if tariff["isDynamic"]:
-            working_price = spot_price + (tariff["workingPrice"] - 0.08)  # Add markup
+        if target_tariff["isDynamic"]:
+            working_price = spot_price + (target_tariff["workingPrice"] - 0.08)  # Add markup
         else:
-            working_price = tariff["workingPrice"]
+            working_price = target_tariff["workingPrice"]
         
         # Calculate total cost
-        annual_cost = (tariff["baseFee"] * 12) + (request.annualConsumption * working_price)
+        annual_cost = (target_tariff["baseFee"] * 12) + (annual_consumption * working_price)
         
-        results.append(TariffResult(
-            name=tariff["name"],
-            provider=tariff["provider"],
-            baseFee=tariff["baseFee"],
-            workingPrice=working_price,
-            totalCost=annual_cost,
-            features=tariff["features"]
-        ))
+        # Calculate savings potential for smart meter users
+        savings_potential = 0
+        if has_smart_meter and target_tariff["isDynamic"]:
+            savings_potential = random.uniform(10, 25)  # 10-25% savings possible
+        
+        return {
+            "annual_cost": annual_cost,
+            "monthly_cost": annual_cost / 12,
+            "savings_potential": savings_potential,
+            "cost_breakdown": {
+                "base_fee_annual": target_tariff["baseFee"] * 12,
+                "energy_cost_annual": annual_consumption * working_price,
+                "working_price": working_price
+            }
+        }
     
-    # Sort by total cost
-    results.sort(key=lambda x: x.totalCost)
-    
-    # Calculate savings compared to most expensive
-    if results:
-        highest_cost = max(results, key=lambda x: x.totalCost).totalCost
-        for result in results:
-            result.savings = highest_cost - result.totalCost
-    
-    return results
+    else:
+        # Return all tariffs comparison
+        results = []
+        
+        # Mock spot price for dynamic tariffs
+        spot_price = random.uniform(0.08, 0.15)  # €/kWh
+        
+        for tariff in ENBW_TARIFFS:
+            # Calculate working price
+            if tariff["isDynamic"]:
+                working_price = spot_price + (tariff["workingPrice"] - 0.08)  # Add markup
+            else:
+                working_price = tariff["workingPrice"]
+            
+            # Calculate total cost
+            annual_cost = (tariff["baseFee"] * 12) + (annual_consumption * working_price)
+            
+            results.append(TariffResult(
+                name=tariff["name"],
+                provider=tariff["provider"],
+                baseFee=tariff["baseFee"],
+                workingPrice=working_price,
+                totalCost=annual_cost,
+                features=tariff["features"]
+            ))
+        
+        # Sort by total cost
+        results.sort(key=lambda x: x.totalCost)
+        
+        # Calculate savings compared to most expensive
+        if results:
+            highest_cost = max(results, key=lambda x: x.totalCost).totalCost
+            for result in results:
+                result.savings = highest_cost - result.totalCost
+        
+        return results
 
 @app.get("/api/market-prices")
 async def get_market_prices():
