@@ -53,14 +53,16 @@ def create_enbw_tariffs():
             provider="EnBW",
             base_price=14.90,
             start_date=start_date,
-            is_dynamic=True
+            is_dynamic=True,
+            markup=0.18  # 18ct/kWh markup for premium dynamic tariff
         ),
         DynamicTariff(
             name="EnBW easy dynamic", 
             provider="EnBW",
             base_price=9.90,
             start_date=start_date,
-            is_dynamic=True
+            is_dynamic=True,
+            markup=0.22  # 22ct/kWh markup for standard dynamic tariff
         ),
         FixedTariff(
             name="EnBW mobility+ Zuhause",

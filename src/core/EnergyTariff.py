@@ -166,11 +166,20 @@ class DynamicTariff(EnergyTariff):
     Represents a dynamic energy tariff.
     """
 
-    def __init__(self, name: str, base_price: float, start_date: datetime, provider: Optional[str] = None, is_dynamic: bool = True):
+    def __init__(self, name: str, base_price: float, start_date: datetime, provider: Optional[str] = None, is_dynamic: bool = True, markup: float = 0.20):
         """
-        Initialize the dynamic tariff with base price and kWh rate.
+        Initialize the dynamic tariff with base price and markup.
+        
+        Args:
+            name: Name of the tariff
+            base_price: Monthly base price in €
+            start_date: Start date for the tariff
+            provider: Energy provider name
+            is_dynamic: Whether this is a dynamic tariff (always True for this class)
+            markup: Markup added to wholesale prices in €/kWh (default 0.20 for grid fees, taxes, etc.)
         """
         super().__init__(name, base_price=base_price, start_date=start_date, provider=provider, is_dynamic=True)
+        self.markup = markup  # €/kWh markup added to wholesale prices
 
     def _get_average_forecast_price(self) -> float:
         """
@@ -195,8 +204,8 @@ class DynamicTariff(EnergyTariff):
             forecast_data = pd.read_csv(price_data_path)
             
             if 'yhat' in forecast_data.columns:
-                # Convert €/MWh to €/kWh and return average
-                return forecast_data['yhat'].mean() / 1000
+                # Convert €/MWh to €/kWh and add markup, then return average
+                return (forecast_data['yhat'].mean() / 1000) + self.markup
             else:
                 return 0.25  # Default fallback price in €/kWh
                 
@@ -312,9 +321,9 @@ class DynamicTariff(EnergyTariff):
             if 'yhat' not in future_prices.columns:
                 raise ValueError(f"Expected 'yhat' column in forecast data, found columns: {list(future_prices.columns)}")
             
-            future_prices['predicted_mean'] = future_prices['yhat'] / 1000  # Convert €/MWh to €/kWh
+            future_prices['predicted_mean'] = (future_prices['yhat'] / 1000) + self.markup  # Convert €/MWh to €/kWh and add markup
             future_prices = future_prices.rename(columns={'ds': 'datetime'})  # Prophet uses 'ds' for datetime
-            print(f"Using Prophet forecast with yhat column, converted prices from €/MWh to €/kWh")
+            print(f"Using Prophet forecast with yhat column, converted prices from €/MWh to €/kWh and added markup of {self.markup}")
             print(f"Sample converted prices: {future_prices['predicted_mean'].head().tolist()}")
         except Exception as e:
             print(f"Error loading price forecast data: {e}")
@@ -423,7 +432,7 @@ class DynamicTariff(EnergyTariff):
             if 'yhat' not in future_prices.columns:
                 raise ValueError(f"Expected 'yhat' column in forecast data, found columns: {list(future_prices.columns)}")
             
-            future_prices['predicted_mean'] = future_prices['yhat'] / 1000  # Convert €/MWh to €/kWh
+            future_prices['predicted_mean'] = (future_prices['yhat'] / 1000) + self.markup  # Convert €/MWh to €/kWh and add markup
             future_prices = future_prices.rename(columns={'ds': 'datetime'})  # Prophet uses 'ds' for datetime
         except Exception as e:
             # Return just base price if price data loading fails
