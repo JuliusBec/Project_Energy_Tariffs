@@ -1,0 +1,1145 @@
+INFO:     Will watch for changes in these directories: ['/Users/juliusbecker/Project_Energy_Tariffs']
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [13838] using StatReload
+INFO:     Started server process [13887]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+Project root directory: /Users/juliusbecker/Project_Energy_Tariffs
+Current working directory: /Users/juliusbecker/Project_Energy_Tariffs
+Created 6 tariffs
+Processing tariff: mobility+ dynamic, is_dynamic: True
+Calculating cost for tariff: mobility+ dynamic
+DynamicTariff.calculate_cost() called with data: <class 'float'>
+Project root directory: /Users/juliusbecker/Project_Energy_Tariffs
+Loading synthetic data for yearly usage: 3500.0
+Successfully loaded consumption data from /Users/juliusbecker/Project_Energy_Tariffs/data/household_data/synthetic_household.csv, shape: (8784, 4)
+Future consumption data shape: (720, 2)
+Successfully loaded price data from /Users/juliusbecker/Project_Energy_Tariffs/data/mock_price_data.csv, shape: (17544, 4)
+Merged data shape: (720, 5)
+Merged data columns: ['datetime', 'value', 'predicted_mean', 'lower_ci', 'upper_ci']
+Consumption column used: value
+Sample consumption values: [0.31606981412927104, 0.29862773349467875, 0.2908389916050376, 0.29328170878005155, 0.31660028716987876]
+Sample price values: [nan, nan, nan, nan, nan]
+Sample consumption costs: [nan, nan, nan, nan, nan]
+Total consumption cost: 0.0
+Base price: 14.9
+Total cost: 14.9
+Cost calculated: 14.9
+Processing tariff: easy dynamic, is_dynamic: True
+Calculating cost for tariff: easy dynamic
+DynamicTariff.calculate_cost() called with data: <class 'float'>
+Project root directory: /Users/juliusbecker/Project_Energy_Tariffs
+Loading synthetic data for yearly usage: 3500.0
+Successfully loaded consumption data from /Users/juliusbecker/Project_Energy_Tariffs/data/household_data/synthetic_household.csv, shape: (8784, 4)
+Future consumption data shape: (720, 2)
+Successfully loaded price data from /Users/juliusbecker/Project_Energy_Tariffs/data/mock_price_data.csv, shape: (17544, 4)
+Merged data shape: (720, 5)
+Merged data columns: ['datetime', 'value', 'predicted_mean', 'lower_ci', 'upper_ci']
+Consumption column used: value
+Sample consumption values: [0.31606981412927104, 0.29862773349467875, 0.2908389916050376, 0.29328170878005155, 0.31660028716987876]
+Sample price values: [nan, nan, nan, nan, nan]
+Sample consumption costs: [nan, nan, nan, nan, nan]
+Total consumption cost: 0.0
+Base price: 9.9
+Total cost: 9.9
+Cost calculated: 9.9
+Processing tariff: mobility+ Zuhause, is_dynamic: False
+Calculating cost for tariff: mobility+ Zuhause
+Cost calculated: 110.38368780080395
+Processing tariff: easy+, is_dynamic: False
+Calculating cost for tariff: easy+
+Cost calculated: 111.17233210518734
+Processing tariff: Basis, is_dynamic: False
+Calculating cost for tariff: Basis
+Cost calculated: 119.96097640957072
+Processing tariff: Komfort, is_dynamic: False
+Calculating cost for tariff: Komfort
+Cost calculated: 120.06665425737903
+Final results: 6 tariffs calculated
+INFO:     127.0.0.1:50562 - "POST /api/calculate-basic HTTP/1.1" 200 OK
+WARNING:  StatReload detected changes in 'src/core/EnergyTariff.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [13887]
+INFO:     Started server process [14494]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  StatReload detected changes in 'src/core/EnergyTariff.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [14494]
+INFO:     Started server process [14533]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+Project root directory: /Users/juliusbecker/Project_Energy_Tariffs
+Current working directory: /Users/juliusbecker/Project_Energy_Tariffs
+Created 6 tariffs
+Processing tariff: mobility+ dynamic, is_dynamic: True
+Calculating cost for tariff: mobility+ dynamic
+DynamicTariff.calculate_cost() called with data: <class 'float'>
+Project root directory: /Users/juliusbecker/Project_Energy_Tariffs
+Loading synthetic data for yearly usage: 3500.0
+Successfully loaded consumption data from /Users/juliusbecker/Project_Energy_Tariffs/data/household_data/synthetic_household.csv, shape: (8784, 4)
+
+=== slice_seasonal_data DEBUG ===
+Function called with start_date: 2025-10-07 10:18:37.695681, days: 30
+Original data date range: 2023-11-01 00:00:00 to 2024-10-31 23:00:00
+Final result shape: (720, 2)
+Final result date range: 2025-10-07 00:18:37.695681 to 2025-11-05 23:18:37.695681
+First 5 rows:
+                    datetime     value
+0 2025-10-07 00:18:37.695681  0.316070
+1 2025-10-07 01:18:37.695681  0.298628
+2 2025-10-07 02:18:37.695681  0.290839
+3 2025-10-07 03:18:37.695681  0.293282
+4 2025-10-07 04:18:37.695681  0.316600
+Last 5 rows:
+                      datetime     value
+715 2025-11-05 19:18:37.695681  0.566675
+716 2025-11-05 20:18:37.695681  0.489226
+717 2025-11-05 21:18:37.695681  0.467556
+718 2025-11-05 22:18:37.695681  0.411704
+719 2025-11-05 23:18:37.695681  0.357126
+=== END slice_seasonal_data DEBUG ===
+
+Future consumption data shape: (720, 2)
+Successfully loaded price data from /Users/juliusbecker/Project_Energy_Tariffs/data/mock_price_data.csv, shape: (17544, 4)
+Merged data shape: (720, 5)
+Merged data columns: ['datetime', 'value', 'predicted_mean', 'lower_ci', 'upper_ci']
+Consumption column used: value
+Sample consumption values: [0.31606981412927104, 0.29862773349467875, 0.2908389916050376, 0.29328170878005155, 0.31660028716987876]
+Sample price values: [nan, nan, nan, nan, nan]
+Sample consumption costs: [nan, nan, nan, nan, nan]
+Total consumption cost: 0.0
+Base price: 14.9
+Total cost: 14.9
+Cost calculated: 14.9
+Processing tariff: easy dynamic, is_dynamic: True
+Calculating cost for tariff: easy dynamic
+DynamicTariff.calculate_cost() called with data: <class 'float'>
+Project root directory: /Users/juliusbecker/Project_Energy_Tariffs
+Loading synthetic data for yearly usage: 3500.0
+Successfully loaded consumption data from /Users/juliusbecker/Project_Energy_Tariffs/data/household_data/synthetic_household.csv, shape: (8784, 4)
+
+=== slice_seasonal_data DEBUG ===
+Function called with start_date: 2025-10-07 10:18:37.695681, days: 30
+Original data date range: 2023-11-01 00:00:00 to 2024-10-31 23:00:00
+Final result shape: (720, 2)
+Final result date range: 2025-10-07 00:18:37.695681 to 2025-11-05 23:18:37.695681
+First 5 rows:
+                    datetime     value
+0 2025-10-07 00:18:37.695681  0.316070
+1 2025-10-07 01:18:37.695681  0.298628
+2 2025-10-07 02:18:37.695681  0.290839
+3 2025-10-07 03:18:37.695681  0.293282
+4 2025-10-07 04:18:37.695681  0.316600
+Last 5 rows:
+                      datetime     value
+715 2025-11-05 19:18:37.695681  0.566675
+716 2025-11-05 20:18:37.695681  0.489226
+717 2025-11-05 21:18:37.695681  0.467556
+718 2025-11-05 22:18:37.695681  0.411704
+719 2025-11-05 23:18:37.695681  0.357126
+=== END slice_seasonal_data DEBUG ===
+
+Future consumption data shape: (720, 2)
+Successfully loaded price data from /Users/juliusbecker/Project_Energy_Tariffs/data/mock_price_data.csv, shape: (17544, 4)
+Merged data shape: (720, 5)
+Merged data columns: ['datetime', 'value', 'predicted_mean', 'lower_ci', 'upper_ci']
+Consumption column used: value
+Sample consumption values: [0.31606981412927104, 0.29862773349467875, 0.2908389916050376, 0.29328170878005155, 0.31660028716987876]
+Sample price values: [nan, nan, nan, nan, nan]
+Sample consumption costs: [nan, nan, nan, nan, nan]
+Total consumption cost: 0.0
+Base price: 9.9
+Total cost: 9.9
+Cost calculated: 9.9
+Processing tariff: mobility+ Zuhause, is_dynamic: False
+Calculating cost for tariff: mobility+ Zuhause
+
+=== slice_seasonal_data DEBUG ===
+Function called with start_date: 2025-10-07 10:18:37.695681, days: 30
+Original data date range: 2023-11-01 00:00:00 to 2024-10-31 23:00:00
+Final result shape: (720, 2)
+Final result date range: 2025-10-07 00:18:37.695681 to 2025-11-05 23:18:37.695681
+First 5 rows:
+                    datetime     value
+0 2025-10-07 00:18:37.695681  0.316070
+1 2025-10-07 01:18:37.695681  0.298628
+2 2025-10-07 02:18:37.695681  0.290839
+3 2025-10-07 03:18:37.695681  0.293282
+4 2025-10-07 04:18:37.695681  0.316600
+Last 5 rows:
+                      datetime     value
+715 2025-11-05 19:18:37.695681  0.566675
+716 2025-11-05 20:18:37.695681  0.489226
+717 2025-11-05 21:18:37.695681  0.467556
+718 2025-11-05 22:18:37.695681  0.411704
+719 2025-11-05 23:18:37.695681  0.357126
+=== END slice_seasonal_data DEBUG ===
+
+Cost calculated: 110.38368780080395
+Processing tariff: easy+, is_dynamic: False
+Calculating cost for tariff: easy+
+
+=== slice_seasonal_data DEBUG ===
+Function called with start_date: 2025-10-07 10:18:37.695681, days: 30
+Original data date range: 2023-11-01 00:00:00 to 2024-10-31 23:00:00
+Final result shape: (720, 2)
+Final result date range: 2025-10-07 00:18:37.695681 to 2025-11-05 23:18:37.695681
+First 5 rows:
+                    datetime     value
+0 2025-10-07 00:18:37.695681  0.316070
+1 2025-10-07 01:18:37.695681  0.298628
+2 2025-10-07 02:18:37.695681  0.290839
+3 2025-10-07 03:18:37.695681  0.293282
+4 2025-10-07 04:18:37.695681  0.316600
+Last 5 rows:
+                      datetime     value
+715 2025-11-05 19:18:37.695681  0.566675
+716 2025-11-05 20:18:37.695681  0.489226
+717 2025-11-05 21:18:37.695681  0.467556
+718 2025-11-05 22:18:37.695681  0.411704
+719 2025-11-05 23:18:37.695681  0.357126
+=== END slice_seasonal_data DEBUG ===
+
+Cost calculated: 111.17233210518734
+Processing tariff: Basis, is_dynamic: False
+Calculating cost for tariff: Basis
+
+=== slice_seasonal_data DEBUG ===
+Function called with start_date: 2025-10-07 10:18:37.695681, days: 30
+Original data date range: 2023-11-01 00:00:00 to 2024-10-31 23:00:00
+Final result shape: (720, 2)
+Final result date range: 2025-10-07 00:18:37.695681 to 2025-11-05 23:18:37.695681
+First 5 rows:
+                    datetime     value
+0 2025-10-07 00:18:37.695681  0.316070
+1 2025-10-07 01:18:37.695681  0.298628
+2 2025-10-07 02:18:37.695681  0.290839
+3 2025-10-07 03:18:37.695681  0.293282
+4 2025-10-07 04:18:37.695681  0.316600
+Last 5 rows:
+                      datetime     value
+715 2025-11-05 19:18:37.695681  0.566675
+716 2025-11-05 20:18:37.695681  0.489226
+717 2025-11-05 21:18:37.695681  0.467556
+718 2025-11-05 22:18:37.695681  0.411704
+719 2025-11-05 23:18:37.695681  0.357126
+=== END slice_seasonal_data DEBUG ===
+
+Cost calculated: 119.96097640957072
+Processing tariff: Komfort, is_dynamic: False
+Calculating cost for tariff: Komfort
+
+=== slice_seasonal_data DEBUG ===
+Function called with start_date: 2025-10-07 10:18:37.695681, days: 30
+Original data date range: 2023-11-01 00:00:00 to 2024-10-31 23:00:00
+Final result shape: (720, 2)
+Final result date range: 2025-10-07 00:18:37.695681 to 2025-11-05 23:18:37.695681
+First 5 rows:
+                    datetime     value
+0 2025-10-07 00:18:37.695681  0.316070
+1 2025-10-07 01:18:37.695681  0.298628
+2 2025-10-07 02:18:37.695681  0.290839
+3 2025-10-07 03:18:37.695681  0.293282
+4 2025-10-07 04:18:37.695681  0.316600
+Last 5 rows:
+                      datetime     value
+715 2025-11-05 19:18:37.695681  0.566675
+716 2025-11-05 20:18:37.695681  0.489226
+717 2025-11-05 21:18:37.695681  0.467556
+718 2025-11-05 22:18:37.695681  0.411704
+719 2025-11-05 23:18:37.695681  0.357126
+=== END slice_seasonal_data DEBUG ===
+
+Cost calculated: 120.06665425737903
+Final results: 6 tariffs calculated
+INFO:     127.0.0.1:50608 - "POST /api/calculate-basic HTTP/1.1" 200 OK
+WARNING:  StatReload detected changes in 'src/api/app.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [14533]
+INFO:     Started server process [15178]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  StatReload detected changes in 'src/api/app.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [15178]
+INFO:     Started server process [15204]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+Project root directory: /Users/juliusbecker/Project_Energy_Tariffs
+Current working directory: /Users/juliusbecker/Project_Energy_Tariffs
+Created 6 tariffs
+Processing tariff: mobility+ dynamic, is_dynamic: True
+Calculating cost for tariff: mobility+ dynamic
+DynamicTariff.calculate_cost() called with data: <class 'float'>
+Project root directory: /Users/juliusbecker/Project_Energy_Tariffs
+Loading synthetic data for yearly usage: 3500.0
+Successfully loaded consumption data from /Users/juliusbecker/Project_Energy_Tariffs/data/household_data/synthetic_household.csv, shape: (8784, 4)
+
+=== slice_seasonal_data DEBUG ===
+Function called with start_date: 2025-10-07 00:00:00, days: 30
+Original data date range: 2023-11-01 00:00:00 to 2024-10-31 23:00:00
+Final result shape: (720, 2)
+Final result date range: 2025-10-07 00:00:00 to 2025-11-05 23:00:00
+First 5 rows:
+             datetime     value
+0 2025-10-07 00:00:00  0.316070
+1 2025-10-07 01:00:00  0.298628
+2 2025-10-07 02:00:00  0.290839
+3 2025-10-07 03:00:00  0.293282
+4 2025-10-07 04:00:00  0.316600
+Last 5 rows:
+               datetime     value
+715 2025-11-05 19:00:00  0.566675
+716 2025-11-05 20:00:00  0.489226
+717 2025-11-05 21:00:00  0.467556
+718 2025-11-05 22:00:00  0.411704
+719 2025-11-05 23:00:00  0.357126
+=== END slice_seasonal_data DEBUG ===
+
+Future consumption data shape: (720, 2)
+Successfully loaded price data from /Users/juliusbecker/Project_Energy_Tariffs/data/mock_price_data.csv, shape: (17544, 4)
+Merged data shape: (720, 5)
+Merged data columns: ['datetime', 'value', 'predicted_mean', 'lower_ci', 'upper_ci']
+Consumption column used: value
+Sample consumption values: [0.31606981412927104, 0.29862773349467875, 0.2908389916050376, 0.29328170878005155, 0.31660028716987876]
+Sample price values: [34.58, 35.34, 33.25, 30.15, 36.09]
+Sample consumption costs: [10.929694172590192, 10.553504101701948, 9.670396470867502, 8.842443519718554, 11.426104363960926]
+Total consumption cost: 27841.585370072848
+Base price: 14.9
+Total cost: 27856.48537007285
+Cost calculated: 27856.48537007285
+Processing tariff: easy dynamic, is_dynamic: True
+Calculating cost for tariff: easy dynamic
+DynamicTariff.calculate_cost() called with data: <class 'float'>
+Project root directory: /Users/juliusbecker/Project_Energy_Tariffs
+Loading synthetic data for yearly usage: 3500.0
+Successfully loaded consumption data from /Users/juliusbecker/Project_Energy_Tariffs/data/household_data/synthetic_household.csv, shape: (8784, 4)
+
+=== slice_seasonal_data DEBUG ===
+Function called with start_date: 2025-10-07 00:00:00, days: 30
+Original data date range: 2023-11-01 00:00:00 to 2024-10-31 23:00:00
+Final result shape: (720, 2)
+Final result date range: 2025-10-07 00:00:00 to 2025-11-05 23:00:00
+First 5 rows:
+             datetime     value
+0 2025-10-07 00:00:00  0.316070
+1 2025-10-07 01:00:00  0.298628
+2 2025-10-07 02:00:00  0.290839
+3 2025-10-07 03:00:00  0.293282
+4 2025-10-07 04:00:00  0.316600
+Last 5 rows:
+               datetime     value
+715 2025-11-05 19:00:00  0.566675
+716 2025-11-05 20:00:00  0.489226
+717 2025-11-05 21:00:00  0.467556
+718 2025-11-05 22:00:00  0.411704
+719 2025-11-05 23:00:00  0.357126
+=== END slice_seasonal_data DEBUG ===
+
+Future consumption data shape: (720, 2)
+Successfully loaded price data from /Users/juliusbecker/Project_Energy_Tariffs/data/mock_price_data.csv, shape: (17544, 4)
+Merged data shape: (720, 5)
+Merged data columns: ['datetime', 'value', 'predicted_mean', 'lower_ci', 'upper_ci']
+Consumption column used: value
+Sample consumption values: [0.31606981412927104, 0.29862773349467875, 0.2908389916050376, 0.29328170878005155, 0.31660028716987876]
+Sample price values: [34.58, 35.34, 33.25, 30.15, 36.09]
+Sample consumption costs: [10.929694172590192, 10.553504101701948, 9.670396470867502, 8.842443519718554, 11.426104363960926]
+Total consumption cost: 27841.585370072848
+Base price: 9.9
+Total cost: 27851.48537007285
+Cost calculated: 27851.48537007285
+Processing tariff: mobility+ Zuhause, is_dynamic: False
+Calculating cost for tariff: mobility+ Zuhause
+
+=== slice_seasonal_data DEBUG ===
+Function called with start_date: 2025-10-07 00:00:00, days: 30
+Original data date range: 2023-11-01 00:00:00 to 2024-10-31 23:00:00
+Final result shape: (720, 2)
+Final result date range: 2025-10-07 00:00:00 to 2025-11-05 23:00:00
+First 5 rows:
+             datetime     value
+0 2025-10-07 00:00:00  0.316070
+1 2025-10-07 01:00:00  0.298628
+2 2025-10-07 02:00:00  0.290839
+3 2025-10-07 03:00:00  0.293282
+4 2025-10-07 04:00:00  0.316600
+Last 5 rows:
+               datetime     value
+715 2025-11-05 19:00:00  0.566675
+716 2025-11-05 20:00:00  0.489226
+717 2025-11-05 21:00:00  0.467556
+718 2025-11-05 22:00:00  0.411704
+719 2025-11-05 23:00:00  0.357126
+=== END slice_seasonal_data DEBUG ===
+
+Cost calculated: 110.38368780080395
+Processing tariff: easy+, is_dynamic: False
+Calculating cost for tariff: easy+
+
+=== slice_seasonal_data DEBUG ===
+Function called with start_date: 2025-10-07 00:00:00, days: 30
+Original data date range: 2023-11-01 00:00:00 to 2024-10-31 23:00:00
+Final result shape: (720, 2)
+Final result date range: 2025-10-07 00:00:00 to 2025-11-05 23:00:00
+First 5 rows:
+             datetime     value
+0 2025-10-07 00:00:00  0.316070
+1 2025-10-07 01:00:00  0.298628
+2 2025-10-07 02:00:00  0.290839
+3 2025-10-07 03:00:00  0.293282
+4 2025-10-07 04:00:00  0.316600
+Last 5 rows:
+               datetime     value
+715 2025-11-05 19:00:00  0.566675
+716 2025-11-05 20:00:00  0.489226
+717 2025-11-05 21:00:00  0.467556
+718 2025-11-05 22:00:00  0.411704
+719 2025-11-05 23:00:00  0.357126
+=== END slice_seasonal_data DEBUG ===
+
+Cost calculated: 111.17233210518734
+Processing tariff: Basis, is_dynamic: False
+Calculating cost for tariff: Basis
+
+=== slice_seasonal_data DEBUG ===
+Function called with start_date: 2025-10-07 00:00:00, days: 30
+Original data date range: 2023-11-01 00:00:00 to 2024-10-31 23:00:00
+Final result shape: (720, 2)
+Final result date range: 2025-10-07 00:00:00 to 2025-11-05 23:00:00
+First 5 rows:
+             datetime     value
+0 2025-10-07 00:00:00  0.316070
+1 2025-10-07 01:00:00  0.298628
+2 2025-10-07 02:00:00  0.290839
+3 2025-10-07 03:00:00  0.293282
+4 2025-10-07 04:00:00  0.316600
+Last 5 rows:
+               datetime     value
+715 2025-11-05 19:00:00  0.566675
+716 2025-11-05 20:00:00  0.489226
+717 2025-11-05 21:00:00  0.467556
+718 2025-11-05 22:00:00  0.411704
+719 2025-11-05 23:00:00  0.357126
+=== END slice_seasonal_data DEBUG ===
+
+Cost calculated: 119.96097640957072
+Processing tariff: Komfort, is_dynamic: False
+Calculating cost for tariff: Komfort
+
+=== slice_seasonal_data DEBUG ===
+Function called with start_date: 2025-10-07 00:00:00, days: 30
+Original data date range: 2023-11-01 00:00:00 to 2024-10-31 23:00:00
+Final result shape: (720, 2)
+Final result date range: 2025-10-07 00:00:00 to 2025-11-05 23:00:00
+First 5 rows:
+             datetime     value
+0 2025-10-07 00:00:00  0.316070
+1 2025-10-07 01:00:00  0.298628
+2 2025-10-07 02:00:00  0.290839
+3 2025-10-07 03:00:00  0.293282
+4 2025-10-07 04:00:00  0.316600
+Last 5 rows:
+               datetime     value
+715 2025-11-05 19:00:00  0.566675
+716 2025-11-05 20:00:00  0.489226
+717 2025-11-05 21:00:00  0.467556
+718 2025-11-05 22:00:00  0.411704
+719 2025-11-05 23:00:00  0.357126
+=== END slice_seasonal_data DEBUG ===
+
+Cost calculated: 120.06665425737903
+Final results: 6 tariffs calculated
+INFO:     127.0.0.1:50992 - "POST /api/calculate-basic HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51071 - "OPTIONS /api/calculate-basic HTTP/1.1" 200 OK
+Project root directory: /Users/juliusbecker/Project_Energy_Tariffs
+Current working directory: /Users/juliusbecker/Project_Energy_Tariffs
+Created 6 tariffs
+Processing tariff: mobility+ dynamic, is_dynamic: True
+Calculating cost for tariff: mobility+ dynamic
+DynamicTariff.calculate_cost() called with data: <class 'float'>
+Project root directory: /Users/juliusbecker/Project_Energy_Tariffs
+Loading synthetic data for yearly usage: 3500.0
+Successfully loaded consumption data from /Users/juliusbecker/Project_Energy_Tariffs/data/household_data/synthetic_household.csv, shape: (8784, 4)
+
+=== slice_seasonal_data DEBUG ===
+Function called with start_date: 2025-10-07 00:00:00, days: 30
+Original data date range: 2023-11-01 00:00:00 to 2024-10-31 23:00:00
+Final result shape: (720, 2)
+Final result date range: 2025-10-07 00:00:00 to 2025-11-05 23:00:00
+First 5 rows:
+             datetime     value
+0 2025-10-07 00:00:00  0.316070
+1 2025-10-07 01:00:00  0.298628
+2 2025-10-07 02:00:00  0.290839
+3 2025-10-07 03:00:00  0.293282
+4 2025-10-07 04:00:00  0.316600
+Last 5 rows:
+               datetime     value
+715 2025-11-05 19:00:00  0.566675
+716 2025-11-05 20:00:00  0.489226
+717 2025-11-05 21:00:00  0.467556
+718 2025-11-05 22:00:00  0.411704
+719 2025-11-05 23:00:00  0.357126
+=== END slice_seasonal_data DEBUG ===
+
+Future consumption data shape: (720, 2)
+Successfully loaded price data from /Users/juliusbecker/Project_Energy_Tariffs/data/mock_price_data.csv, shape: (17544, 4)
+Merged data shape: (720, 5)
+Merged data columns: ['datetime', 'value', 'predicted_mean', 'lower_ci', 'upper_ci']
+Consumption column used: value
+Sample consumption values: [0.31606981412927104, 0.29862773349467875, 0.2908389916050376, 0.29328170878005155, 0.31660028716987876]
+Sample price values: [34.58, 35.34, 33.25, 30.15, 36.09]
+Sample consumption costs: [10.929694172590192, 10.553504101701948, 9.670396470867502, 8.842443519718554, 11.426104363960926]
+Total consumption cost: 27841.585370072848
+Base price: 14.9
+Total cost: 27856.48537007285
+Cost calculated: 27856.48537007285
+Processing tariff: easy dynamic, is_dynamic: True
+Calculating cost for tariff: easy dynamic
+DynamicTariff.calculate_cost() called with data: <class 'float'>
+Project root directory: /Users/juliusbecker/Project_Energy_Tariffs
+Loading synthetic data for yearly usage: 3500.0
+Successfully loaded consumption data from /Users/juliusbecker/Project_Energy_Tariffs/data/household_data/synthetic_household.csv, shape: (8784, 4)
+
+=== slice_seasonal_data DEBUG ===
+Function called with start_date: 2025-10-07 00:00:00, days: 30
+Original data date range: 2023-11-01 00:00:00 to 2024-10-31 23:00:00
+Final result shape: (720, 2)
+Final result date range: 2025-10-07 00:00:00 to 2025-11-05 23:00:00
+First 5 rows:
+             datetime     value
+0 2025-10-07 00:00:00  0.316070
+1 2025-10-07 01:00:00  0.298628
+2 2025-10-07 02:00:00  0.290839
+3 2025-10-07 03:00:00  0.293282
+4 2025-10-07 04:00:00  0.316600
+Last 5 rows:
+               datetime     value
+715 2025-11-05 19:00:00  0.566675
+716 2025-11-05 20:00:00  0.489226
+717 2025-11-05 21:00:00  0.467556
+718 2025-11-05 22:00:00  0.411704
+719 2025-11-05 23:00:00  0.357126
+=== END slice_seasonal_data DEBUG ===
+
+Future consumption data shape: (720, 2)
+Successfully loaded price data from /Users/juliusbecker/Project_Energy_Tariffs/data/mock_price_data.csv, shape: (17544, 4)
+Merged data shape: (720, 5)
+Merged data columns: ['datetime', 'value', 'predicted_mean', 'lower_ci', 'upper_ci']
+Consumption column used: value
+Sample consumption values: [0.31606981412927104, 0.29862773349467875, 0.2908389916050376, 0.29328170878005155, 0.31660028716987876]
+Sample price values: [34.58, 35.34, 33.25, 30.15, 36.09]
+Sample consumption costs: [10.929694172590192, 10.553504101701948, 9.670396470867502, 8.842443519718554, 11.426104363960926]
+Total consumption cost: 27841.585370072848
+Base price: 9.9
+Total cost: 27851.48537007285
+Cost calculated: 27851.48537007285
+Processing tariff: mobility+ Zuhause, is_dynamic: False
+Calculating cost for tariff: mobility+ Zuhause
+
+=== slice_seasonal_data DEBUG ===
+Function called with start_date: 2025-10-07 00:00:00, days: 30
+Original data date range: 2023-11-01 00:00:00 to 2024-10-31 23:00:00
+Final result shape: (720, 2)
+Final result date range: 2025-10-07 00:00:00 to 2025-11-05 23:00:00
+First 5 rows:
+             datetime     value
+0 2025-10-07 00:00:00  0.316070
+1 2025-10-07 01:00:00  0.298628
+2 2025-10-07 02:00:00  0.290839
+3 2025-10-07 03:00:00  0.293282
+4 2025-10-07 04:00:00  0.316600
+Last 5 rows:
+               datetime     value
+715 2025-11-05 19:00:00  0.566675
+716 2025-11-05 20:00:00  0.489226
+717 2025-11-05 21:00:00  0.467556
+718 2025-11-05 22:00:00  0.411704
+719 2025-11-05 23:00:00  0.357126
+=== END slice_seasonal_data DEBUG ===
+
+Cost calculated: 110.38368780080395
+Processing tariff: easy+, is_dynamic: False
+Calculating cost for tariff: easy+
+
+=== slice_seasonal_data DEBUG ===
+Function called with start_date: 2025-10-07 00:00:00, days: 30
+Original data date range: 2023-11-01 00:00:00 to 2024-10-31 23:00:00
+Final result shape: (720, 2)
+Final result date range: 2025-10-07 00:00:00 to 2025-11-05 23:00:00
+First 5 rows:
+             datetime     value
+0 2025-10-07 00:00:00  0.316070
+1 2025-10-07 01:00:00  0.298628
+2 2025-10-07 02:00:00  0.290839
+3 2025-10-07 03:00:00  0.293282
+4 2025-10-07 04:00:00  0.316600
+Last 5 rows:
+               datetime     value
+715 2025-11-05 19:00:00  0.566675
+716 2025-11-05 20:00:00  0.489226
+717 2025-11-05 21:00:00  0.467556
+718 2025-11-05 22:00:00  0.411704
+719 2025-11-05 23:00:00  0.357126
+=== END slice_seasonal_data DEBUG ===
+
+Cost calculated: 111.17233210518734
+Processing tariff: Basis, is_dynamic: False
+Calculating cost for tariff: Basis
+
+=== slice_seasonal_data DEBUG ===
+Function called with start_date: 2025-10-07 00:00:00, days: 30
+Original data date range: 2023-11-01 00:00:00 to 2024-10-31 23:00:00
+Final result shape: (720, 2)
+Final result date range: 2025-10-07 00:00:00 to 2025-11-05 23:00:00
+First 5 rows:
+             datetime     value
+0 2025-10-07 00:00:00  0.316070
+1 2025-10-07 01:00:00  0.298628
+2 2025-10-07 02:00:00  0.290839
+3 2025-10-07 03:00:00  0.293282
+4 2025-10-07 04:00:00  0.316600
+Last 5 rows:
+               datetime     value
+715 2025-11-05 19:00:00  0.566675
+716 2025-11-05 20:00:00  0.489226
+717 2025-11-05 21:00:00  0.467556
+718 2025-11-05 22:00:00  0.411704
+719 2025-11-05 23:00:00  0.357126
+=== END slice_seasonal_data DEBUG ===
+
+Cost calculated: 119.96097640957072
+Processing tariff: Komfort, is_dynamic: False
+Calculating cost for tariff: Komfort
+
+=== slice_seasonal_data DEBUG ===
+Function called with start_date: 2025-10-07 00:00:00, days: 30
+Original data date range: 2023-11-01 00:00:00 to 2024-10-31 23:00:00
+Final result shape: (720, 2)
+Final result date range: 2025-10-07 00:00:00 to 2025-11-05 23:00:00
+First 5 rows:
+             datetime     value
+0 2025-10-07 00:00:00  0.316070
+1 2025-10-07 01:00:00  0.298628
+2 2025-10-07 02:00:00  0.290839
+3 2025-10-07 03:00:00  0.293282
+4 2025-10-07 04:00:00  0.316600
+Last 5 rows:
+               datetime     value
+715 2025-11-05 19:00:00  0.566675
+716 2025-11-05 20:00:00  0.489226
+717 2025-11-05 21:00:00  0.467556
+718 2025-11-05 22:00:00  0.411704
+719 2025-11-05 23:00:00  0.357126
+=== END slice_seasonal_data DEBUG ===
+
+Cost calculated: 120.06665425737903
+Final results: 6 tariffs calculated
+INFO:     127.0.0.1:51071 - "POST /api/calculate-basic HTTP/1.1" 200 OK
+WARNING:  StatReload detected changes in 'src/core/EnergyTariff.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [15204]
+INFO:     Started server process [16170]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+Project root directory: /Users/juliusbecker/Project_Energy_Tariffs
+Current working directory: /Users/juliusbecker/Project_Energy_Tariffs
+Created 6 tariffs
+Processing tariff: mobility+ dynamic, is_dynamic: True
+Calculating cost for tariff: mobility+ dynamic
+DynamicTariff.calculate_cost() called with data: <class 'float'>
+Project root directory: /Users/juliusbecker/Project_Energy_Tariffs
+Loading synthetic data for yearly usage: 3500.0
+Successfully loaded consumption data from /Users/juliusbecker/Project_Energy_Tariffs/data/household_data/synthetic_household.csv, shape: (8784, 4)
+Future consumption data shape: (720, 2)
+Successfully loaded price data from /Users/juliusbecker/Project_Energy_Tariffs/data/mock_price_data.csv, shape: (17544, 4)
+Merged data shape: (720, 5)
+Merged data columns: ['datetime', 'value', 'predicted_mean', 'lower_ci', 'upper_ci']
+Number of non-null price values: 720
+Number of null price values: 0
+Price data date range: 2024-01-01 00:00:00 to 2025-12-31 23:00:00
+Consumption data date range: 2025-10-07 00:00:00 to 2025-11-05 23:00:00
+Consumption column used: value
+Sample consumption values: [0.31606981412927104, 0.29862773349467875, 0.2908389916050376, 0.29328170878005155, 0.31660028716987876]
+Sample price values: [34.58, 35.34, 33.25, 30.15, 36.09]
+Sample consumption costs: [10.929694172590192, 10.553504101701948, 9.670396470867502, 8.842443519718554, 11.426104363960926]
+Total consumption cost: 27841.585370072848
+Base price: 14.9
+Total cost: 27856.48537007285
+Cost calculated: 27856.48537007285
+Processing tariff: easy dynamic, is_dynamic: True
+Calculating cost for tariff: easy dynamic
+DynamicTariff.calculate_cost() called with data: <class 'float'>
+Project root directory: /Users/juliusbecker/Project_Energy_Tariffs
+Loading synthetic data for yearly usage: 3500.0
+Successfully loaded consumption data from /Users/juliusbecker/Project_Energy_Tariffs/data/household_data/synthetic_household.csv, shape: (8784, 4)
+Future consumption data shape: (720, 2)
+Successfully loaded price data from /Users/juliusbecker/Project_Energy_Tariffs/data/mock_price_data.csv, shape: (17544, 4)
+Merged data shape: (720, 5)
+Merged data columns: ['datetime', 'value', 'predicted_mean', 'lower_ci', 'upper_ci']
+Number of non-null price values: 720
+Number of null price values: 0
+Price data date range: 2024-01-01 00:00:00 to 2025-12-31 23:00:00
+Consumption data date range: 2025-10-07 00:00:00 to 2025-11-05 23:00:00
+Consumption column used: value
+Sample consumption values: [0.31606981412927104, 0.29862773349467875, 0.2908389916050376, 0.29328170878005155, 0.31660028716987876]
+Sample price values: [34.58, 35.34, 33.25, 30.15, 36.09]
+Sample consumption costs: [10.929694172590192, 10.553504101701948, 9.670396470867502, 8.842443519718554, 11.426104363960926]
+Total consumption cost: 27841.585370072848
+Base price: 9.9
+Total cost: 27851.48537007285
+Cost calculated: 27851.48537007285
+Processing tariff: mobility+ Zuhause, is_dynamic: False
+Calculating cost for tariff: mobility+ Zuhause
+Cost calculated: 110.38368780080395
+Processing tariff: easy+, is_dynamic: False
+Calculating cost for tariff: easy+
+Cost calculated: 111.17233210518734
+Processing tariff: Basis, is_dynamic: False
+Calculating cost for tariff: Basis
+Cost calculated: 119.96097640957072
+Processing tariff: Komfort, is_dynamic: False
+Calculating cost for tariff: Komfort
+Cost calculated: 120.06665425737903
+Final results: 6 tariffs calculated
+INFO:     127.0.0.1:51324 - "POST /api/calculate-basic HTTP/1.1" 200 OK
+WARNING:  StatReload detected changes in 'src/core/EnergyTariff.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [16170]
+INFO:     Started server process [16445]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  StatReload detected changes in 'src/core/EnergyTariff.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [16445]
+INFO:     Started server process [16668]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  StatReload detected changes in 'src/core/EnergyTariff.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [16668]
+INFO:     Started server process [16701]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+Project root directory: /Users/juliusbecker/Project_Energy_Tariffs
+Current working directory: /Users/juliusbecker/Project_Energy_Tariffs
+Created 6 tariffs
+Processing tariff: mobility+ dynamic, is_dynamic: True
+Calculating cost for tariff: mobility+ dynamic
+DynamicTariff.calculate_cost() called with data: <class 'float'>
+Project root directory: /Users/juliusbecker/Project_Energy_Tariffs
+Loading synthetic data for yearly usage: 3500.0
+Successfully loaded consumption data from /Users/juliusbecker/Project_Energy_Tariffs/data/household_data/synthetic_household.csv, shape: (8784, 4)
+Future consumption data shape: (720, 2)
+Successfully loaded price data from /Users/juliusbecker/Project_Energy_Tariffs/data/mock_price_data.csv, shape: (17544, 4)
+Converted prices from €/MWh to €/kWh
+Sample converted prices: [-0.00517, -0.00107, -0.00147, -0.00508, -0.00449]
+Merged data shape: (720, 5)
+Merged data columns: ['datetime', 'value', 'predicted_mean', 'lower_ci', 'upper_ci']
+Number of non-null price values: 720
+Number of null price values: 0
+Price data date range: 2024-01-01 00:00:00 to 2025-12-31 23:00:00
+Consumption data date range: 2025-10-07 00:00:00 to 2025-11-05 23:00:00
+Consumption column used: value
+Sample consumption values: [0.31606981412927104, 0.29862773349467875, 0.2908389916050376, 0.29328170878005155, 0.31660028716987876]
+Sample price values: [0.03458, 0.03534, 0.03325, 0.03015, 0.036090000000000004]
+Sample consumption costs: [0.010929694172590192, 0.010553504101701947, 0.0096703964708675, 0.008842443519718555, 0.011426104363960925]
+Total consumption cost: 27.841585370072846
+Base price: 14.9
+Total cost: 42.74158537007285
+Cost calculated: 42.74158537007285
+Processing tariff: easy dynamic, is_dynamic: True
+Calculating cost for tariff: easy dynamic
+DynamicTariff.calculate_cost() called with data: <class 'float'>
+Project root directory: /Users/juliusbecker/Project_Energy_Tariffs
+Loading synthetic data for yearly usage: 3500.0
+Successfully loaded consumption data from /Users/juliusbecker/Project_Energy_Tariffs/data/household_data/synthetic_household.csv, shape: (8784, 4)
+Future consumption data shape: (720, 2)
+Successfully loaded price data from /Users/juliusbecker/Project_Energy_Tariffs/data/mock_price_data.csv, shape: (17544, 4)
+Converted prices from €/MWh to €/kWh
+Sample converted prices: [-0.00517, -0.00107, -0.00147, -0.00508, -0.00449]
+Merged data shape: (720, 5)
+Merged data columns: ['datetime', 'value', 'predicted_mean', 'lower_ci', 'upper_ci']
+Number of non-null price values: 720
+Number of null price values: 0
+Price data date range: 2024-01-01 00:00:00 to 2025-12-31 23:00:00
+Consumption data date range: 2025-10-07 00:00:00 to 2025-11-05 23:00:00
+Consumption column used: value
+Sample consumption values: [0.31606981412927104, 0.29862773349467875, 0.2908389916050376, 0.29328170878005155, 0.31660028716987876]
+Sample price values: [0.03458, 0.03534, 0.03325, 0.03015, 0.036090000000000004]
+Sample consumption costs: [0.010929694172590192, 0.010553504101701947, 0.0096703964708675, 0.008842443519718555, 0.011426104363960925]
+Total consumption cost: 27.841585370072846
+Base price: 9.9
+Total cost: 37.74158537007285
+Cost calculated: 37.74158537007285
+Processing tariff: mobility+ Zuhause, is_dynamic: False
+Calculating cost for tariff: mobility+ Zuhause
+Cost calculated: 110.38368780080395
+Processing tariff: easy+, is_dynamic: False
+Calculating cost for tariff: easy+
+Cost calculated: 111.17233210518734
+Processing tariff: Basis, is_dynamic: False
+Calculating cost for tariff: Basis
+Cost calculated: 119.96097640957072
+Processing tariff: Komfort, is_dynamic: False
+Calculating cost for tariff: Komfort
+Cost calculated: 120.06665425737903
+Final results: 6 tariffs calculated
+INFO:     127.0.0.1:51424 - "POST /api/calculate-basic HTTP/1.1" 200 OK
+WARNING:  StatReload detected changes in 'src/core/EnergyTariff.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [16701]
+INFO:     Started server process [17206]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+Project root directory: /Users/juliusbecker/Project_Energy_Tariffs
+Current working directory: /Users/juliusbecker/Project_Energy_Tariffs
+Created 6 tariffs
+Processing tariff: mobility+ dynamic, is_dynamic: True
+Calculating cost for tariff: mobility+ dynamic
+DynamicTariff.calculate_cost() called with data: <class 'float'>
+Project root directory: /Users/juliusbecker/Project_Energy_Tariffs
+Loading synthetic data for yearly usage: 3500.0
+Successfully loaded consumption data from /Users/juliusbecker/Project_Energy_Tariffs/data/household_data/synthetic_household.csv, shape: (8784, 4)
+Future consumption data shape: (720, 2)
+Successfully loaded price data from /Users/juliusbecker/Project_Energy_Tariffs/data/mock_price_data.csv, shape: (17544, 4)
+Converted prices from €/MWh to €/kWh
+Sample converted prices: [-0.00517, -0.00107, -0.00147, -0.00508, -0.00449]
+Merged data shape: (720, 5)
+Merged data columns: ['datetime', 'value', 'predicted_mean', 'lower_ci', 'upper_ci']
+Number of non-null price values: 720
+Number of null price values: 0
+Price data date range: 2024-01-01 00:00:00 to 2025-12-31 23:00:00
+Consumption data date range: 2025-10-07 00:00:00 to 2025-11-05 23:00:00
+Consumption column used: value
+Sample consumption values: [0.31606981412927104, 0.29862773349467875, 0.2908389916050376, 0.29328170878005155, 0.31660028716987876]
+Sample price values: [0.03458, 0.03534, 0.03325, 0.03015, 0.036090000000000004]
+Sample consumption costs: [0.010929694172590192, 0.010553504101701947, 0.0096703964708675, 0.008842443519718555, 0.011426104363960925]
+Total consumption cost: 27.841585370072846
+Base price: 14.9
+Total cost: 42.74158537007285
+Cost calculated: 42.74158537007285
+Processing tariff: easy dynamic, is_dynamic: True
+Calculating cost for tariff: easy dynamic
+DynamicTariff.calculate_cost() called with data: <class 'float'>
+Project root directory: /Users/juliusbecker/Project_Energy_Tariffs
+Loading synthetic data for yearly usage: 3500.0
+Successfully loaded consumption data from /Users/juliusbecker/Project_Energy_Tariffs/data/household_data/synthetic_household.csv, shape: (8784, 4)
+Future consumption data shape: (720, 2)
+Successfully loaded price data from /Users/juliusbecker/Project_Energy_Tariffs/data/mock_price_data.csv, shape: (17544, 4)
+Converted prices from €/MWh to €/kWh
+Sample converted prices: [-0.00517, -0.00107, -0.00147, -0.00508, -0.00449]
+Merged data shape: (720, 5)
+Merged data columns: ['datetime', 'value', 'predicted_mean', 'lower_ci', 'upper_ci']
+Number of non-null price values: 720
+Number of null price values: 0
+Price data date range: 2024-01-01 00:00:00 to 2025-12-31 23:00:00
+Consumption data date range: 2025-10-07 00:00:00 to 2025-11-05 23:00:00
+Consumption column used: value
+Sample consumption values: [0.31606981412927104, 0.29862773349467875, 0.2908389916050376, 0.29328170878005155, 0.31660028716987876]
+Sample price values: [0.03458, 0.03534, 0.03325, 0.03015, 0.036090000000000004]
+Sample consumption costs: [0.010929694172590192, 0.010553504101701947, 0.0096703964708675, 0.008842443519718555, 0.011426104363960925]
+Total consumption cost: 27.841585370072846
+Base price: 9.9
+Total cost: 37.74158537007285
+Cost calculated: 37.74158537007285
+Processing tariff: mobility+ Zuhause, is_dynamic: False
+Calculating cost for tariff: mobility+ Zuhause
+Cost calculated: 110.38368780080395
+Processing tariff: easy+, is_dynamic: False
+Calculating cost for tariff: easy+
+Cost calculated: 111.17233210518734
+Processing tariff: Basis, is_dynamic: False
+Calculating cost for tariff: Basis
+Cost calculated: 119.96097640957072
+Processing tariff: Komfort, is_dynamic: False
+Calculating cost for tariff: Komfort
+Cost calculated: 120.06665425737903
+Final results: 6 tariffs calculated
+INFO:     127.0.0.1:51549 - "POST /api/calculate-basic HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54395 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54396 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:54424 - "GET /api/tariffs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54435 - "OPTIONS /api/calculate-basic HTTP/1.1" 200 OK
+Project root directory: /Users/juliusbecker/Project_Energy_Tariffs
+Current working directory: /Users/juliusbecker/Project_Energy_Tariffs
+Created 6 tariffs
+Processing tariff: mobility+ dynamic, is_dynamic: True
+Calculating cost for tariff: mobility+ dynamic
+DynamicTariff.calculate_cost() called with data: <class 'float'>
+Project root directory: /Users/juliusbecker/Project_Energy_Tariffs
+Loading synthetic data for yearly usage: 20000.0
+Successfully loaded consumption data from /Users/juliusbecker/Project_Energy_Tariffs/data/household_data/synthetic_household.csv, shape: (8784, 4)
+Future consumption data shape: (720, 2)
+Successfully loaded price data from /Users/juliusbecker/Project_Energy_Tariffs/data/mock_price_data.csv, shape: (17544, 4)
+Converted prices from €/MWh to €/kWh
+Sample converted prices: [-0.00517, -0.00107, -0.00147, -0.00508, -0.00449]
+Merged data shape: (720, 5)
+Merged data columns: ['datetime', 'value', 'predicted_mean', 'lower_ci', 'upper_ci']
+Number of non-null price values: 720
+Number of null price values: 0
+Price data date range: 2024-01-01 00:00:00 to 2025-12-31 23:00:00
+Consumption data date range: 2025-10-07 00:00:00 to 2025-11-05 23:00:00
+Consumption column used: value
+Sample consumption values: [1.8061132235958348, 1.7064441913981645, 1.6619370948859296, 1.675895478743152, 1.8091444981135931]
+Sample price values: [0.03458, 0.03534, 0.03325, 0.03015, 0.036090000000000004]
+Sample consumption costs: [0.062455395271943964, 0.06030573772401114, 0.05525940840495716, 0.05052824868410603, 0.06529202493691959]
+Total consumption cost: 159.09477354327342
+Base price: 14.9
+Total cost: 173.99477354327342
+Cost calculated: 173.99477354327342
+Processing tariff: easy dynamic, is_dynamic: True
+Calculating cost for tariff: easy dynamic
+DynamicTariff.calculate_cost() called with data: <class 'float'>
+Project root directory: /Users/juliusbecker/Project_Energy_Tariffs
+Loading synthetic data for yearly usage: 20000.0
+Successfully loaded consumption data from /Users/juliusbecker/Project_Energy_Tariffs/data/household_data/synthetic_household.csv, shape: (8784, 4)
+Future consumption data shape: (720, 2)
+Successfully loaded price data from /Users/juliusbecker/Project_Energy_Tariffs/data/mock_price_data.csv, shape: (17544, 4)
+Converted prices from €/MWh to €/kWh
+Sample converted prices: [-0.00517, -0.00107, -0.00147, -0.00508, -0.00449]
+Merged data shape: (720, 5)
+Merged data columns: ['datetime', 'value', 'predicted_mean', 'lower_ci', 'upper_ci']
+Number of non-null price values: 720
+Number of null price values: 0
+Price data date range: 2024-01-01 00:00:00 to 2025-12-31 23:00:00
+Consumption data date range: 2025-10-07 00:00:00 to 2025-11-05 23:00:00
+Consumption column used: value
+Sample consumption values: [1.8061132235958348, 1.7064441913981645, 1.6619370948859296, 1.675895478743152, 1.8091444981135931]
+Sample price values: [0.03458, 0.03534, 0.03325, 0.03015, 0.036090000000000004]
+Sample consumption costs: [0.062455395271943964, 0.06030573772401114, 0.05525940840495716, 0.05052824868410603, 0.06529202493691959]
+Total consumption cost: 159.09477354327342
+Base price: 9.9
+Total cost: 168.99477354327342
+Cost calculated: 168.99477354327342
+Processing tariff: mobility+ Zuhause, is_dynamic: False
+Calculating cost for tariff: mobility+ Zuhause
+Cost calculated: 560.5210731474511
+Processing tariff: easy+, is_dynamic: False
+Calculating cost for tariff: easy+
+Cost calculated: 588.5990406010704
+Processing tariff: Basis, is_dynamic: False
+Calculating cost for tariff: Basis
+Cost calculated: 624.6770080546898
+Processing tariff: Komfort, is_dynamic: False
+Calculating cost for tariff: Komfort
+Cost calculated: 611.1380243278802
+Final results: 6 tariffs calculated
+INFO:     127.0.0.1:54435 - "POST /api/calculate-basic HTTP/1.1" 200 OK
+WARNING:  StatReload detected changes in 'src/core/EnergyTariff.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [17206]
+INFO:     Started server process [21696]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+Project root directory: /Users/juliusbecker/Project_Energy_Tariffs
+Current working directory: /Users/juliusbecker/Project_Energy_Tariffs
+Created 6 tariffs
+Processing tariff: mobility+ dynamic, is_dynamic: True
+Calculating cost for tariff: mobility+ dynamic
+DynamicTariff.calculate_cost() called with data: <class 'float'>
+Project root directory: /Users/juliusbecker/Project_Energy_Tariffs
+*** USING SLICE_SEASONAL_DATA (basic calculation) ***
+Loading synthetic data for yearly usage: 2000.0
+Successfully loaded consumption data from /Users/juliusbecker/Project_Energy_Tariffs/data/household_data/synthetic_household.csv, shape: (8784, 4)
+Future consumption data shape: (720, 2)
+Successfully loaded price data from /Users/juliusbecker/Project_Energy_Tariffs/data/mock_price_data.csv, shape: (17544, 4)
+Converted prices from €/MWh to €/kWh
+Sample converted prices: [-0.00517, -0.00107, -0.00147, -0.00508, -0.00449]
+Merged data shape: (720, 5)
+Merged data columns: ['datetime', 'value', 'predicted_mean', 'lower_ci', 'upper_ci']
+Number of non-null price values: 720
+Number of null price values: 0
+Price data date range: 2024-01-01 00:00:00 to 2025-12-31 23:00:00
+Consumption data date range: 2025-10-07 00:00:00 to 2025-11-05 23:00:00
+Consumption column used: value
+Sample consumption values: [0.18061132235958346, 0.17064441913981643, 0.16619370948859294, 0.16758954787431518, 0.1809144498113593]
+Sample price values: [0.03458, 0.03534, 0.03325, 0.03015, 0.036090000000000004]
+Sample consumption costs: [0.006245539527194396, 0.0060305737724011136, 0.005525940840495716, 0.005052824868410603, 0.0065292024936919575]
+Total consumption cost: 15.90947735432734
+Base price: 14.9
+Total cost: 30.809477354327342
+Cost calculated: 30.809477354327342
+Processing tariff: easy dynamic, is_dynamic: True
+Calculating cost for tariff: easy dynamic
+DynamicTariff.calculate_cost() called with data: <class 'float'>
+Project root directory: /Users/juliusbecker/Project_Energy_Tariffs
+*** USING SLICE_SEASONAL_DATA (basic calculation) ***
+Loading synthetic data for yearly usage: 2000.0
+Successfully loaded consumption data from /Users/juliusbecker/Project_Energy_Tariffs/data/household_data/synthetic_household.csv, shape: (8784, 4)
+Future consumption data shape: (720, 2)
+Successfully loaded price data from /Users/juliusbecker/Project_Energy_Tariffs/data/mock_price_data.csv, shape: (17544, 4)
+Converted prices from €/MWh to €/kWh
+Sample converted prices: [-0.00517, -0.00107, -0.00147, -0.00508, -0.00449]
+Merged data shape: (720, 5)
+Merged data columns: ['datetime', 'value', 'predicted_mean', 'lower_ci', 'upper_ci']
+Number of non-null price values: 720
+Number of null price values: 0
+Price data date range: 2024-01-01 00:00:00 to 2025-12-31 23:00:00
+Consumption data date range: 2025-10-07 00:00:00 to 2025-11-05 23:00:00
+Consumption column used: value
+Sample consumption values: [0.18061132235958346, 0.17064441913981643, 0.16619370948859294, 0.16758954787431518, 0.1809144498113593]
+Sample price values: [0.03458, 0.03534, 0.03325, 0.03015, 0.036090000000000004]
+Sample consumption costs: [0.006245539527194396, 0.0060305737724011136, 0.005525940840495716, 0.005052824868410603, 0.0065292024936919575]
+Total consumption cost: 15.90947735432734
+Base price: 9.9
+Total cost: 25.809477354327342
+Cost calculated: 25.809477354327342
+Processing tariff: mobility+ Zuhause, is_dynamic: False
+Calculating cost for tariff: mobility+ Zuhause
+Cost calculated: 69.46210731474513
+Processing tariff: easy+, is_dynamic: False
+Calculating cost for tariff: easy+
+Cost calculated: 67.76990406010705
+Processing tariff: Basis, is_dynamic: False
+Calculating cost for tariff: Basis
+Cost calculated: 74.077700805469
+Processing tariff: Komfort, is_dynamic: False
+Calculating cost for tariff: Komfort
+Cost calculated: 75.42380243278802
+Final results: 6 tariffs calculated
+INFO:     127.0.0.1:54671 - "POST /api/calculate-basic HTTP/1.1" 200 OK
+Project root directory: /Users/juliusbecker/Project_Energy_Tariffs
+Current working directory: /Users/juliusbecker/Project_Energy_Tariffs
+Created 6 tariffs
+Processing tariff: mobility+ dynamic, is_dynamic: True
+Calculating cost for tariff: mobility+ dynamic
+DynamicTariff.calculate_cost() called with data: <class 'float'>
+Project root directory: /Users/juliusbecker/Project_Energy_Tariffs
+*** USING SLICE_SEASONAL_DATA (basic calculation) ***
+Loading synthetic data for yearly usage: 5500.0
+Successfully loaded consumption data from /Users/juliusbecker/Project_Energy_Tariffs/data/household_data/synthetic_household.csv, shape: (8784, 4)
+Future consumption data shape: (720, 2)
+Successfully loaded price data from /Users/juliusbecker/Project_Energy_Tariffs/data/mock_price_data.csv, shape: (17544, 4)
+Converted prices from €/MWh to €/kWh
+Sample converted prices: [-0.00517, -0.00107, -0.00147, -0.00508, -0.00449]
+Merged data shape: (720, 5)
+Merged data columns: ['datetime', 'value', 'predicted_mean', 'lower_ci', 'upper_ci']
+Number of non-null price values: 720
+Number of null price values: 0
+Price data date range: 2024-01-01 00:00:00 to 2025-12-31 23:00:00
+Consumption data date range: 2025-10-07 00:00:00 to 2025-11-05 23:00:00
+Consumption column used: value
+Sample consumption values: [0.4966811364888545, 0.46927215263449523, 0.4570327010936306, 0.46087125665436673, 0.49751473698123805]
+Sample price values: [0.03458, 0.03534, 0.03325, 0.03015, 0.036090000000000004]
+Sample consumption costs: [0.017175233699784586, 0.016584077874103063, 0.015196337311363217, 0.013895268388129156, 0.017955306857652883]
+Total consumption cost: 43.751062724400185
+Base price: 14.9
+Total cost: 58.651062724400184
+Cost calculated: 58.651062724400184
+Processing tariff: easy dynamic, is_dynamic: True
+Calculating cost for tariff: easy dynamic
+DynamicTariff.calculate_cost() called with data: <class 'float'>
+Project root directory: /Users/juliusbecker/Project_Energy_Tariffs
+*** USING SLICE_SEASONAL_DATA (basic calculation) ***
+Loading synthetic data for yearly usage: 5500.0
+Successfully loaded consumption data from /Users/juliusbecker/Project_Energy_Tariffs/data/household_data/synthetic_household.csv, shape: (8784, 4)
+Future consumption data shape: (720, 2)
+Successfully loaded price data from /Users/juliusbecker/Project_Energy_Tariffs/data/mock_price_data.csv, shape: (17544, 4)
+Converted prices from €/MWh to €/kWh
+Sample converted prices: [-0.00517, -0.00107, -0.00147, -0.00508, -0.00449]
+Merged data shape: (720, 5)
+Merged data columns: ['datetime', 'value', 'predicted_mean', 'lower_ci', 'upper_ci']
+Number of non-null price values: 720
+Number of null price values: 0
+Price data date range: 2024-01-01 00:00:00 to 2025-12-31 23:00:00
+Consumption data date range: 2025-10-07 00:00:00 to 2025-11-05 23:00:00
+Consumption column used: value
+Sample consumption values: [0.4966811364888545, 0.46927215263449523, 0.4570327010936306, 0.46087125665436673, 0.49751473698123805]
+Sample price values: [0.03458, 0.03534, 0.03325, 0.03015, 0.036090000000000004]
+Sample consumption costs: [0.017175233699784586, 0.016584077874103063, 0.015196337311363217, 0.013895268388129156, 0.017955306857652883]
+Total consumption cost: 43.751062724400185
+Base price: 9.9
+Total cost: 53.651062724400184
+Cost calculated: 53.651062724400184
+Processing tariff: mobility+ Zuhause, is_dynamic: False
+Calculating cost for tariff: mobility+ Zuhause
+Cost calculated: 164.9457951155491
+Processing tariff: easy+, is_dynamic: False
+Calculating cost for tariff: easy+
+Cost calculated: 169.04223616529438
+Processing tariff: Basis, is_dynamic: False
+Calculating cost for tariff: Basis
+Cost calculated: 181.1386772150397
+Processing tariff: Komfort, is_dynamic: False
+Calculating cost for tariff: Komfort
+Cost calculated: 179.59045669016706
+Final results: 6 tariffs calculated
+INFO:     127.0.0.1:54707 - "POST /api/calculate-basic HTTP/1.1" 200 OK
+WARNING:  StatReload detected changes in 'src/api/app.py'. Reloading...
+13:48:41 - cmdstanpy - INFO - Chain [1] start processing
+13:48:41 - cmdstanpy - INFO - Chain [1] done processing
+13:48:42 - cmdstanpy - INFO - Chain [1] start processing
+13:48:42 - cmdstanpy - INFO - Chain [1] done processing
+13:48:42 - cmdstanpy - INFO - Chain [1] start processing
+13:48:43 - cmdstanpy - INFO - Chain [1] done processing
+13:48:43 - cmdstanpy - INFO - Chain [1] start processing
+13:48:43 - cmdstanpy - INFO - Chain [1] done processing
+13:48:44 - cmdstanpy - INFO - Chain [1] start processing
+13:48:44 - cmdstanpy - INFO - Chain [1] done processing
+13:48:45 - cmdstanpy - INFO - Chain [1] start processing
+13:48:45 - cmdstanpy - INFO - Chain [1] done processing
+DynamicTariff.calculate_cost() called with data: <class 'pandas.core.frame.DataFrame'>
+Project root directory: /Users/juliusbecker/Project_Energy_Tariffs
+*** USING PROPHET FORECASTING (uploaded CSV data) ***
+Negative values before clipping: yhat=0, yhat_lower=7902, yhat_upper=0
+Negative values after clipping: yhat=0, yhat_lower=0, yhat_upper=0
+Successfully loaded price data from /Users/juliusbecker/Project_Energy_Tariffs/data/mock_price_data.csv, shape: (17544, 4)
+Converted prices from €/MWh to €/kWh
+Sample converted prices: [-0.00517, -0.00107, -0.00147, -0.00508, -0.00449]
+DynamicTariff.calculate_cost() called with data: <class 'pandas.core.frame.DataFrame'>
+Project root directory: /Users/juliusbecker/Project_Energy_Tariffs
+*** USING PROPHET FORECASTING (uploaded CSV data) ***
+Negative values before clipping: yhat=0, yhat_lower=7813, yhat_upper=0
+Negative values after clipping: yhat=0, yhat_lower=0, yhat_upper=0
+Successfully loaded price data from /Users/juliusbecker/Project_Energy_Tariffs/data/mock_price_data.csv, shape: (17544, 4)
+Converted prices from €/MWh to €/kWh
+Sample converted prices: [-0.00517, -0.00107, -0.00147, -0.00508, -0.00449]
+Negative values before clipping: yhat=0, yhat_lower=7932, yhat_upper=0
+Negative values after clipping: yhat=0, yhat_lower=0, yhat_upper=0
+Negative values before clipping: yhat=0, yhat_lower=7890, yhat_upper=0
+Negative values after clipping: yhat=0, yhat_lower=0, yhat_upper=0
+Negative values before clipping: yhat=0, yhat_lower=7937, yhat_upper=0
+Negative values after clipping: yhat=0, yhat_lower=0, yhat_upper=0
+Negative values before clipping: yhat=0, yhat_lower=7883, yhat_upper=0
+Negative values after clipping: yhat=0, yhat_lower=0, yhat_upper=0
+INFO:     127.0.0.1:54882 - "POST /api/calculate-with-csv HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [21696]
+Fatal Python error: init_sys_streams: can't initialize sys standard streams
+Python runtime state: core initialized
+OSError: [Errno 9] Bad file descriptor
+
+Current thread 0x00000001f3f820c0 (most recent call first):
+  <no Python frame>
+WARNING:  StatReload detected changes in 'src/core/EnergyTariff.py'. Reloading...
+Fatal Python error: init_sys_streams: can't initialize sys standard streams
+Python runtime state: core initialized
+OSError: [Errno 9] Bad file descriptor
+
+Current thread 0x00000001f3f820c0 (most recent call first):
+  <no Python frame>
+INFO:     Stopping reloader process [13838]
