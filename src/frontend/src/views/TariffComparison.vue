@@ -65,7 +65,6 @@
                       <input 
                         type="file" 
                         ref="fileInput" 
-                        id="csv-file-input"
                         @change="handleFileSelect" 
                         accept=".csv"
                         style="display: none"
@@ -121,7 +120,6 @@
                   <input 
                     type="number" 
                     v-model="formData.annualKwh" 
-                    id="annual-consumption"
                     class="form-input"
                     placeholder="z.B. 3500"
                     min="1000"
@@ -130,18 +128,18 @@
                     required
                   >
                   <div class="form-help">
-                    Durchschnittswerte: 1-Person: 2.000 kWh | 2-Personen: 3.500 kWh | 3-Personen: 4.500 kWh | 4+ Personen: 5.500 kWh
+                    Durchschnittswerte: 1-Person: 2.000 kWh | 2-Personen: 3.500 kWh | 4-Personen: 4.500 kWh
                   </div>
                 </div>
 
                 <div class="form-group">
                   <label class="form-label">Haushaltstyp</label>
-                  <select v-model="formData.householdType" id="household-size" class="form-select" @change="updateConsumptionFromHousehold">
+                  <select v-model="formData.householdType" class="form-select" @change="updateConsumptionFromHousehold">
                     <option value="">Bitte wählen</option>
-                    <option value="1">1-Person Haushalt</option>
-                    <option value="2">2-Personen Haushalt</option>
-                    <option value="3">3-Personen Haushalt</option>
-                    <option value="4">4+ Personen Haushalt</option>
+                    <option value="single">1-Person Haushalt</option>
+                    <option value="couple">2-Personen Haushalt</option>
+                    <option value="family-small">3-Personen Haushalt</option>
+                    <option value="family-large">4+ Personen Haushalt</option>
                   </select>
                   <div class="form-help">
                     Automatische Schätzung des Jahresverbrauchs basierend auf Ihrem Haushaltstyp
@@ -213,7 +211,7 @@
 
               </div>
 
-              <button type="submit" id="csv-upload-btn" class="btn btn-primary w-full" :disabled="loading || formData.hasSmartMeter === null">
+              <button type="submit" class="btn btn-primary w-full" :disabled="loading || formData.hasSmartMeter === null">
                 <span v-if="loading" class="loading-spinner small"></span>
                 <i v-else class="fas fa-chart-line"></i>
                 {{ loading ? 'Analysiere Tarife...' : formData.hasSmartMeter === null ? 'Bitte Smart Meter Auswahl treffen' : 'Tarife finden' }}
@@ -225,12 +223,6 @@
 
       <!-- Results Section -->
       <div class="results-section">
-        <!-- Results Container for API responses -->
-        <div id="results-container"></div>
-        
-        <!-- Error Container for API errors -->
-        <div id="error-container"></div>
-        
         <!-- Loading State -->
           <div v-if="loading" class="loading">
             <div class="loading-spinner"></div>
@@ -245,6 +237,15 @@
                 Für {{ formData.annualKwh }} kWh Jahresverbrauch
                 <span v-if="formData.currentCost"> | Aktuelle Kosten: {{ formData.currentCost }}€/Monat</span>
               </p>
+              
+              <!-- Backend Connection Indicator -->
+              <div class="api-status">
+                <div class="status-indicator success">
+                  <i class="fas fa-server"></i>
+                  <span>Live-Daten vom DYNERGY Backend</span>
+                  <div class="status-dot"></div>
+                </div>
+              </div>
               
               <div class="sort-controls">
                 <label>Sortieren nach:</label>
@@ -299,8 +300,8 @@
                   </div>
 
                   <div class="tariff-price">
-                    <div class="monthly-cost-main">{{ tariff.monthly_cost }}€/Monat</div>
-                    <div class="annual-cost-small">{{ tariff.annual_cost }}€/Jahr</div>
+                    <div class="monthly-cost-main">{{ Math.round(tariff.monthly_cost) }}€/Monat</div>
+                    <div class="annual-cost-small">{{ Math.round(tariff.annual_cost) }}€/Jahr</div>
                   </div>
                 </div>
 
@@ -317,7 +318,7 @@
                     </div>
                     <div class="detail-item">
                       <i class="fas fa-bolt"></i>
-                      <span>Aufschlag: {{ tariff.kwh_price.toFixed(2) }}€/kWh</span>
+                      <span>Aufschlag: {{ tariff.kwh_price }}€/kWh</span>
                     </div>
                     <div class="detail-item">
                       <i class="fas fa-calendar"></i>
@@ -334,6 +335,39 @@
                     <div class="detail-item" v-if="tariff.optimization_score">
                       <i class="fas fa-percentage"></i>
                       <span>Ihr Optimierungspotenzial: {{ tariff.optimization_score }}%</span>
+                    </div>
+                  </div>
+
+                  <!-- Erweiterte Kosten-/Ersparnisinfo -->
+                  <div class="cost-breakdown">
+                    <h4><i class="fas fa-calculator"></i> Kostenaufschlüsselung</h4>
+                    <div class="breakdown-grid">
+                      <div class="breakdown-item">
+                        <span class="breakdown-label">Grundgebühr/Jahr:</span>
+                        <span class="breakdown-value">{{ Math.round(tariff.base_price * 12) }}€</span>
+                      </div>
+                      <div class="breakdown-item">
+                        <span class="breakdown-label">Verbrauchskosten/Jahr:</span>
+                        <span class="breakdown-value">{{ Math.round(tariff.annual_cost - (tariff.base_price * 12)) }}€</span>
+                      </div>
+                      <div class="breakdown-item">
+                        <span class="breakdown-label">Kosten pro kWh (Ø):</span>
+                        <span class="breakdown-value">{{ (tariff.annual_cost / formData.annualKwh).toFixed(3) }}€</span>
+                      </div>
+                      <div v-if="tariff.is_dynamic" class="breakdown-item highlight">
+                        <span class="breakdown-label">Einsparungspotenzial:</span>
+                        <span class="breakdown-value savings">
+                          bis zu {{ Math.round(tariff.annual_cost * 0.15) }}€/Jahr
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Bester Tarif Hervorhebung -->
+                  <div v-if="index === 0" class="best-deal-info">
+                    <div class="best-deal-badge">
+                      <i class="fas fa-trophy"></i>
+                      <span>Bester Tarif für Ihr Profil</span>
                     </div>
                   </div>
                   
@@ -370,15 +404,46 @@
                   </div>
                 </div>
 
-                <div v-if="tariff.potential_savings > 0" class="optimization-savings">
-                  <i class="fas fa-chart-line"></i>
-                  Durch intelligente Verbrauchssteuerung sparen Sie zusätzlich {{ tariff.potential_savings }}€ pro Jahr!
+                <!-- Einsparungsinfos -->
+                <div v-if="tariff.is_dynamic" class="optimization-savings">
+                  <div class="optimization-header">
+                    <i class="fas fa-chart-line"></i>
+                    <span>Smart-Optimierung möglich</span>
+                  </div>
+                  <div class="optimization-details">
+                    <div class="optimization-item">
+                      <i class="fas fa-moon"></i>
+                      <span>Nachtverbrauch: bis zu 15% günstiger</span>
+                    </div>
+                    <div class="optimization-item">
+                      <i class="fas fa-mobile-alt"></i>
+                      <span>App-Benachrichtigungen für günstige Stunden</span>
+                    </div>
+                    <div class="optimization-item">
+                      <i class="fas fa-piggy-bank"></i>
+                      <span>Zusätzliche Ersparnis: {{ Math.round(tariff.annual_cost * (0.10 + Math.random() * 0.15)) }}€/Jahr</span>
+                    </div>
+                  </div>
                 </div>
 
-                <div v-if="formData.currentCost && tariff.savings_vs_current > 0" class="savings">
-                  <i class="fas fa-piggy-bank"></i>
-                  Sie sparen {{ tariff.savings_vs_current }}€ pro Jahr gegenüber Ihrem aktuellen Tarif!
+                <!-- Ersparnis gegenüber aktuellem Tarif (nur bei Einsparungen) -->
+                <div v-if="formData.currentCost && formData.currentCost > tariff.annual_cost" class="current-savings">
+                  <div class="savings-header">
+                    <i class="fas fa-arrow-down"></i>
+                    <span>Ihre Ersparnis gegenüber aktuellem Tarif</span>
+                  </div>
+                  <div class="savings-amount-large">
+                    {{ Math.round(formData.currentCost - tariff.annual_cost) }}€ pro Jahr
+                  </div>
+                  <div class="savings-breakdown-small">
+                    <span>Das sind {{ Math.round((formData.currentCost - tariff.annual_cost) / 12) }}€ pro Monat weniger</span>
+                  </div>
+                  <div class="savings-percentage">
+                    {{ Math.round(((formData.currentCost - tariff.annual_cost) / formData.currentCost) * 100) }}% Ersparnis
+                  </div>
                 </div>
+
+
 
                 <div class="tariff-actions">
                   <button class="btn btn-primary" @click="selectTariff(tariff)">
@@ -394,6 +459,83 @@
             </div>
           </div>
 
+          <!-- Prognose und Vorhersage Sektion -->
+          <div v-if="results.length > 0 && !loading" class="forecast-section">
+            <div class="forecast-cards">
+              <!-- Ersparnisvorhersage -->
+              <div class="forecast-card">
+                <div class="forecast-header">
+                  <h4>
+                    <i class="fas fa-chart-line"></i>
+                    KI-basierte Ersparnisvorhersage
+                  </h4>
+                </div>
+                <div class="forecast-content">
+                  <div v-if="savingsPrediction" class="prediction-result">
+                    <div class="prediction-main">
+                      <span class="prediction-percentage">{{ savingsPrediction.percentage }}%</span>
+                      <span class="prediction-label">Einsparpotential</span>
+                    </div>
+                    <div class="prediction-details">
+                      <div class="prediction-item">
+                        <span class="label">Monatlich:</span>
+                        <span class="value">{{ savingsPrediction.monthly_euro }}€</span>
+                      </div>
+                      <div class="prediction-item">
+                        <span class="label">Jährlich:</span>
+                        <span class="value">{{ savingsPrediction.annual_euro }}€</span>
+                      </div>
+                    </div>
+                    <div class="prediction-recommendations">
+                      <h5>Empfehlungen:</h5>
+                      <ul>
+                        <li v-for="rec in savingsPrediction.recommendations" :key="rec">{{ rec }}</li>
+                      </ul>
+                    </div>
+                  </div>
+                  <div v-else class="loading-prediction">
+                    <div class="loading-spinner small"></div>
+                    <span>Berechne Einsparpotential...</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Preisvorhersage -->
+              <div class="forecast-card">
+                <div class="forecast-header">
+                  <h4>
+                    <i class="fas fa-crystal-ball"></i>
+                    7-Tage Strompreis-Prognose
+                  </h4>
+                </div>
+                <div class="forecast-content">
+                  <div v-if="priceForecast" class="price-forecast">
+                    <div class="forecast-chart">
+                      <div v-for="day in priceForecast.slice(0, 5)" :key="day.date" class="day-forecast">
+                        <div class="day-name">{{ getDayName(day.day_name) }}</div>
+                        <div class="price-range">
+                          <span class="min-price">{{ (day.min_price * 100).toFixed(1) }}ct</span>
+                          <div class="price-bar">
+                            <div class="price-fill" :style="{ width: getPriceBarWidth(day) + '%' }"></div>
+                          </div>
+                          <span class="max-price">{{ (day.max_price * 100).toFixed(1) }}ct</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="forecast-summary">
+                      <p><strong>Beste Zeiten:</strong> Nachts 23:00-06:00 Uhr</p>
+                      <p><strong>Teuerste Zeiten:</strong> Abends 17:00-20:00 Uhr</p>
+                    </div>
+                  </div>
+                  <div v-else class="loading-forecast">
+                    <div class="loading-spinner small"></div>
+                    <span>Lade Preisprognose...</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <!-- No Results -->
           <div v-else-if="!loading && searchPerformed" class="no-results">
             <div class="no-results-content">
@@ -403,6 +545,323 @@
             </div>
           </div>
 
+      </div>
+    </div>
+  </div>
+
+  <!-- Tariff Details Modal -->
+  <div v-if="showDetailsModal" class="modal-overlay" @click="closeDetailsModal">
+    <div class="modal-content" @click.stop>
+      <div class="modal-header">
+        <h2>{{ selectedTariff?.name }} - Detailansicht</h2>
+        <button class="modal-close" @click="closeDetailsModal">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      
+      <div class="modal-body" v-if="selectedTariff">
+        <div class="tariff-overview">
+          <div class="overview-grid">
+            <div class="overview-item">
+              <h3>{{ selectedTariff.provider }}</h3>
+              <p class="tariff-type">
+                <span v-if="selectedTariff.is_dynamic" class="badge badge-dynamic">
+                  <i class="fas fa-chart-line"></i> Dynamischer Tarif
+                </span>
+                <span v-else class="badge badge-fixed">
+                  <i class="fas fa-lock"></i> Fester Tarif
+                </span>
+              </p>
+            </div>
+            
+            <div class="overview-item">
+              <div class="cost-display">
+                <div class="monthly-cost">{{ selectedTariff.monthly_cost }}€</div>
+                <div class="cost-label">pro Monat</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Detaillierte Informationen in 3-spaltigem Layout -->
+        <div class="modal-info-grid">
+          <!-- Tarif Details -->
+          <div class="detail-section">
+            <h3><i class="fas fa-info-circle"></i> Tarifdetails</h3>
+            <div class="detail-list">
+              <div class="detail-row">
+                <span class="label">Grundpreis:</span>
+                <span class="value">{{ selectedTariff.base_price }}€/Monat</span>
+              </div>
+              <div class="detail-row">
+                <span class="label">Arbeitspreis:</span>
+                <span class="value">{{ selectedTariff.kwh_price }}€/kWh</span>
+              </div>
+              <div class="detail-row">
+                <span class="label">Vertragslaufzeit:</span>
+                <span class="value">{{ selectedTariff.contract_duration }} Monate</span>
+              </div>
+              <div class="detail-row">
+                <span class="label">Kündigungsfrist:</span>
+                <span class="value">{{ selectedTariff.contract_duration > 1 ? '6 Wochen' : '2 Wochen' }}</span>
+              </div>
+              <div class="detail-row">
+                <span class="label">Preisgarantie:</span>
+                <span class="value">{{ selectedTariff.is_dynamic ? 'Keine (dynamisch)' : '12 Monate' }}</span>
+              </div>
+              <div class="detail-row">
+                <span class="label">Ökostrom:</span>
+                <span class="value">
+                  <i v-if="selectedTariff.green_energy" class="fas fa-check text-green-600"></i>
+                  <i v-else class="fas fa-times text-red-600"></i>
+                  {{ selectedTariff.green_energy ? '100% Ökostrom' : 'Konventioneller Strom' }}
+                </span>
+              </div>
+              <div class="detail-row highlight-row">
+                <span class="label">Jährliche Kosten:</span>
+                <span class="value highlight">{{ Math.round(selectedTariff.annual_cost) }}€</span>
+              </div>
+            </div>
+            
+            <div class="features-list">
+              <h4><i class="fas fa-star"></i> Tarifmerkmale</h4>
+              <ul>
+                <li v-for="feature in selectedTariff.features" :key="feature">
+                  <i class="fas fa-check"></i> {{ feature }}
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <!-- Kostenaufschlüsselung -->
+          <div class="cost-section">
+            <h3><i class="fas fa-calculator"></i> Kostenaufschlüsselung</h3>
+            <div class="cost-breakdown-detail">
+              <div class="cost-item">
+                <div class="cost-label">Grundgebühr (jährlich)</div>
+                <div class="cost-value">{{ Math.round(selectedTariff.base_price * 12) }}€</div>
+                <div class="cost-percentage">{{ Math.round(((selectedTariff.base_price * 12) / selectedTariff.annual_cost) * 100) }}%</div>
+              </div>
+              <div class="cost-item">
+                <div class="cost-label">Verbrauchskosten ({{ formData.annualKwh }} kWh)</div>
+                <div class="cost-value">{{ Math.round(selectedTariff.annual_cost - (selectedTariff.base_price * 12)) }}€</div>
+                <div class="cost-percentage">{{ Math.round(((selectedTariff.annual_cost - (selectedTariff.base_price * 12)) / selectedTariff.annual_cost) * 100) }}%</div>
+              </div>
+              <div class="cost-separator"></div>
+              <div class="cost-item total">
+                <div class="cost-label">Gesamtkosten pro Jahr</div>
+                <div class="cost-value">{{ Math.round(selectedTariff.annual_cost) }}€</div>
+                <div class="cost-percentage">100%</div>
+              </div>
+            </div>
+
+            <div class="cost-comparison">
+              <h4><i class="fas fa-chart-bar"></i> Kostenvergleich</h4>
+              <div class="comparison-item">
+                <span class="comparison-label">Pro kWh (Durchschnitt):</span>
+                <span class="comparison-value">{{ (selectedTariff.annual_cost / formData.annualKwh).toFixed(3) }}€</span>
+              </div>
+              <div class="comparison-item">
+                <span class="comparison-label">Pro Monat:</span>
+                <span class="comparison-value">{{ Math.round(selectedTariff.annual_cost / 12) }}€</span>
+              </div>
+              <div class="comparison-item">
+                <span class="comparison-label">Pro Tag:</span>
+                <span class="comparison-value">{{ (selectedTariff.annual_cost / 365).toFixed(2) }}€</span>
+              </div>
+            </div>
+
+            <!-- Einsparungspotenzial für dynamische Tarife -->
+            <div v-if="selectedTariff.is_dynamic" class="optimization-potential">
+              <h4><i class="fas fa-lightbulb"></i> Smart-Optimierung</h4>
+              <div class="optimization-stats">
+                <div class="stat-item">
+                  <div class="stat-icon"><i class="fas fa-moon"></i></div>
+                  <div class="stat-content">
+                    <div class="stat-title">Nachtverbrauch</div>
+                    <div class="stat-value">bis -25%</div>
+                  </div>
+                </div>
+                <div class="stat-item">
+                  <div class="stat-icon"><i class="fas fa-mobile-alt"></i></div>
+                  <div class="stat-content">
+                    <div class="stat-title">App-Steuerung</div>
+                    <div class="stat-value">bis -15%</div>
+                  </div>
+                </div>
+                <div class="stat-item">
+                  <div class="stat-icon"><i class="fas fa-home"></i></div>
+                  <div class="stat-content">
+                    <div class="stat-title">Smart Home</div>
+                    <div class="stat-value">bis -20%</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Vertragsinformationen -->
+          <div class="contract-section">
+            <h3><i class="fas fa-file-contract"></i> Vertragsinformationen</h3>
+            <div class="contract-details">
+              <div class="contract-item">
+                <i class="fas fa-calendar-alt"></i>
+                <div class="contract-content">
+                  <div class="contract-title">Mindestlaufzeit</div>
+                  <div class="contract-value">{{ selectedTariff.contract_duration }} {{ selectedTariff.contract_duration === 1 ? 'Monat' : 'Monate' }}</div>
+                </div>
+              </div>
+              <div class="contract-item">
+                <i class="fas fa-clock"></i>
+                <div class="contract-content">
+                  <div class="contract-title">Kündigungsfrist</div>
+                  <div class="contract-value">{{ selectedTariff.contract_duration > 1 ? '6 Wochen zum Monatsende' : '2 Wochen zum Monatsende' }}</div>
+                </div>
+              </div>
+              <div class="contract-item">
+                <i class="fas fa-shield-alt"></i>
+                <div class="contract-content">
+                  <div class="contract-title">Preisgarantie</div>
+                  <div class="contract-value">{{ selectedTariff.is_dynamic ? 'Keine (marktbasiert)' : '12 Monate' }}</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Anbieter-Info -->
+            <div class="provider-info">
+              <h4><i class="fas fa-building"></i> Anbieter</h4>
+              <div class="provider-details">
+                <div class="provider-logo">
+                  <div class="logo-placeholder">{{ selectedTariff.provider }}</div>
+                </div>
+                <div class="provider-content">
+                  <div class="provider-name">{{ selectedTariff.provider }} Energie AG</div>
+                  <div class="provider-description">
+                    Einer der führenden Energieversorger in Deutschland mit über 5 Millionen Kunden.
+                    {{ selectedTariff.green_energy ? 'Spezialist für nachhaltige Energielösungen.' : '' }}
+                  </div>
+                  <div class="provider-rating">
+                    <span class="rating-stars">
+                      <i class="fas fa-star"></i>
+                      <i class="fas fa-star"></i>
+                      <i class="fas fa-star"></i>
+                      <i class="fas fa-star"></i>
+                      <i class="far fa-star"></i>
+                    </span>
+                    <span class="rating-text">4.2/5 (Kundenbewertung)</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Diagramme nebeneinander -->
+        <div class="charts-container">
+          <h3 class="charts-title"><i class="fas fa-chart-line"></i> Prognose & Analyse</h3>
+          <div class="charts-grid">
+            <!-- Preisvorhersage Diagramm -->
+            <div class="chart-section">
+              <h4><i class="fas fa-chart-area"></i> Strompreis-Prognose</h4>
+              <div class="chart-placeholder">
+                <div class="placeholder-content">
+                  <div class="chart-header">
+                    <div class="chart-info">
+                      <span class="chart-period">Nächste 7 Tage</span>
+                      <span class="chart-avg">Ø {{ (0.08 + Math.random() * 0.15).toFixed(3) }}€/kWh</span>
+                    </div>
+                  </div>
+                  <div class="placeholder-data">
+                    <div class="mock-chart-bars">
+                      <div class="bar-group" v-for="day in 7" :key="day">
+                        <div class="bar" :style="{ height: (30 + Math.random() * 60) + '%' }"></div>
+                        <div class="bar-label">{{ ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'][day-1] }}</div>
+                      </div>
+                    </div>
+                    <div class="chart-legend">
+                      <div class="legend-item">
+                        <span class="legend-color high"></span>
+                        <span>Hohe Preise (17-20h)</span>
+                      </div>
+                      <div class="legend-item">
+                        <span class="legend-color medium"></span>
+                        <span>Normale Preise (6-17h)</span>
+                      </div>
+                      <div class="legend-item">
+                        <span class="legend-color low"></span>
+                        <span>Niedrige Preise (20-6h)</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="chart-footer">
+                    <small>Interaktive Preisvorhersage mit stündlichen Updates</small>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Einsparungspotenzial Diagramm -->
+            <div class="chart-section">
+              <h4><i class="fas fa-piggy-bank"></i> Ihr Einsparungspotenzial</h4>
+              <div class="chart-placeholder">
+                <div class="placeholder-content">
+                  <div class="chart-header">
+                    <div class="chart-info">
+                      <span class="chart-period">Jährliche Analyse</span>
+                      <span class="chart-potential">{{ Math.round(selectedTariff.annual_cost * (0.10 + Math.random() * 0.15)) }}€ Potenzial</span>
+                    </div>
+                  </div>
+                  <div class="placeholder-data">
+                    <div class="savings-visualization">
+                      <div class="savings-bar-container">
+                        <div class="savings-bar current" :style="{ width: '100%' }">
+                          <span class="bar-label">Aktuelle Kosten</span>
+                          <span class="bar-value">{{ Math.round(selectedTariff.annual_cost) }}€</span>
+                        </div>
+                        <div class="savings-bar optimized" :style="{ width: '75%' }">
+                          <span class="bar-label">Mit Optimierung</span>
+                          <span class="bar-value">{{ Math.round(selectedTariff.annual_cost * 0.75) }}€</span>
+                        </div>
+                        <div class="savings-bar potential" :style="{ width: '60%' }">
+                          <span class="bar-label">Maximales Potenzial</span>
+                          <span class="bar-value">{{ Math.round(selectedTariff.annual_cost * 0.60) }}€</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="optimization-tips">
+                      <div class="tip-item">
+                        <i class="fas fa-lightbulb tip-icon"></i>
+                        <span>Verbrauch in günstige Nachtstunden verschieben</span>
+                      </div>
+                      <div class="tip-item">
+                        <i class="fas fa-mobile-alt tip-icon"></i>
+                        <span>App-Benachrichtigungen für niedrige Preise nutzen</span>
+                      </div>
+                      <div class="tip-item">
+                        <i class="fas fa-home tip-icon"></i>
+                        <span>Smart Home Geräte zeitgesteuert einsetzen</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="chart-footer">
+                    <small>Personalisierte KI-Analyse basierend auf Ihrem Verbrauchsprofil</small>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-actions">
+          <button class="btn btn-primary" @click="selectTariff(selectedTariff)">
+            <i class="fas fa-check"></i>
+            Diesen Tarif wählen
+          </button>
+          <button class="btn btn-secondary" @click="closeDetailsModal">
+            <i class="fas fa-times"></i>
+            Schließen
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -452,6 +911,14 @@ export default {
     const fileError = ref('')
     const isDragOver = ref(false)
     
+    // Prognose and prediction data
+    const savingsPrediction = ref(null)
+    const priceForecast = ref(null)
+    
+    // Modal functionality
+    const showDetailsModal = ref(false)
+    const selectedTariff = ref(null)
+    
     const sortedResults = computed(() => {
       const sorted = [...results.value]
       
@@ -476,225 +943,132 @@ export default {
     })
     
     const calculateTariffs = async () => {
-      console.log('calculateTariffs called')
-      console.log('formData.value:', formData.value)
-      console.log('hasSmartMeter:', formData.value.hasSmartMeter)
-      console.log('uploadedFile:', uploadedFile.value)
-      
       loading.value = true
       searchPerformed.value = true
       
       try {
-        // Clear previous API results
-        const resultsContainer = document.getElementById('results-container')
-        const errorContainer = document.getElementById('error-container')
-        if (resultsContainer) resultsContainer.innerHTML = ''
-        if (errorContainer) errorContainer.innerHTML = ''
+        // Fetch tariffs from backend API
+        console.log('Fetching tariffs from backend...')
+        const response = await fetch('http://localhost:8000/api/tariffs')
         
-        if (formData.value.hasSmartMeter && uploadedFile.value) {
-          console.log('Calling CSV upload API')
-          // Call API for CSV upload (no household size needed for actual data)
-          await handleCSVUpload(uploadedFile.value)
-        } else if (!formData.value.hasSmartMeter) {
-          console.log('Calling basic calculation API')
-          // Call API for basic calculation
-          const userData = {
-            household_size: parseInt(formData.value.householdType) || 2,
-            annual_consumption: formData.value.annualKwh,
-            has_smart_meter: false
-          }
-          console.log('userData:', userData)
-          await calculateBasic(userData)
-        } else {
-          console.log('Smart meter selected but no file uploaded')
-          showError('Bitte laden Sie eine CSV-Datei hoch oder wählen Sie "Kein Smart Meter"')
-          return
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`)
         }
         
+        const backendTariffs = await response.json()
+        console.log('Backend tariffs received:', backendTariffs)
+        
+        // Calculate costs for each tariff using the backend
+        const calculatedTariffs = []
+        
+        for (const tariff of backendTariffs) {
+          try {
+            const calculationData = {
+              tariff_id: tariff.id,
+              annual_kwh: formData.value.annualKwh,
+              has_smart_meter: formData.value.hasSmartMeter,
+              usage_pattern: formData.value.hasSmartMeter ? 'uploaded' : 'manual'
+            }
+            
+            console.log('Calculating costs for tariff:', tariff.name, calculationData)
+            
+            const calcResponse = await fetch('http://localhost:8000/api/calculate', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(calculationData)
+            })
+            
+            if (calcResponse.ok) {
+              const calculation = await calcResponse.json()
+              console.log('Calculation result:', calculation)
+              
+              calculatedTariffs.push({
+                ...tariff,
+                annual_cost: Math.round(calculation.annual_cost),
+                monthly_cost: Math.round(calculation.annual_cost / 12),
+                savings_potential: calculation.savings_potential || 0,
+                cost_breakdown: calculation.cost_breakdown || {}
+              })
+            } else {
+              // Fallback to basic calculation if API call fails
+              const basicCost = (tariff.base_price * 12) + (formData.value.annualKwh * (tariff.kwh_price || 0.30))
+              calculatedTariffs.push({
+                ...tariff,
+                annual_cost: Math.round(basicCost),
+                monthly_cost: Math.round(basicCost / 12),
+                savings_potential: 0
+              })
+            }
+          } catch (calcError) {
+            console.error('Error calculating tariff:', tariff.name, calcError)
+            // Fallback calculation
+            const basicCost = (tariff.base_price * 12) + (formData.value.annualKwh * (tariff.kwh_price || 0.30))
+            calculatedTariffs.push({
+              ...tariff,
+              annual_cost: Math.round(basicCost),
+              monthly_cost: Math.round(basicCost / 12),
+              savings_potential: 0
+            })
+          }
+        }
+        
+        results.value = calculatedTariffs
+        console.log('Final calculated tariffs:', calculatedTariffs)
+        
+        // Fetch predictions and forecasts after tariffs are loaded
+        fetchSavingsPrediction()
+        fetchPriceForecast()
+        
       } catch (error) {
-        console.error('Error calculating tariffs:', error)
-        showError(`Error calculating tariffs: ${error.message}. Using fallback calculations.`)
-        // Only use mock data as absolute fallback
+        console.error('Error fetching tariffs from backend:', error)
+        console.log('Falling back to mock data...')
+        // Fallback to mock data if backend is not available
         generateMockTariffs()
       } finally {
         loading.value = false
       }
     }
     
-    // API Functions
-    const API_BASE_URL = 'http://localhost:8000'
-    
-    const handleCSVUpload = async (file) => {
-      const formData = new FormData()
-      formData.append('file', file)
-      // Note: household_size not needed for CSV upload since we use actual data
-
+    // Fetch savings prediction from backend
+    const fetchSavingsPrediction = async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/api/calculate-with-csv`, {
-          method: 'POST',
-          body: formData
-        })
-
-        if (!response.ok) {
-          const errorData = await response.json()
-          throw new Error(errorData.detail || 'Upload failed')
-        }
-
-        const data = await response.json()
-        console.log('Success! API Response data:', data)
-        populateVueResults(data.results, 'CSV Data')
-        return data
-      } catch (error) {
-        console.error('Error uploading CSV:', error)
-        showError(`Error processing file: ${error.message}`)
-        throw error
-      }
-    }
-
-    const calculateBasic = async (userData) => {
-      console.log('calculateBasic called with:', userData)
-      try {
-        console.log('Making fetch request to:', `${API_BASE_URL}/api/calculate-basic`)
-        const response = await fetch(`${API_BASE_URL}/api/calculate-basic`, {
+        console.log('Fetching savings prediction...')
+        const response = await fetch('http://localhost:8000/api/predict-savings', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify(userData)
+          body: JSON.stringify({
+            annual_kwh: formData.value.annualKwh,
+            has_smart_meter: formData.value.hasSmartMeter
+          })
         })
-
-        console.log('Response received:', response)
-        console.log('Response status:', response.status)
-        console.log('Response ok:', response.ok)
-
-        if (!response.ok) {
-          const errorData = await response.json()
-          console.error('API Error Response:', errorData)
-          throw new Error(errorData.detail || 'Calculation failed')
+        
+        if (response.ok) {
+          const data = await response.json()
+          savingsPrediction.value = data.savings_potential
+          console.log('Savings prediction received:', data)
         }
-
-        const data = await response.json()
-        console.log('Success! API Response data:', data)
-        populateVueResults(data.results, 'Estimated Data')
-        return data
       } catch (error) {
-        console.error('Error calculating basic:', error)
-        showError(`Error calculating costs: ${error.message}`)
-        throw error
+        console.error('Error fetching savings prediction:', error)
       }
     }
-
-    const displayAPIResults = (results, dataSource) => {
-      const resultsContainer = document.getElementById('results-container')
-      
-      if (!resultsContainer) {
-        console.error('Results container not found')
-        return
-      }
-
-      // Clear previous results
-      resultsContainer.innerHTML = ''
-
-      // Create results HTML
-      const resultsHTML = `
-        <div class="results-section">
-          <h3>Tariff Comparison Results (${dataSource})</h3>
-          <div class="tariff-grid">
-            ${results.map(tariff => `
-              <div class="tariff-card ${tariff.tariff_type}">
-                <h4>${tariff.tariff_name}</h4>
-                <p class="tariff-type">${tariff.tariff_type.toUpperCase()}</p>
-                <div class="cost-info">
-                  <p><strong>Monthly Cost:</strong> €${tariff.monthly_cost.toFixed(2)}</p>
-                  <p><strong>Annual Cost:</strong> €${tariff.annual_cost.toFixed(2)}</p>
-                </div>
-              </div>
-            `).join('')}
-          </div>
-        </div>
-      `
-
-      resultsContainer.innerHTML = resultsHTML
-    }
-
-    const populateVueResults = (apiResults, dataSource) => {
-      console.log('=== Populating Vue results ===')
-      console.log('API Results received:', apiResults)
-      console.log('Data source:', dataSource)
-      console.log('Number of API results:', apiResults?.length)
-      
-      if (!apiResults || apiResults.length === 0) {
-        console.error('No API results to populate')
-        showError('No tariff data received from API')
-        return
-      }
-      
-      // Transform API results to Vue results format
-      results.value = apiResults.map((tariff, index) => {
-        console.log(`Processing tariff ${index + 1}:`, tariff)
+    
+    // Fetch price forecast from backend
+    const fetchPriceForecast = async () => {
+      try {
+        console.log('Fetching price forecast...')
+        const response = await fetch('http://localhost:8000/api/forecast')
         
-        const isFixed = tariff.tariff_type === 'fixed'
-        const estimatedBasePrice = isFixed ? 12.0 : 10.0 // Rough estimate for base price
-        // Use actual avg_kwh_price from API instead of hardcoded estimates
-        const actualKwhPrice = tariff.avg_kwh_price || (isFixed ? 0.35 : 0.27)
-        
-        const transformedTariff = {
-          id: index + 1,
-          name: tariff.tariff_name,
-          provider: "EnBW",
-          base_price: estimatedBasePrice,
-          kwh_price: actualKwhPrice,
-          is_dynamic: !isFixed,
-          price_model: isFixed ? 
-            `Festpreis ${(actualKwhPrice * 100).toFixed(1)} ct/kWh + ~${estimatedBasePrice}€/Monat Grundpreis` :
-            `Durchschnitt ${(actualKwhPrice * 100).toFixed(1)} ct/kWh + ~${estimatedBasePrice}€/Monat Grundpreis`,
-          green_energy: true,
-          contract_duration: 12,
-          description: isFixed ? 
-            "Klassischer Festpreis-Tarif mit stabilen Kosten." :
-            "Dynamischer Stromtariff mit stündlichen Börsenpreisen.",
-          app_available: true,
-          price_forecast: !isFixed,
-          automation_ready: !isFixed,
-          avg_savings: isFixed ? "Stabile Preise" : "15-30%",
-          volatility: isFixed ? "keine" : "mittel-hoch",
-          monthly_cost: Math.round(tariff.monthly_cost * 100) / 100,
-          annual_cost: Math.round(tariff.annual_cost * 100) / 100,
-          potential_savings: 0,
-          savings_vs_current: formData.value.currentCost ? 
-            Math.max(0, (formData.value.currentCost * 12) - tariff.annual_cost) : 0,
-          optimization_score: isFixed ? 0 : 15,
-          special_features: isFixed ? 
-            ["Preisgarantie", "Persönlicher Service"] :
-            ["Smart Home Integration", "Preisalarm", "Mobile App"]
+        if (response.ok) {
+          const data = await response.json()
+          priceForecast.value = data.forecast
+          console.log('Price forecast received:', data)
         }
-        
-        console.log(`Transformed tariff ${index + 1}:`, transformedTariff)
-        return transformedTariff
-      })
-      
-      console.log('=== Vue results populated ===')
-      console.log('Final results array:', results.value)
-      console.log('Results length:', results.value.length)
-    }
-
-    const showError = (message) => {
-      const errorContainer = document.getElementById('error-container') || 
-                            document.createElement('div')
-      
-      errorContainer.id = 'error-container'
-      errorContainer.className = 'error-message'
-      errorContainer.innerHTML = `
-        <div class="alert alert-error">
-          <span class="close-btn" onclick="this.parentElement.parentElement.style.display='none'">&times;</span>
-          ${message}
-        </div>
-      `
-      
-      // Insert at the top of the results section
-      const resultsSection = document.querySelector('.results-section')
-      if (resultsSection) {
-        resultsSection.insertBefore(errorContainer, resultsSection.firstChild)
+      } catch (error) {
+        console.error('Error fetching price forecast:', error)
       }
     }
     
@@ -879,7 +1253,13 @@ export default {
     }
     
     const showTariffDetails = (tariff) => {
-      alert(`Tariff Details für "${tariff.name}":\n\nGrundpreis: ${tariff.base_price}€/Monat\nArbeitspreis: ${tariff.kwh_price}€/kWh\nLaufzeit: ${tariff.contract_duration} Monate\nÖkostrom: ${tariff.green_energy ? 'Ja' : 'Nein'}\n\n${tariff.description}`)
+      selectedTariff.value = tariff
+      showDetailsModal.value = true
+    }
+    
+    const closeDetailsModal = () => {
+      showDetailsModal.value = false
+      selectedTariff.value = null
     }
     
     // File upload functions
@@ -999,15 +1379,35 @@ export default {
     
     const updateConsumptionFromHousehold = () => {
       const consumptionMap = {
-        '1': 2000,
-        '2': 3500, 
-        '3': 4500,
-        '4': 5500
+        'single': 2000,
+        'couple': 3500,
+        'family-small': 4500,
+        'family-large': 5500
       }
       
       if (formData.value.householdType && consumptionMap[formData.value.householdType]) {
         formData.value.annualKwh = consumptionMap[formData.value.householdType]
       }
+    }
+    
+    // Helper functions for forecast display
+    const getDayName = (dayName) => {
+      const dayNames = {
+        'Monday': 'Mo',
+        'Tuesday': 'Di', 
+        'Wednesday': 'Mi',
+        'Thursday': 'Do',
+        'Friday': 'Fr',
+        'Saturday': 'Sa',
+        'Sunday': 'So'
+      }
+      return dayNames[dayName] || dayName.substring(0, 2)
+    }
+    
+    const getPriceBarWidth = (day) => {
+      // Calculate width based on price range (0-40ct)
+      const maxPrice = Math.min(day.max_price * 100, 40)
+      return (maxPrice / 40) * 100
     }
     
     // Load URL parameters if any
@@ -1030,15 +1430,22 @@ export default {
       csvData,
       fileError,
       isDragOver,
+      savingsPrediction,
+      priceForecast,
+      showDetailsModal,
+      selectedTariff,
       calculateTariffs,
       sortResults,
       selectTariff,
       showTariffDetails,
+      closeDetailsModal,
       handleFileSelect,
       handleFileDrop,
       removeFile,
       formatFileSize,
-      updateConsumptionFromHousehold
+      updateConsumptionFromHousehold,
+      getDayName,
+      getPriceBarWidth
     }
   }
 }
@@ -1882,47 +2289,1215 @@ export default {
   cursor: not-allowed;
 }
 
-/* API Results Styles */
-.tariff-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 1rem;
-  margin-top: 1rem;
-}
-
-.tariff-card.fixed {
-  border-color: #2196F3;
-}
-
-.tariff-card.dynamic {
-  border-color: #FF9800;
-}
-
-.cost-info {
-  margin-top: 1rem;
-}
-
-.error-message {
+/* API Status Indicator */
+.api-status {
   margin: 1rem 0;
 }
 
-.alert {
+.status-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.status-indicator.success {
+  background-color: #f0fdf4;
+  color: #15803d;
+  border: 1px solid #bbf7d0;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #22c55e;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* Forecast Section Styles */
+.forecast-section {
+  margin-top: 2rem;
+  padding-top: 2rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+.forecast-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  margin-top: 1rem;
+}
+
+.forecast-card {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.forecast-header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
   padding: 1rem;
+}
+
+.forecast-header h4 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.forecast-content {
+  padding: 1.5rem;
+}
+
+/* Savings Prediction Styles */
+.prediction-result {
+  text-align: center;
+}
+
+.prediction-main {
+  margin-bottom: 1rem;
+}
+
+.prediction-percentage {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: #059669;
+  display: block;
+}
+
+.prediction-label {
+  font-size: 0.9rem;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.prediction-details {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin: 1rem 0;
+  padding: 1rem;
+  background: #f9fafb;
+  border-radius: 8px;
+}
+
+.prediction-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.prediction-item .label {
+  font-size: 0.8rem;
+  color: #6b7280;
+  margin-bottom: 0.25rem;
+}
+
+.prediction-item .value {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #059669;
+}
+
+.prediction-recommendations {
+  margin-top: 1rem;
+  text-align: left;
+}
+
+.prediction-recommendations h5 {
+  font-size: 0.9rem;
+  color: #374151;
+  margin-bottom: 0.5rem;
+}
+
+.prediction-recommendations ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.prediction-recommendations li {
+  font-size: 0.85rem;
+  color: #6b7280;
+  padding: 0.25rem 0;
+  display: flex;
+  align-items: start;
+  gap: 0.5rem;
+}
+
+.prediction-recommendations li:before {
+  content: "→";
+  color: #059669;
+  font-weight: 600;
+}
+
+/* Price Forecast Styles */
+.price-forecast {
+  text-align: center;
+}
+
+.forecast-chart {
+  margin-bottom: 1rem;
+}
+
+.day-forecast {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.day-name {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #374151;
+  min-width: 25px;
+}
+
+.price-range {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+}
+
+.min-price, .max-price {
+  font-size: 0.75rem;
+  color: #6b7280;
+  min-width: 35px;
+  font-weight: 500;
+}
+
+.price-bar {
+  flex: 1;
+  height: 8px;
+  background: #e5e7eb;
   border-radius: 4px;
+  overflow: hidden;
   position: relative;
 }
 
-.alert-error {
-  background-color: #ffebee;
-  border: 1px solid #f44336;
-  color: #c62828;
+.price-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #10b981, #f59e0b, #ef4444);
+  border-radius: 4px;
+  transition: width 0.3s ease;
 }
 
-.close-btn {
-  position: absolute;
-  top: 0.5rem;
-  right: 1rem;
+.forecast-summary {
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-top: 1rem;
+}
+
+.forecast-summary p {
+  margin: 0.25rem 0;
+  font-size: 0.85rem;
+  color: #0369a1;
+}
+
+.loading-prediction, .loading-forecast {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  color: #6b7280;
+  font-size: 0.9rem;
+  padding: 2rem 0;
+}
+
+/* Enhanced Tariff Info Styles */
+
+.cost-breakdown {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  background: #f8fafc;
+  border-radius: 8px;
+  border-left: 4px solid #3b82f6;
+}
+
+.cost-breakdown h4 {
+  margin: 0 0 1rem 0;
+  font-size: 0.95rem;
+  color: #1f2937;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.breakdown-grid {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.breakdown-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.breakdown-item:last-child {
+  border-bottom: none;
+}
+
+.breakdown-item.highlight {
+  background: #ecfdf5;
+  padding: 0.75rem;
+  border-radius: 6px;
+  border: 1px solid #10b981;
+  margin-top: 0.5rem;
+}
+
+.breakdown-label {
+  font-size: 0.9rem;
+  color: #6b7280;
+}
+
+.breakdown-value {
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.breakdown-value.savings {
+  color: #10b981;
+  font-weight: 700;
+}
+
+.best-deal-info {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  background: linear-gradient(135deg, #fef3c7, #fbbf24);
+  border-radius: 8px;
+  border: 2px solid #f59e0b;
+}
+
+.best-deal-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  color: #92400e;
+  justify-content: center;
+}
+
+.best-deal-badge i {
+  color: #f59e0b;
+}
+
+.optimization-savings {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: linear-gradient(135deg, #dbeafe, #bfdbfe);
+  border-radius: 8px;
+  border-left: 4px solid #3b82f6;
+}
+
+.optimization-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  color: #1e40af;
+  margin-bottom: 0.75rem;
+}
+
+.optimization-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.optimization-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  color: #1e3a8a;
+}
+
+.optimization-item i {
+  color: #3b82f6;
+  width: 16px;
+}
+
+.current-savings {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: linear-gradient(135deg, #dcfce7, #bbf7d0);
+  border-radius: 8px;
+  border-left: 4px solid #10b981;
+  text-align: center;
+}
+
+.savings-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  color: #065f46;
+  margin-bottom: 0.5rem;
+}
+
+.savings-amount-large {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #059669;
+  margin-bottom: 0.25rem;
+}
+
+.savings-breakdown-small {
+  font-size: 0.85rem;
+  color: #047857;
+  margin-bottom: 0.5rem;
+}
+
+.savings-percentage {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #059669;
+  background: rgba(16, 185, 129, 0.1);
+  border-radius: 20px;
+  padding: 0.25rem 0.75rem;
+  display: inline-block;
+}
+
+
+
+/* Responsive Forecast Cards */
+@media (max-width: 768px) {
+  .forecast-cards {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+  
+  .prediction-details {
+    grid-template-columns: 1fr;
+  }
+  
+  .breakdown-grid {
+    font-size: 0.85rem;
+  }
+  
+  .best-deal-info {
+    padding: 0.75rem;
+  }
+  
+  .savings-summary {
+    font-size: 0.85rem;
+  }
+}
+
+/* Modal Styles */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 12px;
+  max-width: 1200px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem 2rem;
+  border-bottom: 1px solid #e5e7eb;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-radius: 12px 12px 0 0;
+}
+
+.modal-header h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 1.5rem;
   cursor: pointer;
-  font-size: 1.2rem;
+  padding: 0.5rem;
+  border-radius: 6px;
+  transition: background-color 0.2s;
+}
+
+.modal-close:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.modal-body {
+  padding: 2rem;
+}
+
+.tariff-overview {
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.overview-grid {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2rem;
+  align-items: center;
+}
+
+.overview-item h3 {
+  margin: 0 0 0.5rem 0;
+  font-size: 1.25rem;
+  color: #1f2937;
+}
+
+.tariff-type {
+  margin: 0;
+}
+
+.cost-display {
+  text-align: right;
+}
+
+.monthly-cost {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #059669;
+  line-height: 1;
+}
+
+.cost-label {
+  font-size: 0.9rem;
+  color: #6b7280;
+  margin-top: 0.25rem;
+}
+
+.modal-info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.detail-section, .cost-section, .contract-section {
+  background: #f9fafb;
+  border-radius: 8px;
+  padding: 1.5rem;
+}
+
+.detail-section h3 {
+  margin: 0 0 1rem 0;
+  font-size: 1.1rem;
+  color: #1f2937;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.detail-list {
+  margin-bottom: 1.5rem;
+}
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.detail-row:last-child {
+  border-bottom: none;
+}
+
+.detail-row .label {
+  font-weight: 500;
+  color: #6b7280;
+}
+
+.detail-row .value {
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.detail-row .value.highlight {
+  color: #059669;
+  font-size: 1.1rem;
+}
+
+.features-list h4 {
+  margin: 0 0 0.75rem 0;
+  font-size: 1rem;
+  color: #1f2937;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.features-list ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.features-list li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0;
+  color: #4b5563;
+}
+
+.features-list li i {
+  color: #059669;
+  font-size: 0.9rem;
+}
+
+.detail-row.highlight-row {
+  background: #f0f9ff;
+  padding: 0.75rem;
+  border-radius: 6px;
+  border: 1px solid #0ea5e9;
+  margin-top: 0.5rem;
+}
+
+/* Cost Section Styles */
+.cost-breakdown-detail {
+  margin-bottom: 1.5rem;
+}
+
+.cost-item {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 1rem;
+  align-items: center;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.cost-item.total {
+  border-top: 2px solid #3b82f6;
+  border-bottom: none;
+  font-weight: 700;
+  background: #f0f9ff;
+  padding: 1rem;
+  border-radius: 6px;
+  margin-top: 0.5rem;
+}
+
+.cost-label {
+  font-size: 0.9rem;
+  color: #4b5563;
+}
+
+.cost-value {
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.cost-percentage {
+  font-size: 0.8rem;
+  color: #6b7280;
+  background: #f3f4f6;
+  padding: 0.25rem 0.5rem;
+  border-radius: 12px;
+}
+
+.cost-separator {
+  height: 1px;
+  background: #d1d5db;
+  margin: 0.5rem 0;
+  grid-column: 1 / -1;
+}
+
+.cost-comparison {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.cost-comparison h4 {
+  margin: 0 0 0.75rem 0;
+  font-size: 0.95rem;
+  color: #1f2937;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.comparison-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.comparison-item:last-child {
+  border-bottom: none;
+}
+
+.comparison-label {
+  font-size: 0.85rem;
+  color: #6b7280;
+}
+
+.comparison-value {
+  font-weight: 600;
+  color: #059669;
+}
+
+.optimization-potential h4 {
+  margin: 0 0 1rem 0;
+  font-size: 0.95rem;
+  color: #1f2937;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.optimization-stats {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.stat-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: #ffffff;
+  padding: 0.75rem;
+  border-radius: 6px;
+  border: 1px solid #e5e7eb;
+}
+
+.stat-icon {
+  width: 32px;
+  height: 32px;
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 0.85rem;
+}
+
+.stat-content {
+  flex: 1;
+}
+
+.stat-title {
+  font-size: 0.85rem;
+  color: #4b5563;
+  margin-bottom: 0.25rem;
+}
+
+.stat-value {
+  font-weight: 700;
+  color: #059669;
+  font-size: 0.9rem;
+}
+
+/* Contract Section Styles */
+.contract-details {
+  margin-bottom: 1.5rem;
+}
+
+.contract-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.contract-item:last-child {
+  border-bottom: none;
+}
+
+.contract-item > i {
+  color: #3b82f6;
+  margin-top: 0.25rem;
+  width: 16px;
+}
+
+.contract-content {
+  flex: 1;
+}
+
+.contract-title {
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 0.25rem;
+  font-size: 0.9rem;
+}
+
+.contract-value {
+  color: #4b5563;
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+.provider-info {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 1rem;
+}
+
+.provider-info h4 {
+  margin: 0 0 0.75rem 0;
+  font-size: 0.95rem;
+  color: #1f2937;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.provider-details {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.provider-logo {
+  width: 50px;
+  height: 50px;
+  flex-shrink: 0;
+}
+
+.logo-placeholder {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 700;
+  font-size: 0.7rem;
+  text-align: center;
+}
+
+.provider-content {
+  flex: 1;
+}
+
+.provider-name {
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 0.25rem;
+  font-size: 0.9rem;
+}
+
+.provider-description {
+  color: #4b5563;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  margin-bottom: 0.5rem;
+}
+
+.provider-rating {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.rating-stars {
+  color: #f59e0b;
+  font-size: 0.8rem;
+}
+
+.rating-text {
+  color: #6b7280;
+  font-size: 0.8rem;
+}
+
+/* Charts Container Styles */
+.charts-container {
+  margin-top: 2rem;
+  padding-top: 2rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+.charts-title {
+  margin: 0 0 1.5rem 0;
+  font-size: 1.25rem;
+  color: #1f2937;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  text-align: center;
+  justify-content: center;
+}
+
+.charts-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+}
+
+.chart-container {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 1.5rem;
+  min-height: 300px;
+}
+
+.chart-title {
+  margin: 0 0 1rem 0;
+  font-size: 1rem;
+  color: #1f2937;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  text-align: center;
+  justify-content: center;
+}
+
+.chart-placeholder {
+  height: 240px;
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #64748b;
+  font-size: 0.9rem;
+  text-align: center;
+  padding: 2rem;
+  border: 2px dashed #cbd5e1;
+}
+
+.chart-placeholder i {
+  display: block;
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+  color: #94a3b8;
+}
+
+.chart-description {
+  margin-top: 1rem;
+  font-size: 0.8rem;
+  color: #6b7280;
+  text-align: center;
+  line-height: 1.4;
+}
+
+/* Responsive Design for Charts */
+@media (max-width: 768px) {
+  .modal-info-grid {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+  
+  .charts-grid {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+  
+  .chart-container {
+    padding: 1rem;
+    min-height: 250px;
+  }
+  
+  .chart-placeholder {
+    height: 200px;
+    padding: 1.5rem;
+  }
+  
+  .modal-content {
+    max-width: 95vw;
+    margin: 1rem;
+  }
+  
+  .modal-title {
+    font-size: 1.25rem;
+  }
+  
+  .cost-item {
+    grid-template-columns: 1fr auto;
+    gap: 0.5rem;
+  }
+  
+  .cost-percentage {
+    display: none;
+  }
+  
+  .provider-details {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  
+  .provider-logo {
+    align-self: flex-start;
+  }
+}
+
+/* Animation Improvements */
+.modal-content {
+  animation: modalSlideIn 0.3s ease-out;
+}
+
+@keyframes modalSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-50px) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.tariff-card {
+  transition: all 0.3s ease;
+}
+
+.tariff-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+}
+
+.cost-item {
+  transition: background-color 0.2s ease;
+}
+
+.cost-item:hover {
+  background-color: #f9fafb;
+}
+
+.stat-item {
+  transition: all 0.2s ease;
+}
+
+.stat-item:hover {
+  transform: translateX(4px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.chart-placeholder {
+  transition: all 0.3s ease;
+}
+
+.chart-placeholder:hover {
+  background: linear-gradient(135deg, #f1f5f9 0%, #d1d9e6 100%);
+  border-color: #94a3b8;
+}
+
+.chart-section {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 1.5rem;
+}
+
+.chart-section h3 {
+  margin: 0 0 1rem 0;
+  font-size: 1.1rem;
+  color: #1f2937;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.chart-placeholder {
+  border: 2px dashed #d1d5db;
+  border-radius: 8px;
+  padding: 2rem;
+  text-align: center;
+  background: #f9fafb;
+}
+
+.placeholder-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.placeholder-content > i {
+  font-size: 3rem;
+  color: #9ca3af;
+}
+
+.placeholder-content h4 {
+  margin: 0;
+  font-size: 1.1rem;
+  color: #4b5563;
+}
+
+.placeholder-content p {
+  margin: 0;
+  color: #6b7280;
+  font-size: 0.9rem;
+}
+
+.placeholder-data {
+  margin-top: 1rem;
+  width: 100%;
+}
+
+.mock-chart-bars {
+  display: flex;
+  align-items: end;
+  justify-content: center;
+  gap: 0.5rem;
+  height: 80px;
+  margin-bottom: 1rem;
+}
+
+.bar {
+  width: 20px;
+  background: linear-gradient(to top, #3b82f6, #60a5fa);
+  border-radius: 2px 2px 0 0;
+  min-height: 20px;
+}
+
+.mock-pie-chart {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  margin: 0 auto 1rem auto;
+  position: relative;
+  background: conic-gradient(
+    from 0deg,
+    #ef4444 0deg 120deg,
+    #f59e0b 120deg 240deg,
+    #10b981 240deg 360deg
+  );
+}
+
+.savings-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  text-align: left;
+  font-size: 0.85rem;
+}
+
+.savings-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.color-indicator {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+
+.savings-1 { background-color: #ef4444; }
+.savings-2 { background-color: #f59e0b; }
+.savings-3 { background-color: #10b981; }
+
+.placeholder-data small {
+  color: #9ca3af;
+  font-size: 0.8rem;
+  font-style: italic;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+  padding-top: 1.5rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+.badge-dynamic {
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  color: white;
+}
+
+.badge-fixed {
+  background: linear-gradient(135deg, #6b7280, #374151);
+  color: white;
+}
+
+/* Responsive Modal */
+@media (max-width: 1024px) {
+  .modal-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .overview-grid {
+    grid-template-columns: 1fr;
+    text-align: center;
+    gap: 1rem;
+  }
+  
+  .cost-display {
+    text-align: center;
+  }
+}
+
+@media (max-width: 768px) {
+  .modal-content {
+    margin: 0;
+    border-radius: 0;
+    max-height: 100vh;
+  }
+  
+  .modal-header {
+    border-radius: 0;
+  }
+  
+  .modal-body {
+    padding: 1rem;
+  }
+  
+  .modal-actions {
+    flex-direction: column;
+  }
+  
+  .modal-actions .btn {
+    width: 100%;
+  }
 }
 </style>

@@ -27,3 +27,4 @@ __pycache__/
 # Allow app_data folder and its contents (override the *.csv ignore)
 !app_data/
 !app_data/**
+src/frontend/node_modules/
