@@ -23,3 +23,7 @@ venv/
 env/
 __pycache__/
 *.pyc
+
+# Allow app_data folder and its contents (override the *.csv ignore)
+!app_data/
+!app_data/**
