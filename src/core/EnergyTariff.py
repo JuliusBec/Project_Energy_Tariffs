@@ -4,6 +4,7 @@ from typing import Optional
 import pandas as pd
 from .forecasting.usage_forecasting.UsageForecaster import forecast_prophet
 from calendar import monthrange
+import os
 
 class EnergyTariff(ABC):
     """
@@ -133,10 +134,10 @@ class FixedTariff(EnergyTariff):
             consumption_data = consumption_data.resample('H', on='datetime').sum().reset_index()
             future_consumption = forecast_prophet(consumption_data)
         elif isinstance(data, (int, float)):
-            # load synthetic data
+            # load standard load profile data
             yearly_usage = data
-            synthetic_data_path = os.path.join(project_root, "data", "household_data", "synthetic_household.csv")
-            consumption_data = pd.read_csv(synthetic_data_path)
+            standard_profile_path = os.path.join(project_root, "app_data", "standard_profile", "Standard_Load_Profile_2025_2026.csv")
+            consumption_data = pd.read_csv(standard_profile_path)
             consumption_data['datetime'] = pd.to_datetime(consumption_data['datetime'])
             current_yearly_usage = consumption_data['value'].sum()
             adjustment_factor = yearly_usage / current_yearly_usage if current_yearly_usage > 0 else 1
@@ -171,6 +172,37 @@ class DynamicTariff(EnergyTariff):
         """
         super().__init__(name, base_price=base_price, start_date=start_date, provider=provider, is_dynamic=True)
 
+    def _get_average_forecast_price(self) -> float:
+        """
+        Get average price from the latest forecast data.
+        Returns a default value if forecast data is not available.
+        """
+        import os
+        try:
+            # Get the project root directory
+            project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            app_data_path = os.path.join(project_root, "app_data")
+            
+            # Find the most recent price forecast file
+            forecast_files = [f for f in os.listdir(app_data_path) if f.startswith('germany_price_forecast_') and f.endswith('.csv')]
+            if not forecast_files:
+                return 0.25  # Default fallback price in €/kWh
+            
+            # Sort by filename to get the most recent
+            latest_forecast_file = sorted(forecast_files)[-1]
+            price_data_path = os.path.join(app_data_path, latest_forecast_file)
+            
+            forecast_data = pd.read_csv(price_data_path)
+            
+            if 'yhat' in forecast_data.columns:
+                # Convert €/MWh to €/kWh and return average
+                return forecast_data['yhat'].mean() / 1000
+            else:
+                return 0.25  # Default fallback price in €/kWh
+                
+        except Exception:
+            return 0.25  # Default fallback price in €/kWh
+
     def calculate_cost_split(self, total_consumption_kwh: float) -> dict:
         """
         Calculate cost breakdown for dynamic tariff.
@@ -187,8 +219,8 @@ class DynamicTariff(EnergyTariff):
         # The actual cost calculation with time-dependent pricing is handled in calculate_cost
         billing_period_days = self.calculate_billing_period_days()
         
-        # Placeholder average price - in real implementation this would need market price forecast
-        estimated_avg_kwh_price = 0.25  # €/kWh - should be calculated from market data
+        # Get average price from latest forecast data
+        estimated_avg_kwh_price = self._get_average_forecast_price()
         
         variable_cost = total_consumption_kwh * estimated_avg_kwh_price
         total_cost = variable_cost + self.base_price
@@ -207,7 +239,6 @@ class DynamicTariff(EnergyTariff):
         """
         Calculate the total cost for a given consumption in kWh.
         """
-        import os
         print(f"DynamicTariff.calculate_cost() called with data: {type(data)}")
         
         # Calculate actual billing period based on German monthly billing practices
@@ -238,16 +269,16 @@ class DynamicTariff(EnergyTariff):
             future_consumption = future_consumption.rename(columns={'ds': 'datetime', 'yhat': 'value'})
             print(f"Prophet forecast columns after rename: {list(future_consumption.columns)}")
         elif isinstance(data, (int, float)):
-            # load synthetic data
+            # load standard load profile
             yearly_usage = data
-            print(f"Loading synthetic data for yearly usage: {yearly_usage}")
+            print(f"Loading standard load profile for yearly usage: {yearly_usage}")
             
             try:
-                synthetic_data_path = os.path.join(project_root, "data", "household_data", "synthetic_household.csv")
-                consumption_data = pd.read_csv(synthetic_data_path)
-                print(f"Successfully loaded consumption data from {synthetic_data_path}, shape: {consumption_data.shape}")
+                standard_profile_path = os.path.join(project_root, "app_data", "standard_profile", "Standard_Load_Profile_2025_2026.csv")
+                consumption_data = pd.read_csv(standard_profile_path)
+                print(f"Successfully loaded standard load profile from {standard_profile_path}, shape: {consumption_data.shape}")
             except Exception as e:
-                print(f"Error loading consumption data: {e}")
+                print(f"Error loading standard load profile: {e}")
                 # Return just base price if data loading fails
                 return self.base_price
                 
@@ -261,18 +292,32 @@ class DynamicTariff(EnergyTariff):
         else:
             raise ValueError("Input data must be a pandas DataFrame or a numeric yearly usage value.")
         
-        # load price data
+        # load price forecast data from app_data
         try:
-            price_data_path = os.path.join(project_root, "data", "mock_price_data.csv")
-            future_prices = pd.read_csv(price_data_path)
-            print(f"Successfully loaded price data from {price_data_path}, shape: {future_prices.shape}")
+            app_data_path = os.path.join(project_root, "app_data")
             
-            # Convert price from €/MWh to €/kWh (divide by 1000)
-            future_prices['predicted_mean'] = future_prices['predicted_mean'] / 1000
-            print(f"Converted prices from €/MWh to €/kWh")
+            # Find the most recent price forecast file
+            forecast_files = [f for f in os.listdir(app_data_path) if f.startswith('germany_price_forecast_') and f.endswith('.csv')]
+            if not forecast_files:
+                raise FileNotFoundError("No price forecast files found in app_data")
+            
+            # Sort by filename to get the most recent (assumes timestamp in filename)
+            latest_forecast_file = sorted(forecast_files)[-1]
+            price_data_path = os.path.join(app_data_path, latest_forecast_file)
+            
+            future_prices = pd.read_csv(price_data_path)
+            print(f"Successfully loaded price forecast data from {price_data_path}, shape: {future_prices.shape}")
+            
+            # Use 'yhat' column from Prophet forecast and convert from €/MWh to €/kWh
+            if 'yhat' not in future_prices.columns:
+                raise ValueError(f"Expected 'yhat' column in forecast data, found columns: {list(future_prices.columns)}")
+            
+            future_prices['predicted_mean'] = future_prices['yhat'] / 1000  # Convert €/MWh to €/kWh
+            future_prices = future_prices.rename(columns={'ds': 'datetime'})  # Prophet uses 'ds' for datetime
+            print(f"Using Prophet forecast with yhat column, converted prices from €/MWh to €/kWh")
             print(f"Sample converted prices: {future_prices['predicted_mean'].head().tolist()}")
         except Exception as e:
-            print(f"Error loading price data: {e}")
+            print(f"Error loading price forecast data: {e}")
             # Return just base price if price data loading fails
             return self.base_price
             
@@ -340,12 +385,12 @@ class DynamicTariff(EnergyTariff):
             # Prophet returns columns 'ds' and 'yhat', but we need 'datetime' and 'value'
             future_consumption = future_consumption.rename(columns={'ds': 'datetime', 'yhat': 'value'})
         elif isinstance(data, (int, float)):
-            # load synthetic data
+            # load standard load profile
             yearly_usage = data
             
             try:
-                synthetic_data_path = os.path.join(project_root, "data", "household_data", "synthetic_household.csv")
-                consumption_data = pd.read_csv(synthetic_data_path)
+                standard_profile_path = os.path.join(project_root, "app_data", "standard_profile", "Standard_Load_Profile_2025_2026.csv")
+                consumption_data = pd.read_csv(standard_profile_path)
             except Exception as e:
                 # Return just base price if data loading fails
                 return {'total_cost': self.base_price, 'avg_kwh_price': 0.0}
@@ -359,13 +404,27 @@ class DynamicTariff(EnergyTariff):
         else:
             raise ValueError("Input data must be a pandas DataFrame or a numeric yearly usage value.")
         
-        # load price data
+        # load price forecast data from app_data
         try:
-            price_data_path = os.path.join(project_root, "data", "mock_price_data.csv")
+            app_data_path = os.path.join(project_root, "app_data")
+            
+            # Find the most recent price forecast file
+            forecast_files = [f for f in os.listdir(app_data_path) if f.startswith('germany_price_forecast_') and f.endswith('.csv')]
+            if not forecast_files:
+                raise FileNotFoundError("No price forecast files found in app_data")
+            
+            # Sort by filename to get the most recent (assumes timestamp in filename)
+            latest_forecast_file = sorted(forecast_files)[-1]
+            price_data_path = os.path.join(app_data_path, latest_forecast_file)
+            
             future_prices = pd.read_csv(price_data_path)
             
-            # Convert price from €/MWh to €/kWh (divide by 1000)
-            future_prices['predicted_mean'] = future_prices['predicted_mean'] / 1000
+            # Use 'yhat' column from Prophet forecast and convert from €/MWh to €/kWh
+            if 'yhat' not in future_prices.columns:
+                raise ValueError(f"Expected 'yhat' column in forecast data, found columns: {list(future_prices.columns)}")
+            
+            future_prices['predicted_mean'] = future_prices['yhat'] / 1000  # Convert €/MWh to €/kWh
+            future_prices = future_prices.rename(columns={'ds': 'datetime'})  # Prophet uses 'ds' for datetime
         except Exception as e:
             # Return just base price if price data loading fails
             return {'total_cost': self.base_price, 'avg_kwh_price': 0.0}

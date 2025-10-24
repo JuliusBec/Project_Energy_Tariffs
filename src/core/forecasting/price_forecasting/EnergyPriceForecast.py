@@ -287,7 +287,7 @@ def plot_forecast_analysis(model: Prophet, forecast: pd.DataFrame, actual_data: 
         plt.style.use('default')  # Using default style instead of seaborn
         
         # Create figures directory if it doesn't exist
-        figures_dir = '/workspaces/Project_Energy_Tariffs/figures'
+        figures_dir = 'figures'
         os.makedirs(figures_dir, exist_ok=True)
         
         # Create figure with multiple subplots
@@ -338,7 +338,7 @@ def plot_forecast_analysis(model: Prophet, forecast: pd.DataFrame, actual_data: 
         ax3.set_ylabel('Frequency')
         
         plt.tight_layout()
-        save_path = os.path.join('/workspaces/Project_Energy_Tariffs/figures', 'forecast_analysis.png')
+        save_path = os.path.join(figures_dir, 'forecast_analysis.png')
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
         plt.close()
         
@@ -381,8 +381,9 @@ def main():
         )
         args = parser.parse_args()
 
-        # Create output directory
-        os.makedirs('output', exist_ok=True)
+        # Use app_data directory for output
+        output_dir = 'app_data'
+        os.makedirs(output_dir, exist_ok=True)
 
         # Calculate required chunks for 2 years of data
         required_chunks = calculate_required_chunks(args.training_days)
@@ -405,15 +406,16 @@ def main():
             logging.warning(f"Warning: Only got {date_range.days} days of data, "
                           f"less than the requested {args.training_days} days")
         
-        # Save raw data
-        raw_data_path = 'output/smard_dayahead_de.csv'
+        # Save raw data with descriptive filename
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        raw_data_path = os.path.join(output_dir, f'germany_dayahead_prices_raw_{timestamp}.csv')
         df.to_csv(raw_data_path, index=False)
         logging.info(f"\nRaw data saved to {raw_data_path}")
 
         # Calculate EUR/kWh if requested
         if args.save_eur_kwh:
             kwh_df = to_eur_per_kwh(df)
-            kwh_path = 'output/smard_dayahead_de_kwh.csv'
+            kwh_path = os.path.join(output_dir, f'germany_dayahead_prices_kwh_{timestamp}.csv')
             kwh_df.to_csv(kwh_path, index=False)
             logging.info(f"EUR/kWh prices saved to {kwh_path}")
 
@@ -433,8 +435,8 @@ def main():
             return_components=True
         )
 
-        # Save forecast results
-        forecast_path = 'output/forecast.csv'
+        # Save forecast results with descriptive filename
+        forecast_path = os.path.join(output_dir, f'germany_price_forecast_{args.horizon_hours}h.csv')
         forecast.to_csv(forecast_path, index=False)
         logging.info(f"Forecast saved to {forecast_path}")
 
