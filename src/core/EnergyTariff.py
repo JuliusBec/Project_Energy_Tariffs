@@ -118,6 +118,20 @@ class FixedTariff(EnergyTariff):
         """
         Calculate the total cost for a given consumption in kWh.
         """
+        print(f"\n{'='*80}")
+        print(f"FixedTariff.calculate_cost() called for tariff: {self.name}")
+        print(f"Data type: {type(data)}")
+        
+        if isinstance(data, pd.DataFrame):
+            print(f"DataFrame shape: {data.shape}")
+            print(f"DataFrame columns: {list(data.columns)}")
+            print(f"DataFrame date range: {data['datetime'].min() if 'datetime' in data.columns else 'N/A'} to {data['datetime'].max() if 'datetime' in data.columns else 'N/A'}")
+            if 'value' in data.columns:
+                print(f"Total consumption in uploaded data: {data['value'].sum():.2f} kWh")
+        else:
+            print(f"Numeric value (annual consumption): {data}")
+        print(f"{'='*80}\n")
+        
         import os
         
         # Calculate actual billing period based on German monthly billing practices
@@ -259,7 +273,19 @@ class DynamicTariff(EnergyTariff):
         """
         Calculate the total cost for a given consumption in kWh.
         """
-        print(f"DynamicTariff.calculate_cost() called with data: {type(data)}")
+        print(f"\n{'='*80}")
+        print(f"DynamicTariff.calculate_cost() called for tariff: {self.name}")
+        print(f"Data type: {type(data)}")
+        
+        if isinstance(data, pd.DataFrame):
+            print(f"DataFrame shape: {data.shape}")
+            print(f"DataFrame columns: {list(data.columns)}")
+            print(f"DataFrame date range: {data['datetime'].min() if 'datetime' in data.columns else 'N/A'} to {data['datetime'].max() if 'datetime' in data.columns else 'N/A'}")
+            if 'value' in data.columns:
+                print(f"Total consumption in uploaded data: {data['value'].sum():.2f} kWh")
+        else:
+            print(f"Numeric value (annual consumption): {data}")
+        print(f"{'='*80}\n")
         
         # Calculate actual billing period based on German monthly billing practices
         billing_period_days = self.calculate_billing_period_days()
@@ -288,6 +314,10 @@ class DynamicTariff(EnergyTariff):
             # Prophet returns columns 'ds' and 'yhat', but we need 'datetime' and 'value'
             future_consumption = future_consumption.rename(columns={'ds': 'datetime', 'yhat': 'value'})
             print(f"Prophet forecast columns after rename: {list(future_consumption.columns)}")
+            print(f"Prophet forecast shape: {future_consumption.shape}")
+            print(f"Prophet forecast date range: {future_consumption['datetime'].min()} to {future_consumption['datetime'].max()}")
+            print(f"Prophet forecast total consumption: {future_consumption['value'].sum():.2f} kWh")
+            print(f"Prophet forecast avg hourly: {future_consumption['value'].mean():.4f} kWh")
         elif isinstance(data, (int, float)):
             # load standard load profile
             yearly_usage = data

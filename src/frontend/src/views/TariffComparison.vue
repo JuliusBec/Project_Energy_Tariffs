@@ -90,7 +90,6 @@
                             <div class="file-size">{{ formatFileSize(uploadedFile.size) }}</div>
                             <div v-if="csvData" class="file-preview">
                               {{ csvData.length }} Datensätze erkannt
-                              <span v-if="formData.annualKwh"> | {{ formData.annualKwh }} kWh/Jahr</span>
                             </div>
                           </div>
                         </div>
@@ -928,7 +927,56 @@ export default {
         const backendTariffs = await response.json()
         console.log('Backend tariffs received:', backendTariffs)
         
-        // Calculate costs for each tariff using the backend
+        // Check if user uploaded a CSV file
+        if (formData.value.hasSmartMeter && uploadedFile.value) {
+          console.log('Using uploaded CSV file for calculations:', uploadedFile.value.name)
+          
+          // Use the /api/calculate-with-csv endpoint
+          try {
+            const formDataObj = new FormData()
+            formDataObj.append('file', uploadedFile.value)
+            
+            const csvResponse = await fetch('http://localhost:8000/api/calculate-with-csv', {
+              method: 'POST',
+              body: formDataObj
+            })
+            
+            if (csvResponse.ok) {
+              const csvResults = await csvResponse.json()
+              console.log('CSV calculation results:', csvResults)
+              
+              // Map the results to the tariffs
+              const calculatedTariffs = csvResults.results.map(result => {
+                const tariff = backendTariffs.find(t => t.name === result.tariff_name)
+                return {
+                  ...tariff,
+                  annual_cost: Math.round(result.annual_cost),
+                  monthly_cost: Math.round(result.monthly_cost),
+                  savings_potential: 0,
+                  avg_kwh_price: result.avg_kwh_price,
+                  tariff_type: result.tariff_type
+                }
+              })
+              
+              results.value = calculatedTariffs
+              console.log('Final calculated tariffs from CSV:', calculatedTariffs)
+              
+              // Fetch predictions and forecasts
+              fetchSavingsPrediction()
+              fetchPriceForecast()
+              
+              loading.value = false
+              return
+            } else {
+              console.error('CSV calculation failed, falling back to manual calculation')
+            }
+          } catch (csvError) {
+            console.error('Error with CSV calculation:', csvError)
+          }
+        }
+        
+        // Fallback: Manual calculation (no CSV file or CSV failed)
+        console.log('Using manual calculation without CSV')
         const calculatedTariffs = []
         
         for (const tariff of backendTariffs) {
@@ -937,7 +985,7 @@ export default {
               tariff_id: tariff.id,
               annual_kwh: formData.value.annualKwh,
               has_smart_meter: formData.value.hasSmartMeter,
-              usage_pattern: formData.value.hasSmartMeter ? 'uploaded' : 'manual'
+              usage_pattern: 'manual'
             }
             
             console.log('Calculating costs for tariff:', tariff.name, calculationData)

@@ -285,6 +285,16 @@ async def calculate_with_csv(
         # Convert datetime column
         df['datetime'] = pd.to_datetime(df['datetime'])
         
+        # DEBUG: Print uploaded data info
+        print(f"\n{'='*80}")
+        print(f"UPLOADED CSV FILE: {file.filename}")
+        print(f"Data shape: {df.shape}")
+        print(f"Date range: {df['datetime'].min()} to {df['datetime'].max()}")
+        print(f"Total consumption: {df['value'].sum():.2f} kWh")
+        print(f"Average hourly consumption: {df['value'].mean():.4f} kWh")
+        print(f"First 5 rows:\n{df.head()}")
+        print(f"{'='*80}\n")
+        
         # Calculate costs for each tariff using user's actual data
         tariffs = ENBW_TARIFFS
         print(f"Created {len(tariffs)} tariffs")
