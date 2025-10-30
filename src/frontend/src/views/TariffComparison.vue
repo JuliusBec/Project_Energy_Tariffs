@@ -760,44 +760,10 @@
         <div class="charts-container">
           <h3 class="charts-title"><i class="fas fa-chart-line"></i> Prognose & Analyse</h3>
           <div class="charts-grid">
-            <!-- Preisvorhersage Diagramm -->
+            <!-- Backtest Chart -->
             <div class="chart-section">
-              <h4><i class="fas fa-chart-area"></i> Strompreis-Prognose</h4>
-              <div class="chart-placeholder">
-                <div class="placeholder-content">
-                  <div class="chart-header">
-                    <div class="chart-info">
-                      <span class="chart-period">Nächste 7 Tage</span>
-                      <span class="chart-avg">Ø {{ (0.08 + Math.random() * 0.15).toFixed(3) }}€/kWh</span>
-                    </div>
-                  </div>
-                  <div class="placeholder-data">
-                    <div class="mock-chart-bars">
-                      <div class="bar-group" v-for="day in 7" :key="day">
-                        <div class="bar" :style="{ height: (30 + Math.random() * 60) + '%' }"></div>
-                        <div class="bar-label">{{ ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'][day-1] }}</div>
-                      </div>
-                    </div>
-                    <div class="chart-legend">
-                      <div class="legend-item">
-                        <span class="legend-color high"></span>
-                        <span>Hohe Preise (17-20h)</span>
-                      </div>
-                      <div class="legend-item">
-                        <span class="legend-color medium"></span>
-                        <span>Normale Preise (6-17h)</span>
-                      </div>
-                      <div class="legend-item">
-                        <span class="legend-color low"></span>
-                        <span>Niedrige Preise (20-6h)</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div class="chart-footer">
-                    <small>Interaktive Preisvorhersage mit stündlichen Updates</small>
-                  </div>
-                </div>
-              </div>
+              <h4><i class="fas fa-chart-area"></i> Verbrauchsprognose Backtest</h4>
+              <BacktestChart :uploadedFile="uploadedFile" />
             </div>
 
             <!-- Einsparungspotenzial Diagramm -->
@@ -869,10 +835,14 @@
 
 <script>
 import { ref, computed, onMounted } from 'vue'
+import BacktestChart from '../components/BacktestChart.vue'
 // import { apiService } from '../services/api' // Deactivated for frontend-only mode
 
 export default {
   name: 'TariffComparison',
+  components: {
+    BacktestChart
+  },
   setup() {
     const formData = ref({
       hasSmartMeter: null, // Start with null to force user selection

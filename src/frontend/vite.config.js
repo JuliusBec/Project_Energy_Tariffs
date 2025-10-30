@@ -15,9 +15,15 @@ export default defineConfig({
     }
   },
   build: {
-    outDir: 'dist'
+    outDir: 'dist',
+    commonjsOptions: {
+      include: [/node_modules/]
+    }
   },
   optimizeDeps: {
-    include: ['vue', 'vue-router', 'axios']
+    include: ['vue', 'vue-router', 'axios', 'chart.js'],
+    esbuildOptions: {
+      target: 'esnext'
+    }
   }
 })
