@@ -460,3 +460,320 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+def create_chart_data(historical_file=None, 
+                        forecast_file='germany_price_forecast_720h.csv',
+                        app_data_dir='app_data'):
+    """
+    Create chart data for visualization on the frontend using Chart.js.
+    Reads historical and forecast data from app_data folder and resamples to daily averages.
+    
+    Args:
+        historical_file: Name of the historical price data CSV file (if None, uses most recent)
+        forecast_file: Name of the forecast data CSV file
+        app_data_dir: Directory containing the data files
+    
+    Returns:
+        dict: Dictionary with structure suitable for Chart.js containing:
+            - historical_data: {timestamps, prices} daily averages of historical data
+            - forecast_data: {timestamps, prices, lower_bound, upper_bound} daily averages
+            - metrics: {avg_historical_price, avg_forecast_price, etc.}
+            - combined_data: Full timeline combining historical and forecast
+    """
+    try:
+        import glob
+        
+        # If no historical file specified, find the most recent one
+        if historical_file is None:
+            pattern = os.path.join(app_data_dir, 'germany_dayahead_prices_raw_*.csv')
+            historical_files = glob.glob(pattern)
+            if not historical_files:
+                raise FileNotFoundError(f"No historical price files found matching pattern: {pattern}")
+            # Sort by filename (which includes timestamp) and get the most recent
+            historical_file = os.path.basename(sorted(historical_files)[-1])
+            logging.info(f"Auto-selected most recent historical file: {historical_file}")
+        
+        # Construct file paths
+        historical_path = os.path.join(app_data_dir, historical_file)
+        forecast_path = os.path.join(app_data_dir, forecast_file)
+        
+        # Read historical data
+        logging.info(f"Reading historical price data from {historical_path}")
+        historical_df = pd.read_csv(historical_path)
+        historical_df['ds'] = pd.to_datetime(historical_df['ds'])
+        
+        # Read forecast data
+        logging.info(f"Reading forecast data from {forecast_path}")
+        forecast_df = pd.read_csv(forecast_path)
+        forecast_df['ds'] = pd.to_datetime(forecast_df['ds'])
+        
+        # Resample historical data to daily averages for better readability
+        logging.info("Resampling data to daily averages...")
+        historical_daily = historical_df.set_index('ds').resample('D').agg({
+            'price_eur_per_mwh': 'mean'
+        }).reset_index()
+        
+        # Remove any NaN values from historical data
+        historical_daily = historical_daily.dropna()
+        
+        # Resample forecast data to daily averages
+        forecast_daily = forecast_df.set_index('ds').resample('D').agg({
+            'yhat': 'mean',
+            'yhat_lower': 'mean',
+            'yhat_upper': 'mean'
+        }).reset_index()
+        
+        # Remove any NaN values from forecast data
+        forecast_daily = forecast_daily.dropna()
+        
+        # Separate historical and future forecast (no overlap)
+        last_historical_date = historical_daily['ds'].max()
+        forecast_future_only = forecast_daily[forecast_daily['ds'] > last_historical_date].copy()
+        
+        # Limit forecast to exactly 30 days from the last historical date
+        forecast_end_date = last_historical_date + pd.Timedelta(days=30)
+        forecast_future_only = forecast_future_only[forecast_future_only['ds'] <= forecast_end_date].copy()
+        
+        logging.info(f"Forecast limited to 30 days: {len(forecast_future_only)} days from {forecast_future_only['ds'].min()} to {forecast_future_only['ds'].max()}")
+        
+        # Replace any remaining NaN/Inf values with None for JSON compatibility
+        def clean_for_json(series):
+            """Convert NaN and Inf values to None for JSON serialization"""
+            return series.replace([np.inf, -np.inf], np.nan).where(pd.notna(series), None).tolist()
+        
+        # Prepare historical data for Chart.js
+        historical_data = {
+            'timestamps': historical_daily['ds'].dt.strftime('%Y-%m-%d').tolist(),
+            'prices': [round(float(x), 2) if x is not None and not np.isnan(x) and not np.isinf(x) else None 
+                        for x in historical_daily['price_eur_per_mwh']]
+        }
+        
+        # Prepare forecast data for Chart.js
+        forecast_data = {
+            'timestamps': forecast_future_only['ds'].dt.strftime('%Y-%m-%d').tolist(),
+            'prices': [round(float(x), 2) if x is not None and not np.isnan(x) and not np.isinf(x) else None 
+                        for x in forecast_future_only['yhat']],
+            'lower_bound': [round(float(x), 2) if x is not None and not np.isnan(x) and not np.isinf(x) else None 
+                            for x in forecast_future_only['yhat_lower']],
+            'upper_bound': [round(float(x), 2) if x is not None and not np.isnan(x) and not np.isinf(x) else None 
+                            for x in forecast_future_only['yhat_upper']]
+        }
+        
+        # Calculate metrics
+        avg_historical_price = historical_daily['price_eur_per_mwh'].mean()
+        avg_forecast_price = forecast_future_only['yhat'].mean()
+        max_historical_price = historical_daily['price_eur_per_mwh'].max()
+        max_forecast_price = forecast_future_only['yhat'].max()
+        min_historical_price = historical_daily['price_eur_per_mwh'].min()
+        min_forecast_price = forecast_future_only['yhat'].min()
+        
+        metrics = {
+            'historical_period_days': len(historical_daily),
+            'forecast_period_days': len(forecast_future_only),
+            'avg_historical_price': float(round(avg_historical_price, 2)),
+            'avg_forecast_price': float(round(avg_forecast_price, 2)),
+            'max_historical_price': float(round(max_historical_price, 2)),
+            'max_forecast_price': float(round(max_forecast_price, 2)),
+            'min_historical_price': float(round(min_historical_price, 2)),
+            'min_forecast_price': float(round(min_forecast_price, 2)),
+            'price_change_percentage': float(round(
+                ((avg_forecast_price - avg_historical_price) / avg_historical_price) * 100, 2
+            )),
+            'historical_start_date': historical_daily['ds'].min().strftime('%Y-%m-%d'),
+            'historical_end_date': historical_daily['ds'].max().strftime('%Y-%m-%d'),
+            'forecast_start_date': forecast_future_only['ds'].min().strftime('%Y-%m-%d'),
+            'forecast_end_date': forecast_future_only['ds'].max().strftime('%Y-%m-%d')
+        }
+        
+        # Create combined timeline for a complete view
+        combined_timestamps = historical_data['timestamps'] + forecast_data['timestamps']
+        combined_historical = historical_data['prices'] + [None] * len(forecast_data['timestamps'])
+        combined_forecast = [None] * len(historical_data['timestamps']) + forecast_data['prices']
+        
+        combined_data = {
+            'timestamps': combined_timestamps,
+            'historical_prices': combined_historical,
+            'forecast_prices': combined_forecast,
+            'forecast_lower': [None] * len(historical_data['timestamps']) + forecast_data['lower_bound'],
+            'forecast_upper': [None] * len(historical_data['timestamps']) + forecast_data['upper_bound']
+        }
+        
+        logging.info(f"Chart data prepared successfully:")
+        logging.info(f"  Historical: {len(historical_daily)} days ({metrics['historical_start_date']} to {metrics['historical_end_date']})")
+        logging.info(f"  Forecast: {len(forecast_future_only)} days ({metrics['forecast_start_date']} to {metrics['forecast_end_date']})")
+        logging.info(f"  Avg Historical Price: {avg_historical_price:.2f} EUR/MWh")
+        logging.info(f"  Avg Forecast Price: {avg_forecast_price:.2f} EUR/MWh")
+        logging.info(f"  Price Change: {metrics['price_change_percentage']}%")
+        
+        return {
+            'historical_data': historical_data,
+            'forecast_data': forecast_data,
+            'combined_data': combined_data,
+            'metrics': metrics
+        }
+        
+    except FileNotFoundError as e:
+        logging.error(f"Data file not found: {str(e)}")
+        return None
+    except Exception as e:
+        logging.error(f"Error creating chart data: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+
+def get_price_breakdown(avg_price_eur_per_mwh=None, app_data_dir='app_data'):
+    """
+    Calculate the breakdown of energy price components for doughnut chart.
+    
+    This function calculates the breakdown of electricity price components based on
+    typical German electricity price structure. The percentages are placeholder values
+    and should be updated with data from a reliable source (e.g., Bundesnetzagentur).
+    
+    Typical German electricity price structure (approximate):
+    - Generation/Wholesale: ~40% (market price from SMARD)
+    - Network fees: ~25%
+    - Taxes & levies: ~20% (EEG levy, electricity tax, etc.)
+    - VAT: ~16%
+    - Profit margin & other: ~5-10%
+    
+    Args:
+        avg_price_eur_per_mwh: Average wholesale market price in EUR/MWh. 
+                               If None, uses the average from the latest forecast file.
+        app_data_dir: Directory containing the forecast data files.
+    
+    Returns:
+        dict: Price breakdown suitable for Chart.js doughnut chart with structure:
+            {
+                'labels': List of component names,
+                'values': List of percentage values,
+                'colors': List of color codes for each component,
+                'prices_eur_per_kwh': List of absolute prices in EUR/kWh,
+                'total_price_eur_per_kwh': Total end-user price,
+                'wholesale_price_eur_per_mwh': Wholesale market price used,
+                'note': 'Explanation that percentages should be updated'
+            }
+    """
+    try:
+        # If no price provided, get average from last 24h of historical data
+        if avg_price_eur_per_mwh is None:
+            import glob
+            from datetime import datetime, timedelta
+            
+            # Look for historical price data files
+            historical_pattern = os.path.join(app_data_dir, 'germany_dayahead_prices_raw_*.csv')
+            historical_files = glob.glob(historical_pattern)
+            
+            if historical_files:
+                # Get the most recent historical file
+                latest_historical = sorted(historical_files)[-1]
+                logging.info(f"Loading historical data from {latest_historical}")
+                historical_df = pd.read_csv(latest_historical)
+                
+                # Parse datetime column
+                historical_df['ds'] = pd.to_datetime(historical_df['ds'])
+                
+                # Filter to last 24 hours
+                now = datetime.now()
+                last_24h_start = now - timedelta(hours=24)
+                
+                # Get data from last 24 hours
+                recent_data = historical_df[historical_df['ds'] >= last_24h_start]
+                
+                if len(recent_data) > 0:
+                    avg_price_eur_per_mwh = recent_data['price_eur_per_mwh'].mean()
+                    logging.info(f"Using average price from last 24h: {avg_price_eur_per_mwh:.2f} EUR/MWh ({len(recent_data)} data points)")
+                else:
+                    # If no data in last 24h, use most recent available data
+                    logging.warning("No data found in last 24h, using most recent 24 data points")
+                    recent_data = historical_df.tail(24)
+                    avg_price_eur_per_mwh = recent_data['price_eur_per_mwh'].mean()
+                    logging.info(f"Using average of last 24 data points: {avg_price_eur_per_mwh:.2f} EUR/MWh")
+            else:
+                # Fallback to a reasonable default
+                avg_price_eur_per_mwh = 100.0
+                logging.warning("No historical price files found, using default price of 100 EUR/MWh")
+        
+        # Convert wholesale price from EUR/MWh to EUR/kWh
+        wholesale_price_eur_per_kwh = avg_price_eur_per_mwh / 1000
+        
+        # Define price component breakdown (PLACEHOLDER percentages - UPDATE WITH RELIABLE SOURCE)
+        # These percentages are approximate and should be updated with official data
+        components = {
+            'Generation & Wholesale': {
+                'percentage': 40.0,
+                'color': '#3b82f6',  # Blue
+                'description': 'Wholesale electricity market price'
+            },
+            'Network Fees': {
+                'percentage': 25.0,
+                'color': '#f59e0b',  # Orange
+                'description': 'Grid infrastructure and transmission costs'
+            },
+            'Taxes & Levies': {
+                'percentage': 20.0,
+                'color': '#ef4444',  # Red
+                'description': 'EEG levy, electricity tax, and other levies'
+            },
+            'VAT (19%)': {
+                'percentage': 16.0,
+                'color': '#8b5cf6',  # Purple
+                'description': 'Value Added Tax on electricity'
+            },
+            'Retail Margin': {
+                'percentage': 7.0,
+                'color': '#10b981',  # Green
+                'description': 'Supplier profit margin and operations'
+            }
+        }
+        
+        # Calculate total end-user price
+        # The wholesale price represents the "Generation & Wholesale" component
+        # We can estimate the total price by scaling up
+        wholesale_percentage = components['Generation & Wholesale']['percentage']
+        estimated_total_price_eur_per_kwh = wholesale_price_eur_per_kwh * (100 / wholesale_percentage)
+        
+        # Calculate absolute prices for each component
+        labels = []
+        percentages = []
+        colors = []
+        prices_eur_per_kwh = []
+        descriptions = []
+        
+        for component_name, component_data in components.items():
+            labels.append(component_name)
+            percentages.append(component_data['percentage'])
+            colors.append(component_data['color'])
+            descriptions.append(component_data['description'])
+            
+            # Calculate absolute price for this component
+            component_price = estimated_total_price_eur_per_kwh * (component_data['percentage'] / 100)
+            prices_eur_per_kwh.append(round(component_price, 4))
+        
+        result = {
+            'labels': labels,
+            'values': percentages,
+            'colors': colors,
+            'prices_eur_per_kwh': prices_eur_per_kwh,
+            'descriptions': descriptions,
+            'total_price_eur_per_kwh': round(estimated_total_price_eur_per_kwh, 4),
+            'wholesale_price_eur_per_mwh': round(avg_price_eur_per_mwh, 2),
+            'wholesale_price_eur_per_kwh': round(wholesale_price_eur_per_kwh, 4),
+            'note': 'Component percentages are approximate and should be updated with data from official sources like Bundesnetzagentur',
+            'data_source': 'Placeholder percentages - requires update with reliable source',
+            'last_updated': None  # Can be updated when using official data
+        }
+        
+        logging.info("Price breakdown calculated successfully:")
+        logging.info(f"  Wholesale price: {avg_price_eur_per_mwh:.2f} EUR/MWh ({wholesale_price_eur_per_kwh:.4f} EUR/kWh)")
+        logging.info(f"  Estimated total end-user price: {estimated_total_price_eur_per_kwh:.4f} EUR/kWh")
+        logging.info(f"  Components: {len(labels)}")
+        
+        return result
+        
+    except Exception as e:
+        logging.error(f"Error calculating price breakdown: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return None
+    

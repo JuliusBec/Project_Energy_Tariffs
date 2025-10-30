@@ -655,6 +655,42 @@ async def get_market_prices():
         ]
     }
 
+@app.get("/api/price-chart-data")
+async def get_price_chart_data():
+    """Get historical and forecast price data for chart visualization"""
+    try:
+        from src.core.forecasting.price_forecasting.EnergyPriceForecast import create_chart_data
+        
+        # Generate chart data
+        chart_data = create_chart_data()
+        
+        if chart_data is None:
+            raise HTTPException(status_code=500, detail="Failed to generate price chart data")
+        
+        return chart_data
+        
+    except Exception as e:
+        print(f"Error generating price chart data: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error generating price chart data: {str(e)}")
+
+@app.get("/api/price-breakdown")
+async def get_price_breakdown():
+    """Get energy price component breakdown for doughnut chart visualization"""
+    try:
+        from src.core.forecasting.price_forecasting.EnergyPriceForecast import get_price_breakdown
+        
+        # Generate price breakdown data
+        breakdown_data = get_price_breakdown()
+        
+        if breakdown_data is None:
+            raise HTTPException(status_code=500, detail="Failed to generate price breakdown data")
+        
+        return breakdown_data
+        
+    except Exception as e:
+        print(f"Error generating price breakdown: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error generating price breakdown: {str(e)}")
+
 @app.get("/api/forecast")
 async def get_price_forecast():
     """Get price forecast for the next 7 days"""

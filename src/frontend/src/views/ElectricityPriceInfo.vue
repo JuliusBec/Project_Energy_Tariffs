@@ -66,10 +66,7 @@
 
         <div class="breakdown-container">
           <div class="breakdown-chart">
-            <div class="chart-placeholder">
-              <i class="fas fa-chart-pie"></i>
-              <div>Interaktives Kreisdiagramm<br><small>Wird hier angezeigt</small></div>
-            </div>
+            <PriceBreakdownChart />
           </div>
 
           <div class="breakdown-details">
@@ -190,10 +187,7 @@
 
         <div class="evolution-content">
           <div class="evolution-chart">
-            <div class="chart-placeholder">
-              <i class="fas fa-chart-line"></i>
-              <div>Strompreisentwicklung 2020-2025<br><small>Liniendiagramm wird hier angezeigt</small></div>
-            </div>
+            <PriceEvolutionChart />
           </div>
 
           <div class="evolution-info">
@@ -278,8 +272,15 @@
 </template>
 
 <script>
+import PriceEvolutionChart from '../components/PriceEvolutionChart.vue';
+import PriceBreakdownChart from '../components/PriceBreakdownChart.vue';
+
 export default {
   name: 'ElectricityPriceInfo',
+  components: {
+    PriceEvolutionChart,
+    PriceBreakdownChart
+  },
   mounted() {
     // Scroll to top when component is mounted
     window.scrollTo(0, 0);
@@ -543,12 +544,16 @@ section {
 /* Market Evolution */
 .evolution-content {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 2fr 1fr;
   gap: 3rem;
   background: white;
   border-radius: 12px;
   padding: 2rem;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.evolution-chart {
+  min-height: 400px;
 }
 
 .evolution-info h3 {
