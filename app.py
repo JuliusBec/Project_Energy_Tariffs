@@ -87,7 +87,8 @@ def create_enbw_tariffs():
             base_price=14.90,
             start_date=start_date,
             is_dynamic=True,
-            markup=0.18  # 18ct/kWh markup for premium dynamic tariff
+            markup=0.18,  # 18ct/kWh markup for premium dynamic tariff
+            features=["dynamic", "green"]
         ),
         DynamicTariff(
             name="EnBW easy dynamic", 
@@ -95,7 +96,8 @@ def create_enbw_tariffs():
             base_price=9.90,
             start_date=start_date,
             is_dynamic=True,
-            markup=0.22  # 22ct/kWh markup for standard dynamic tariff
+            markup=0.22,  # 22ct/kWh markup for standard dynamic tariff
+            features=["dynamic", "green"]
         ),
         FixedTariff(
             name="EnBW mobility+ Zuhause",
@@ -104,7 +106,8 @@ def create_enbw_tariffs():
             kwh_rate=0.3299,
             start_date=start_date,
             min_duration=12,
-            is_dynamic=False
+            is_dynamic=False,
+            features=["green"]
         ),
         FixedTariff(
             name="EnBW easy+",
@@ -113,7 +116,8 @@ def create_enbw_tariffs():
             kwh_rate=0.3499,
             start_date=start_date,
             min_duration=12,
-            is_dynamic=False
+            is_dynamic=False,
+            features=["green"]
         ),
         FixedTariff(
             name="EnBW Basis",
@@ -122,7 +126,8 @@ def create_enbw_tariffs():
             kwh_rate=0.3699,
             start_date=start_date,
             min_duration=12,
-            is_dynamic=False
+            is_dynamic=False,
+            features=["green"]
         ),
         FixedTariff(
             name="Komfort",
@@ -131,7 +136,8 @@ def create_enbw_tariffs():
             kwh_rate=0.3599,
             start_date=start_date,
             min_duration=12,
-            is_dynamic=False
+            is_dynamic=False,
+            features=["green"]
         )
     ]
 
@@ -214,9 +220,9 @@ async def get_tariffs():
                 "base_price": tariff.base_price,
                 "kwh_price": kwh_rate,
                 "is_dynamic": tariff.is_dynamic,
-                "features": ["Dynamischer Tariff", "100% Ökostrom"] if tariff.is_dynamic else ["Fester Tariff", "100% Ökostrom"],
+                "features": tariff.features if tariff.features else [],
                 "contract_duration": getattr(tariff, 'min_duration', 1),
-                "green_energy": True,  # All EnBW tariffs are green
+                "green_energy": "green" in (tariff.features or []),  # Check if 'green' feature exists
                 "description": f"{'Dynamischer' if tariff.is_dynamic else 'Fester'} Stromtarif von {tariff.provider}",
                 "type": "dynamic" if tariff.is_dynamic else "fixed"
             }

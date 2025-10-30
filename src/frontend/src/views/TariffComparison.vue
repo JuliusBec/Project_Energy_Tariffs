@@ -276,11 +276,11 @@
                     <p class="tariff-description">{{ tariff.description }}</p>
                     
                     <div class="tariff-badges">
-                      <span v-if="tariff.is_dynamic" class="badge badge-dynamic">
+                      <span v-if="tariff.features && tariff.features.includes('dynamic')" class="badge badge-dynamic">
                         <i class="fas fa-chart-line"></i>
                         Dynamisch
                       </span>
-                      <span v-if="tariff.green_energy" class="badge badge-green">
+                      <span v-if="tariff.features && tariff.features.includes('green')" class="badge badge-green">
                         <i class="fas fa-leaf"></i>
                         Ökostrom
                       </span>
@@ -1091,7 +1091,8 @@ export default {
           avg_savings: "15-30%",
           volatility: "hoch",
           dynamic_markup: 0.02, // 2 ct/kWh Aufschlag auf Börsenpreis
-          special_features: ["E-Auto Ladetarif", "Smart Home Integration", "Preisalarm"]
+          special_features: ["E-Auto Ladetarif", "Smart Home Integration", "Preisalarm"],
+          features: ["dynamic", "green"]
         },
         {
           id: 2,
@@ -1109,7 +1110,8 @@ export default {
           avg_savings: "10-25%",
           volatility: "mittel-hoch",
           dynamic_markup: 0.035, // 3,5 ct/kWh Aufschlag auf Börsenpreis
-          special_features: ["Einfache App", "Tagesvorhersage"]
+          special_features: ["Einfache App", "Tagesvorhersage"],
+          features: ["dynamic", "green"]
         },
         
         // EnBW Festpreis-Tarife
@@ -1128,7 +1130,8 @@ export default {
           automation_ready: true,
           avg_savings: "Stabile Preise",
           volatility: "keine",
-          special_features: ["E-Auto Ladetarif", "Mobility+ Vorteile", "THG-Quote möglich"]
+          special_features: ["E-Auto Ladetarif", "Mobility+ Vorteile", "THG-Quote möglich"],
+          features: ["green"]
         },
         {
           id: 4,
@@ -1145,7 +1148,8 @@ export default {
           automation_ready: false,
           avg_savings: "Günstig & fair",
           volatility: "keine",
-          special_features: ["12 Monate Preisgarantie", "Online-Service"]
+          special_features: ["12 Monate Preisgarantie", "Online-Service"],
+          features: ["green"]
         },
         {
           id: 5,
@@ -1162,7 +1166,8 @@ export default {
           automation_ready: false,
           avg_savings: "Bewährt & sicher",
           volatility: "keine",
-          special_features: ["24 Monate Preisgarantie", "Persönlicher Service"]
+          special_features: ["24 Monate Preisgarantie", "Persönlicher Service"],
+          features: []
         },
         {
           id: 6,
@@ -1179,7 +1184,8 @@ export default {
           automation_ready: true,
           avg_savings: "Premium Service",
           volatility: "keine",
-          special_features: ["24h Hotline", "Smart Home Paket", "Energieberatung"]
+          special_features: ["24h Hotline", "Smart Home Paket", "Energieberatung"],
+          features: ["green"]
         }
       ]
       
