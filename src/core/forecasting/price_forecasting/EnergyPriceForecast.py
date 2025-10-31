@@ -697,40 +697,30 @@ def get_price_breakdown(avg_price_eur_per_mwh=None, app_data_dir='app_data'):
         # Convert wholesale price from EUR/MWh to EUR/kWh
         wholesale_price_eur_per_kwh = avg_price_eur_per_mwh / 1000
         
-        # Define price component breakdown (PLACEHOLDER percentages - UPDATE WITH RELIABLE SOURCE)
-        # These percentages are approximate and should be updated with official data
+
+        # percentages taken from bundesnetzagentur
         components = {
-            'Generation & Wholesale': {
-                'percentage': 40.0,
-                'color': '#3b82f6',  # Blue
+            'Beschaffung, Vertrieb und Marge': {
+                'percentage': 43.5200769,
+                'color': '#059669',  # Green
                 'description': 'Wholesale electricity market price'
             },
-            'Network Fees': {
-                'percentage': 25.0,
+            'Netzentgelte': {
+                'percentage': 31.7864871,
                 'color': '#f59e0b',  # Orange
                 'description': 'Grid infrastructure and transmission costs'
             },
-            'Taxes & Levies': {
-                'percentage': 20.0,
+            'Steuern, Abgaben und weitere Umlagen': {
+                'percentage': 24.6934359,
                 'color': '#ef4444',  # Red
                 'description': 'EEG levy, electricity tax, and other levies'
-            },
-            'VAT (19%)': {
-                'percentage': 16.0,
-                'color': '#8b5cf6',  # Purple
-                'description': 'Value Added Tax on electricity'
-            },
-            'Retail Margin': {
-                'percentage': 7.0,
-                'color': '#10b981',  # Green
-                'description': 'Supplier profit margin and operations'
             }
         }
         
         # Calculate total end-user price
-        # The wholesale price represents the "Generation & Wholesale" component
+        # The wholesale price represents the "Beschaffung, Vertrieb und Marge" component
         # We can estimate the total price by scaling up
-        wholesale_percentage = components['Generation & Wholesale']['percentage']
+        wholesale_percentage = components['Beschaffung, Vertrieb und Marge']['percentage']
         estimated_total_price_eur_per_kwh = wholesale_price_eur_per_kwh * (100 / wholesale_percentage)
         
         # Calculate absolute prices for each component

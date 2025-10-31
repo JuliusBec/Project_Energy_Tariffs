@@ -25,5 +25,8 @@ export default defineConfig({
     esbuildOptions: {
       target: 'esnext'
     }
+  },
+  css: {
+    devSourcemap: false
   }
 })

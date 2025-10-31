@@ -14,6 +14,10 @@
         <div class="center-price">{{ formattedCenterPrice }}</div>
         <div class="center-label">Ø Preis/kWh</div>
       </div>
+      <div class="chart-disclaimer">
+        <i class="fas fa-info-circle"></i>
+        <p>Informationen basieren auf Daten der Bundesnetzagentur. Die Aufschlüsselung ist nicht zwingend zu 100% genau.</p>
+      </div>
     </div>
   </div>
 </template>
@@ -228,6 +232,31 @@ export default {
   letter-spacing: 0.5px;
 }
 
+.chart-disclaimer {
+  margin-top: 1.5rem;
+  padding: 0.75rem 1rem;
+  background-color: #f1f5f9;
+  border-left: 3px solid #059669;
+  border-radius: 0.375rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  font-size: 0.75rem;
+  color: #475569;
+  line-height: 1.5;
+}
+
+.chart-disclaimer i {
+  color: #059669;
+  font-size: 0.875rem;
+  margin-top: 0.125rem;
+  flex-shrink: 0;
+}
+
+.chart-disclaimer p {
+  margin: 0;
+}
+
 @media (max-width: 768px) {
   .chart-container {
     max-width: 320px;
@@ -239,6 +268,11 @@ export default {
   
   .center-label {
     font-size: 0.75rem;
+  }
+  
+  .chart-disclaimer {
+    font-size: 0.7rem;
+    padding: 0.625rem 0.875rem;
   }
 }
 </style>
