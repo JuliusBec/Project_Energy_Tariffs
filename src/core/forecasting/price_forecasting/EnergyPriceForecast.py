@@ -701,17 +701,17 @@ def get_price_breakdown(avg_price_eur_per_mwh=None, app_data_dir='app_data'):
         # percentages taken from bundesnetzagentur
         components = {
             'Beschaffung, Vertrieb und Marge': {
-                'percentage': 43.5200769,
+                'percentage': 43.5,
                 'color': '#059669',  # Green
                 'description': 'Wholesale electricity market price'
             },
             'Netzentgelte': {
-                'percentage': 31.7864871,
+                'percentage': 31.8,
                 'color': '#f59e0b',  # Orange
                 'description': 'Grid infrastructure and transmission costs'
             },
             'Steuern, Abgaben und weitere Umlagen': {
-                'percentage': 24.6934359,
+                'percentage': 24.7,
                 'color': '#ef4444',  # Red
                 'description': 'EEG levy, electricity tax, and other levies'
             }
