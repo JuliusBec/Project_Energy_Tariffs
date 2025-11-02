@@ -145,8 +145,25 @@ class FixedTariff(EnergyTariff):
             # Process uploaded consumption data
             consumption_data = data.copy()
             consumption_data['datetime'] = pd.to_datetime(consumption_data['datetime'])
-            consumption_data = consumption_data.resample('H', on='datetime').sum().reset_index()
+            
+            # Convert from power (kW) to energy (kWh) based on time intervals
+            time_diff = consumption_data['datetime'].diff().mode()[0]
+            if time_diff == pd.Timedelta(minutes=15):
+                # 15-minute intervals: multiply by 0.25 hours to convert kW to kWh
+                consumption_data['value'] = consumption_data['value'] * 0.25
+                print(f"Converted 15-minute kW readings to kWh (multiplied by 0.25)")
+            elif time_diff == pd.Timedelta(hours=1):
+                # Hourly data: multiply by 1 hour to convert kW to kWh
+                consumption_data['value'] = consumption_data['value'] * 1.0
+                print(f"Converted hourly kW readings to kWh (multiplied by 1.0)")
+            # If already in kWh or other intervals, use as-is
+            
+            consumption_data = consumption_data.resample('h', on='datetime').sum().reset_index()
+            print(f"After resampling to hourly: {len(consumption_data)} rows, total: {consumption_data['value'].sum():.2f} kWh")
             future_consumption = forecast_prophet(consumption_data)
+            
+            # Prophet returns columns 'ds' and 'yhat', rename to match expected format
+            future_consumption = future_consumption.rename(columns={'ds': 'datetime', 'yhat': 'value'})
         elif isinstance(data, (int, float)):
             # load standard load profile data
             yearly_usage = data
@@ -160,7 +177,7 @@ class FixedTariff(EnergyTariff):
                 # Values are in W for 15-minute intervals
                 # Convert to kWh: multiply by 0.25 hours and divide by 1000
                 consumption_data['value'] = consumption_data['value'] * 0.25 / 1000
-                consumption_data = consumption_data.set_index('datetime').resample('H').sum().reset_index()
+                consumption_data = consumption_data.set_index('datetime').resample('h').sum().reset_index()
             
             # NOW calculate the adjustment factor with properly converted kWh values
             current_yearly_usage = consumption_data['value'].sum()
@@ -300,14 +317,27 @@ class DynamicTariff(EnergyTariff):
             consumption_data = data.copy()
             consumption_data['datetime'] = pd.to_datetime(consumption_data['datetime'])
             
+            # Convert from power (kW) to energy (kWh) based on time intervals
+            time_diff = consumption_data['datetime'].diff().mode()[0]
+            if time_diff == pd.Timedelta(minutes=15):
+                # 15-minute intervals: multiply by 0.25 hours to convert kW to kWh
+                consumption_data['value'] = consumption_data['value'] * 0.25
+                print(f"Converted 15-minute kW readings to kWh (multiplied by 0.25)")
+            elif time_diff == pd.Timedelta(hours=1):
+                # Hourly data: multiply by 1 hour to convert kW to kWh
+                consumption_data['value'] = consumption_data['value'] * 1.0
+                print(f"Converted hourly kW readings to kWh (multiplied by 1.0)")
+            # If already in kWh or other intervals, use as-is
+            
             # Use only the most recent 3 months for faster Prophet processing
             # while still capturing seasonal patterns
             consumption_data = consumption_data.sort_values('datetime')
             cutoff_date = consumption_data['datetime'].max() - pd.Timedelta(days=90)
             consumption_data = consumption_data[consumption_data['datetime'] >= cutoff_date]
             print(f"Using recent 3 months of data: {len(consumption_data)} rows, from {consumption_data['datetime'].min()} to {consumption_data['datetime'].max()}")
+            print(f"Total consumption in 3-month period: {consumption_data['value'].sum():.2f} kWh")
             
-            consumption_data = consumption_data.resample('H', on='datetime').sum().reset_index()
+            consumption_data = consumption_data.resample('h', on='datetime').sum().reset_index()
             print(f"After hourly resampling: {len(consumption_data)} rows")
             future_consumption = forecast_prophet(consumption_data)
             
@@ -341,7 +371,7 @@ class DynamicTariff(EnergyTariff):
                 # Values are in W for 15-minute intervals
                 # Convert to kWh: multiply by 0.25 hours and divide by 1000
                 consumption_data['value'] = consumption_data['value'] * 0.25 / 1000
-                consumption_data = consumption_data.set_index('datetime').resample('H').sum().reset_index()
+                consumption_data = consumption_data.set_index('datetime').resample('h').sum().reset_index()
                 print(f"After conversion: {len(consumption_data)} rows")
             
             # NOW calculate the adjustment factor with properly converted kWh values
@@ -353,6 +383,8 @@ class DynamicTariff(EnergyTariff):
             
             future_consumption = slice_seasonal_data(consumption_data, self.start_date, days=billing_period_days)
             print(f"Future consumption data shape: {future_consumption.shape}")
+            print(f"Future consumption total: {future_consumption['value'].sum():.2f} kWh for {billing_period_days} days")
+            print(f"Expected consumption for {billing_period_days} days: {(yearly_usage / 365.25) * billing_period_days:.2f} kWh")
         else:
             raise ValueError("Input data must be a pandas DataFrame or a numeric yearly usage value.")
         
@@ -444,12 +476,22 @@ class DynamicTariff(EnergyTariff):
             consumption_data = data.copy()
             consumption_data['datetime'] = pd.to_datetime(consumption_data['datetime'])
             
+            # Convert from power (kW) to energy (kWh) based on time intervals
+            time_diff = consumption_data['datetime'].diff().mode()[0]
+            if time_diff == pd.Timedelta(minutes=15):
+                # 15-minute intervals: multiply by 0.25 hours to convert kW to kWh
+                consumption_data['value'] = consumption_data['value'] * 0.25
+            elif time_diff == pd.Timedelta(hours=1):
+                # Hourly data: multiply by 1 hour to convert kW to kWh
+                consumption_data['value'] = consumption_data['value'] * 1.0
+            # If already in kWh or other intervals, use as-is
+            
             # Use only the most recent 3 months for faster Prophet processing
             consumption_data = consumption_data.sort_values('datetime')
             cutoff_date = consumption_data['datetime'].max() - pd.Timedelta(days=90)
             consumption_data = consumption_data[consumption_data['datetime'] >= cutoff_date]
             
-            consumption_data = consumption_data.resample('H', on='datetime').sum().reset_index()
+            consumption_data = consumption_data.resample('h', on='datetime').sum().reset_index()
             future_consumption = forecast_prophet(consumption_data)
             
             # Prophet returns columns 'ds' and 'yhat', but we need 'datetime' and 'value'
@@ -473,7 +515,7 @@ class DynamicTariff(EnergyTariff):
                 # Values are in W for 15-minute intervals
                 # Convert to kWh: multiply by 0.25 hours and divide by 1000
                 consumption_data['value'] = consumption_data['value'] * 0.25 / 1000
-                consumption_data = consumption_data.set_index('datetime').resample('H').sum().reset_index()
+                consumption_data = consumption_data.set_index('datetime').resample('h').sum().reset_index()
             
             # NOW calculate the adjustment factor with properly converted kWh values
             current_yearly_usage = consumption_data['value'].sum()

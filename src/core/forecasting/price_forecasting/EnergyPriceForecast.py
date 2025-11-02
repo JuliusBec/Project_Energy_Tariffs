@@ -206,6 +206,7 @@ def train_prophet(df_hourly: pd.DataFrame,
     try:
         # Create and configure Prophet model optimized for long-term forecasting
         model = Prophet(
+            growth='logistic',  # Use logistic growth to allow floor/cap constraints
             yearly_seasonality=20,  # Increased Fourier terms for better yearly pattern modeling
             weekly_seasonality=10,  # Increased Fourier terms for weekly patterns
             daily_seasonality=season_daily,
@@ -223,9 +224,15 @@ def train_prophet(df_hourly: pd.DataFrame,
             fourier_order=12
         )
         
-        # Prepare training data
+        # Prepare training data with floor and cap for logistic growth
         train = df_hourly.rename(columns={"ds": "ds", "price_eur_per_mwh": "y"})[["ds", "y"]]
         train["y"] = train["y"].astype(float)
+        
+        # Set floor to prevent unrealistic negative prices (allow some negative but not extreme)
+        # German electricity market occasionally has negative prices but rarely below -100 EUR/MWh
+        train['floor'] = -50.0
+        # Set a reasonable cap based on historical maximum
+        train['cap'] = train['y'].max() * 1.5
         
         # Fit the model
         logging.info("Training Prophet model...")
@@ -241,7 +248,8 @@ def train_prophet(df_hourly: pd.DataFrame,
 def make_future_and_predict(model: Prophet, 
                           horizon_hours: int, 
                           tz: str = "Europe/Berlin",
-                          return_components: bool = False) -> pd.DataFrame:
+                          return_components: bool = False,
+                          training_data: pd.DataFrame = None) -> pd.DataFrame:
     """
     Generate and make predictions for future dates
     Args:
@@ -249,6 +257,7 @@ def make_future_and_predict(model: Prophet,
         horizon_hours: Number of hours to forecast
         tz: Timezone for the predictions
         return_components: Whether to return trend and seasonality components
+        training_data: Original training data to extract floor/cap values
     Returns:
         pd.DataFrame: Forecast results
     """
@@ -261,6 +270,11 @@ def make_future_and_predict(model: Prophet,
             freq="H",
             include_history=True
         )
+        
+        # Add floor and cap for logistic growth model
+        if training_data is not None:
+            future['floor'] = -50.0
+            future['cap'] = training_data['price_eur_per_mwh'].max() * 1.5
         
         # Make predictions (Prophet doesn't support timezones)
         forecast = model.predict(future)
@@ -432,7 +446,8 @@ def main():
         forecast = make_future_and_predict(
             model,
             args.horizon_hours,
-            return_components=True
+            return_components=True,
+            training_data=df
         )
 
         # Save forecast results with descriptive filename
