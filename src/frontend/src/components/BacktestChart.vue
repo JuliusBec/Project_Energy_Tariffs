@@ -100,9 +100,10 @@ export default {
     
     const toggleFullscreen = () => {
       isFullscreen.value = !isFullscreen.value
-      // Re-render chart after fullscreen toggle to adjust size
+      // Re-render chart after fullscreen toggle to adjust size and aspect ratio
       setTimeout(() => {
         if (chartInstance) {
+          chartInstance.options.maintainAspectRatio = !isFullscreen.value
           chartInstance.resize()
         }
       }, 300) // Wait for CSS transition

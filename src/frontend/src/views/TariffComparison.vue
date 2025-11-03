@@ -945,6 +945,12 @@ export default {
               const csvResults = await csvResponse.json()
               console.log('CSV calculation results:', csvResults)
               
+              // Update formData with the calculated annual kWh from CSV
+              if (csvResults.annual_kwh) {
+                formData.value.annualKwh = Math.round(csvResults.annual_kwh)
+                console.log('Updated annualKwh from CSV:', formData.value.annualKwh)
+              }
+              
               // Map the results to the tariffs
               const calculatedTariffs = csvResults.results.map(result => {
                 const tariff = backendTariffs.find(t => t.name === result.tariff_name)
