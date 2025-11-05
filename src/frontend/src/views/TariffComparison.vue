@@ -90,7 +90,6 @@
                             <div class="file-size">{{ formatFileSize(uploadedFile.size) }}</div>
                             <div v-if="csvData" class="file-preview">
                               {{ csvData.length }} Datensätze erkannt
-                              <span v-if="formData.annualKwh"> | {{ formData.annualKwh }} kWh/Jahr</span>
                             </div>
                           </div>
                         </div>
@@ -276,11 +275,11 @@
                     <p class="tariff-description">{{ tariff.description }}</p>
                     
                     <div class="tariff-badges">
-                      <span v-if="tariff.is_dynamic" class="badge badge-dynamic">
+                      <span v-if="tariff.features && tariff.features.includes('dynamic')" class="badge badge-dynamic">
                         <i class="fas fa-chart-line"></i>
                         Dynamisch
                       </span>
-                      <span v-if="tariff.green_energy" class="badge badge-green">
+                      <span v-if="tariff.features && tariff.features.includes('green')" class="badge badge-green">
                         <i class="fas fa-leaf"></i>
                         Ökostrom
                       </span>
@@ -760,44 +759,10 @@
         <div class="charts-container">
           <h3 class="charts-title"><i class="fas fa-chart-line"></i> Prognose & Analyse</h3>
           <div class="charts-grid">
-            <!-- Preisvorhersage Diagramm -->
+            <!-- Backtest Chart -->
             <div class="chart-section">
-              <h4><i class="fas fa-chart-area"></i> Strompreis-Prognose</h4>
-              <div class="chart-placeholder">
-                <div class="placeholder-content">
-                  <div class="chart-header">
-                    <div class="chart-info">
-                      <span class="chart-period">Nächste 7 Tage</span>
-                      <span class="chart-avg">Ø {{ (0.08 + Math.random() * 0.15).toFixed(3) }}€/kWh</span>
-                    </div>
-                  </div>
-                  <div class="placeholder-data">
-                    <div class="mock-chart-bars">
-                      <div class="bar-group" v-for="day in 7" :key="day">
-                        <div class="bar" :style="{ height: (30 + Math.random() * 60) + '%' }"></div>
-                        <div class="bar-label">{{ ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'][day-1] }}</div>
-                      </div>
-                    </div>
-                    <div class="chart-legend">
-                      <div class="legend-item">
-                        <span class="legend-color high"></span>
-                        <span>Hohe Preise (17-20h)</span>
-                      </div>
-                      <div class="legend-item">
-                        <span class="legend-color medium"></span>
-                        <span>Normale Preise (6-17h)</span>
-                      </div>
-                      <div class="legend-item">
-                        <span class="legend-color low"></span>
-                        <span>Niedrige Preise (20-6h)</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div class="chart-footer">
-                    <small>Interaktive Preisvorhersage mit stündlichen Updates</small>
-                  </div>
-                </div>
-              </div>
+              <h4><i class="fas fa-chart-area"></i> Verbrauchsprognose Backtest</h4>
+              <BacktestChart :uploadedFile="uploadedFile" />
             </div>
 
             <!-- Einsparungspotenzial Diagramm -->
@@ -869,10 +834,14 @@
 
 <script>
 import { ref, computed, onMounted } from 'vue'
+import BacktestChart from '../components/BacktestChart.vue'
 // import { apiService } from '../services/api' // Deactivated for frontend-only mode
 
 export default {
   name: 'TariffComparison',
+  components: {
+    BacktestChart
+  },
   setup() {
     const formData = ref({
       hasSmartMeter: null, // Start with null to force user selection
@@ -958,7 +927,62 @@ export default {
         const backendTariffs = await response.json()
         console.log('Backend tariffs received:', backendTariffs)
         
-        // Calculate costs for each tariff using the backend
+        // Check if user uploaded a CSV file
+        if (formData.value.hasSmartMeter && uploadedFile.value) {
+          console.log('Using uploaded CSV file for calculations:', uploadedFile.value.name)
+          
+          // Use the /api/calculate-with-csv endpoint
+          try {
+            const formDataObj = new FormData()
+            formDataObj.append('file', uploadedFile.value)
+            
+            const csvResponse = await fetch('http://localhost:8000/api/calculate-with-csv', {
+              method: 'POST',
+              body: formDataObj
+            })
+            
+            if (csvResponse.ok) {
+              const csvResults = await csvResponse.json()
+              console.log('CSV calculation results:', csvResults)
+              
+              // Update formData with the calculated annual kWh from CSV
+              if (csvResults.annual_kwh) {
+                formData.value.annualKwh = Math.round(csvResults.annual_kwh)
+                console.log('Updated annualKwh from CSV:', formData.value.annualKwh)
+              }
+              
+              // Map the results to the tariffs
+              const calculatedTariffs = csvResults.results.map(result => {
+                const tariff = backendTariffs.find(t => t.name === result.tariff_name)
+                return {
+                  ...tariff,
+                  annual_cost: Math.round(result.annual_cost),
+                  monthly_cost: Math.round(result.monthly_cost),
+                  savings_potential: 0,
+                  avg_kwh_price: result.avg_kwh_price,
+                  tariff_type: result.tariff_type
+                }
+              })
+              
+              results.value = calculatedTariffs
+              console.log('Final calculated tariffs from CSV:', calculatedTariffs)
+              
+              // Fetch predictions and forecasts
+              fetchSavingsPrediction()
+              fetchPriceForecast()
+              
+              loading.value = false
+              return
+            } else {
+              console.error('CSV calculation failed, falling back to manual calculation')
+            }
+          } catch (csvError) {
+            console.error('Error with CSV calculation:', csvError)
+          }
+        }
+        
+        // Fallback: Manual calculation (no CSV file or CSV failed)
+        console.log('Using manual calculation without CSV')
         const calculatedTariffs = []
         
         for (const tariff of backendTariffs) {
@@ -967,7 +991,7 @@ export default {
               tariff_id: tariff.id,
               annual_kwh: formData.value.annualKwh,
               has_smart_meter: formData.value.hasSmartMeter,
-              usage_pattern: formData.value.hasSmartMeter ? 'uploaded' : 'manual'
+              usage_pattern: 'manual'
             }
             
             console.log('Calculating costs for tariff:', tariff.name, calculationData)
@@ -1091,7 +1115,8 @@ export default {
           avg_savings: "15-30%",
           volatility: "hoch",
           dynamic_markup: 0.02, // 2 ct/kWh Aufschlag auf Börsenpreis
-          special_features: ["E-Auto Ladetarif", "Smart Home Integration", "Preisalarm"]
+          special_features: ["E-Auto Ladetarif", "Smart Home Integration", "Preisalarm"],
+          features: ["dynamic", "green"]
         },
         {
           id: 2,
@@ -1109,7 +1134,8 @@ export default {
           avg_savings: "10-25%",
           volatility: "mittel-hoch",
           dynamic_markup: 0.035, // 3,5 ct/kWh Aufschlag auf Börsenpreis
-          special_features: ["Einfache App", "Tagesvorhersage"]
+          special_features: ["Einfache App", "Tagesvorhersage"],
+          features: ["dynamic", "green"]
         },
         
         // EnBW Festpreis-Tarife
@@ -1128,7 +1154,8 @@ export default {
           automation_ready: true,
           avg_savings: "Stabile Preise",
           volatility: "keine",
-          special_features: ["E-Auto Ladetarif", "Mobility+ Vorteile", "THG-Quote möglich"]
+          special_features: ["E-Auto Ladetarif", "Mobility+ Vorteile", "THG-Quote möglich"],
+          features: ["green"]
         },
         {
           id: 4,
@@ -1145,7 +1172,8 @@ export default {
           automation_ready: false,
           avg_savings: "Günstig & fair",
           volatility: "keine",
-          special_features: ["12 Monate Preisgarantie", "Online-Service"]
+          special_features: ["12 Monate Preisgarantie", "Online-Service"],
+          features: ["green"]
         },
         {
           id: 5,
@@ -1162,7 +1190,8 @@ export default {
           automation_ready: false,
           avg_savings: "Bewährt & sicher",
           volatility: "keine",
-          special_features: ["24 Monate Preisgarantie", "Persönlicher Service"]
+          special_features: ["24 Monate Preisgarantie", "Persönlicher Service"],
+          features: []
         },
         {
           id: 6,
@@ -1179,7 +1208,8 @@ export default {
           automation_ready: true,
           avg_savings: "Premium Service",
           volatility: "keine",
-          special_features: ["24h Hotline", "Smart Home Paket", "Energieberatung"]
+          special_features: ["24h Hotline", "Smart Home Paket", "Energieberatung"],
+          features: ["green"]
         }
       ]
       

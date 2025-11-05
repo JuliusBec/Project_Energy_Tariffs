@@ -69,6 +69,7 @@ class TariffCalculationResponse(BaseModel):
     annual_cost: float
     tariff_type: str  # "fixed" or "dynamic"
     avg_kwh_price: float  # Average price per kWh for the forecasted period
+    annual_kwh: Optional[float] = None  # Annual consumption in kWh (from CSV data)
 
 class BacktestDataResponse(BaseModel):
     hourly_data: dict
@@ -87,7 +88,8 @@ def create_enbw_tariffs():
             base_price=14.90,
             start_date=start_date,
             is_dynamic=True,
-            markup=0.18  # 18ct/kWh markup for premium dynamic tariff
+            markup=0.18,  # 18ct/kWh markup for premium dynamic tariff
+            features=["dynamic", "green"]
         ),
         DynamicTariff(
             name="EnBW easy dynamic", 
@@ -95,7 +97,8 @@ def create_enbw_tariffs():
             base_price=9.90,
             start_date=start_date,
             is_dynamic=True,
-            markup=0.22  # 22ct/kWh markup for standard dynamic tariff
+            markup=0.22,  # 22ct/kWh markup for standard dynamic tariff
+            features=["dynamic", "green"]
         ),
         FixedTariff(
             name="EnBW mobility+ Zuhause",
@@ -104,7 +107,8 @@ def create_enbw_tariffs():
             kwh_rate=0.3299,
             start_date=start_date,
             min_duration=12,
-            is_dynamic=False
+            is_dynamic=False,
+            features=["green"]
         ),
         FixedTariff(
             name="EnBW easy+",
@@ -113,7 +117,8 @@ def create_enbw_tariffs():
             kwh_rate=0.3499,
             start_date=start_date,
             min_duration=12,
-            is_dynamic=False
+            is_dynamic=False,
+            features=["green"]
         ),
         FixedTariff(
             name="EnBW Basis",
@@ -122,7 +127,8 @@ def create_enbw_tariffs():
             kwh_rate=0.3699,
             start_date=start_date,
             min_duration=12,
-            is_dynamic=False
+            is_dynamic=False,
+            features=["green"]
         ),
         FixedTariff(
             name="Komfort",
@@ -131,7 +137,8 @@ def create_enbw_tariffs():
             kwh_rate=0.3599,
             start_date=start_date,
             min_duration=12,
-            is_dynamic=False
+            is_dynamic=False,
+            features=["green"]
         )
     ]
 
@@ -214,9 +221,9 @@ async def get_tariffs():
                 "base_price": tariff.base_price,
                 "kwh_price": kwh_rate,
                 "is_dynamic": tariff.is_dynamic,
-                "features": ["Dynamischer Tariff", "100% Ökostrom"] if tariff.is_dynamic else ["Fester Tariff", "100% Ökostrom"],
+                "features": tariff.features if tariff.features else [],
                 "contract_duration": getattr(tariff, 'min_duration', 1),
-                "green_energy": True,  # All EnBW tariffs are green
+                "green_energy": "green" in (tariff.features or []),  # Check if 'green' feature exists
                 "description": f"{'Dynamischer' if tariff.is_dynamic else 'Fester'} Stromtarif von {tariff.provider}",
                 "type": "dynamic" if tariff.is_dynamic else "fixed"
             }
@@ -252,6 +259,70 @@ async def options_tariffs():
     """Handle preflight OPTIONS request for CORS"""
     return {"message": "OK"}
 
+@app.options("/api/calculate-yearly-usage")
+async def options_calculate_yearly_usage():
+    """Handle preflight OPTIONS request for CORS"""
+    return {"message": "OK"}
+
+@app.post("/api/calculate-yearly-usage")
+async def calculate_yearly_usage(
+    file: UploadFile = File(...)
+):
+    """
+    Calculate the total yearly usage from an uploaded CSV file.
+    Returns the annual kWh consumption extrapolated from the provided data.
+    """
+    # Validate file type
+    if not file.filename.endswith('.csv'):
+        raise HTTPException(status_code=400, detail="File must be a CSV")
+    
+    try:
+        # Read the uploaded CSV
+        contents = await file.read()
+        df = pd.read_csv(io.StringIO(contents.decode('utf-8')))
+        
+        # Validate CSV has required columns
+        if 'datetime' not in df.columns or 'value' not in df.columns:
+            raise HTTPException(
+                status_code=400, 
+                detail="CSV must have 'datetime' and 'value' columns"
+            )
+        
+        # Convert datetime column
+        df['datetime'] = pd.to_datetime(df['datetime'])
+        
+        # Calculate total consumption from the data
+        # Note: CSV values are in 15-minute intervals, so divide by 4 to get kWh
+        # (since 1 hour = 4 x 15-minute intervals)
+        total_consumption = df['value'].sum() / 4
+        
+        # Calculate the time span of the data
+        date_range = (df['datetime'].max() - df['datetime'].min()).total_seconds() / (365.25 * 24 * 3600)
+        
+        # Extrapolate to yearly consumption if data is less than a year
+        if date_range > 0 and date_range < 1:
+            annual_kwh = total_consumption / date_range
+        else:
+            annual_kwh = total_consumption
+        
+        print(f"CSV Analysis:")
+        print(f"  - Data range: {df['datetime'].min()} to {df['datetime'].max()}")
+        print(f"  - Time span: {date_range:.2f} years")
+        print(f"  - Total consumption in data: {total_consumption:.2f} kWh")
+        print(f"  - Extrapolated annual consumption: {annual_kwh:.2f} kWh")
+        
+        return {
+            "annual_kwh": round(annual_kwh, 2),
+            "total_consumption": round(total_consumption, 2),
+            "data_start": df['datetime'].min().isoformat(),
+            "data_end": df['datetime'].max().isoformat(),
+            "days_of_data": (df['datetime'].max() - df['datetime'].min()).days,
+            "number_of_records": len(df)
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error processing file: {str(e)}")
+
 @app.post("/api/calculate-with-csv")
 async def calculate_with_csv(
     file: UploadFile = File(...)
@@ -279,6 +350,30 @@ async def calculate_with_csv(
         # Convert datetime column
         df['datetime'] = pd.to_datetime(df['datetime'])
         
+        # Calculate total consumption and extrapolate to yearly
+        # Note: CSV values are in 15-minute intervals, so divide by 4 to get kWh
+        # (since 1 hour = 4 x 15-minute intervals)
+        total_consumption = df['value'].sum() / 4
+        date_range = (df['datetime'].max() - df['datetime'].min()).total_seconds() / (365.25 * 24 * 3600)
+        
+        # Extrapolate to yearly consumption if data is less than a year
+        if date_range > 0 and date_range < 1:
+            annual_kwh = total_consumption / date_range
+        else:
+            annual_kwh = total_consumption
+        
+        # DEBUG: Print uploaded data info
+        print(f"\n{'='*80}")
+        print(f"UPLOADED CSV FILE: {file.filename}")
+        print(f"Data shape: {df.shape}")
+        print(f"Date range: {df['datetime'].min()} to {df['datetime'].max()}")
+        print(f"Total consumption: {total_consumption:.2f} kWh")
+        print(f"Time span: {date_range:.2f} years")
+        print(f"Extrapolated annual consumption: {annual_kwh:.2f} kWh")
+        print(f"Average hourly consumption: {df['value'].mean():.4f} kWh")
+        print(f"First 5 rows:\n{df.head()}")
+        print(f"{'='*80}\n")
+        
         # Calculate costs for each tariff using user's actual data
         tariffs = ENBW_TARIFFS
         print(f"Created {len(tariffs)} tariffs")
@@ -305,7 +400,8 @@ async def calculate_with_csv(
                     monthly_cost=cost,
                     annual_cost=cost * 12,
                     tariff_type="dynamic" if tariff.is_dynamic else "fixed",
-                    avg_kwh_price=avg_kwh_price
+                    avg_kwh_price=avg_kwh_price,
+                    annual_kwh=round(annual_kwh, 2)
                 ))
             except Exception as e:
                 # Log the error instead of silently skipping
@@ -315,7 +411,11 @@ async def calculate_with_csv(
                 continue
         
         print(f"Final results: {len(results)} tariffs calculated")
-        return {"results": results, "data_source": "uploaded_csv"}
+        return {
+            "results": results, 
+            "data_source": "uploaded_csv",
+            "annual_kwh": round(annual_kwh, 2)
+        }
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing file: {str(e)}")
@@ -638,6 +738,42 @@ async def get_market_prices():
             for i in range(24)
         ]
     }
+
+@app.get("/api/price-chart-data")
+async def get_price_chart_data():
+    """Get historical and forecast price data for chart visualization"""
+    try:
+        from src.core.forecasting.price_forecasting.EnergyPriceForecast import create_chart_data
+        
+        # Generate chart data
+        chart_data = create_chart_data()
+        
+        if chart_data is None:
+            raise HTTPException(status_code=500, detail="Failed to generate price chart data")
+        
+        return chart_data
+        
+    except Exception as e:
+        print(f"Error generating price chart data: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error generating price chart data: {str(e)}")
+
+@app.get("/api/price-breakdown")
+async def get_price_breakdown():
+    """Get energy price component breakdown for doughnut chart visualization"""
+    try:
+        from src.core.forecasting.price_forecasting.EnergyPriceForecast import get_price_breakdown
+        
+        # Generate price breakdown data
+        breakdown_data = get_price_breakdown()
+        
+        if breakdown_data is None:
+            raise HTTPException(status_code=500, detail="Failed to generate price breakdown data")
+        
+        return breakdown_data
+        
+    except Exception as e:
+        print(f"Error generating price breakdown: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error generating price breakdown: {str(e)}")
 
 @app.get("/api/forecast")
 async def get_price_forecast():

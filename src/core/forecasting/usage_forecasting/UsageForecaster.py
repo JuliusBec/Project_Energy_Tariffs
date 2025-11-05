@@ -24,7 +24,7 @@ def forecast_prophet(df, days=30):
     # Only drop status column if it exists
     if 'status' in df.columns:
         df.drop(columns=['status'], inplace=True)
-    df = df.set_index("datetime").resample("H").sum().reset_index()
+    df = df.set_index("datetime").resample("h").sum().reset_index()
 
     prophet_df = df.copy()
     prophet_df.rename(columns={'datetime': 'ds', 'value': 'y'}, inplace=True)
@@ -45,8 +45,19 @@ def forecast_prophet(df, days=30):
     future = prophet_model.make_future_dataframe(periods=24*days, freq='h')
 
     forecast = prophet_model.predict(future)
+    
+    # IMPORTANT: Only return the future forecast, not the historical period
+    # Get the last timestamp from the training data
+    last_train_date = prophet_df['ds'].max()
+    
+    # Filter to only future dates (after the last training date)
+    future_forecast = forecast[forecast['ds'] > last_train_date].copy()
+    
+    print(f"Prophet forecast: {len(future_forecast)} hours ({len(future_forecast)/24:.1f} days) of future data")
+    print(f"Forecast range: {future_forecast['ds'].min()} to {future_forecast['ds'].max()}")
+    print(f"Forecast total consumption: {future_forecast['yhat'].sum():.2f} kWh")
 
-    return forecast
+    return future_forecast
 
 def create_backtest(usage_df, return_data=False, show_daily_view=False, show_hourly_view=True):
     """
