@@ -103,8 +103,19 @@ export default {
       // Re-render chart after fullscreen toggle to adjust size and aspect ratio
       setTimeout(() => {
         if (chartInstance) {
+          // Update aspect ratio settings
           chartInstance.options.maintainAspectRatio = !isFullscreen.value
+          chartInstance.options.aspectRatio = isFullscreen.value ? undefined : 2
+          
+          // Force chart to recalculate dimensions
           chartInstance.resize()
+          
+          // Additional resize after a short delay to ensure proper rendering
+          setTimeout(() => {
+            if (chartInstance) {
+              chartInstance.resize()
+            }
+          }, 50)
         }
       }, 300) // Wait for CSS transition
     }
@@ -605,6 +616,12 @@ export default {
   transition: all 0.3s ease;
 }
 
+.chart-wrapper canvas {
+  width: 100% !important;
+  height: auto !important;
+  max-width: 100%;
+}
+
 .chart-wrapper.fullscreen {
   position: fixed;
   top: 0;
@@ -623,6 +640,8 @@ export default {
 
 .chart-wrapper.fullscreen canvas {
   max-height: calc(100vh - 4rem);
+  width: 100% !important;
+  height: calc(100vh - 4rem) !important;
 }
 
 .chart-metrics {

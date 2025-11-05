@@ -292,7 +292,9 @@ async def calculate_yearly_usage(
         df['datetime'] = pd.to_datetime(df['datetime'])
         
         # Calculate total consumption from the data
-        total_consumption = df['value'].sum()
+        # Note: CSV values are in 15-minute intervals, so divide by 4 to get kWh
+        # (since 1 hour = 4 x 15-minute intervals)
+        total_consumption = df['value'].sum() / 4
         
         # Calculate the time span of the data
         date_range = (df['datetime'].max() - df['datetime'].min()).total_seconds() / (365.25 * 24 * 3600)
@@ -349,7 +351,9 @@ async def calculate_with_csv(
         df['datetime'] = pd.to_datetime(df['datetime'])
         
         # Calculate total consumption and extrapolate to yearly
-        total_consumption = df['value'].sum()
+        # Note: CSV values are in 15-minute intervals, so divide by 4 to get kWh
+        # (since 1 hour = 4 x 15-minute intervals)
+        total_consumption = df['value'].sum() / 4
         date_range = (df['datetime'].max() - df['datetime'].min()).total_seconds() / (365.25 * 24 * 3600)
         
         # Extrapolate to yearly consumption if data is less than a year
