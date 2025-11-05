@@ -2,7 +2,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import time
 from statsmodels.tsa.statespace.sarimax import SARIMAX
-import EnergyPrices as energy_prices
+import analysis.EnergyPrices as energy_prices
 import pickle
 import os
 

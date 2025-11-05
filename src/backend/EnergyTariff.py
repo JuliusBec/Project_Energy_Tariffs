@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from datetime import datetime, time, timedelta
 from typing import Optional
 import pandas as pd
-from .forecasting.usage_forecasting.UsageForecaster import forecast_prophet
+from .forecasting.UsageForecast import forecast_prophet
 from calendar import monthrange
 import os
 

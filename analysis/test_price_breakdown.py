@@ -9,7 +9,7 @@ import os
 # Add src to Python path
 sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
 
-from src.core.forecasting.price_forecasting.EnergyPriceForecast import get_price_breakdown
+from src.backend.forecasting.price_forecasting.EnergyPriceForecast import get_price_breakdown
 import json
 
 def test_price_breakdown():

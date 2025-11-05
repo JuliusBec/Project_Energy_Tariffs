@@ -9,11 +9,12 @@ import pandas as pd
 import io
 import sys
 import os
+from src.backend.EnergyTariff import FixedTariff, DynamicTariff
+from src.backend.forecasting.UsageForecaster import create_backtest
 
-# Add src to Python path for imports
+
 sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
-from src.core.EnergyTariff import FixedTariff, DynamicTariff
-from src.core.forecasting.usage_forecasting.UsageForecaster import create_backtest
+
 
 app = FastAPI(title="DYNERGY API", description="Backend for Dynamic Energy Tariff Comparison")
 
@@ -743,7 +744,7 @@ async def get_market_prices():
 async def get_price_chart_data():
     """Get historical and forecast price data for chart visualization"""
     try:
-        from src.core.forecasting.price_forecasting.EnergyPriceForecast import create_chart_data
+        from src.backend.forecasting.EnergyPriceForecast import create_chart_data
         
         # Generate chart data
         chart_data = create_chart_data()
@@ -761,7 +762,7 @@ async def get_price_chart_data():
 async def get_price_breakdown():
     """Get energy price component breakdown for doughnut chart visualization"""
     try:
-        from src.core.forecasting.price_forecasting.EnergyPriceForecast import get_price_breakdown
+        from src.backend.forecasting.EnergyPriceForecast import get_price_breakdown
         
         # Generate price breakdown data
         breakdown_data = get_price_breakdown()
