@@ -75,6 +75,7 @@
 <script>
 import { ref, onMounted, watch } from 'vue'
 import { Chart, registerables } from 'chart.js'
+import { apiService } from '../services/api'
 
 Chart.register(...registerables)
 
@@ -129,19 +130,8 @@ export default {
       error.value = null
       
       try {
-        const formData = new FormData()
-        formData.append('file', props.uploadedFile)
-        
-        const response = await fetch('http://localhost:8000/api/backtest-data', {
-          method: 'POST',
-          body: formData
-        })
-        
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`)
-        }
-        
-        const data = await response.json()
+        const response = await apiService.getBacktestData(props.uploadedFile)
+        const data = response.data
         console.log('Backtest data received:', data)
         
         dailyData.value = data.daily_data

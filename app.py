@@ -10,7 +10,7 @@ import io
 import sys
 import os
 from src.backend.EnergyTariff import FixedTariff, DynamicTariff
-from src.backend.forecasting.UsageForecaster import create_backtest
+from src.backend.forecasting.UsageForecast import create_backtest
 
 
 sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
@@ -875,6 +875,58 @@ async def get_usage_tips():
         "tips": random.sample(tips, 5),
         "savings_potential": f"{random.randint(10, 30)}% Ersparnis möglich"
     }
+
+@app.post("/api/risk-analysis")
+async def get_risk_analysis(file: UploadFile = File(...), days: int = Form(30)):
+    """
+    Perform comprehensive risk analysis on user consumption data.
+    Returns historic risk analysis, coincidence factor, and load profile data.
+    """
+    from src.backend.RiskAnalysis import (
+        create_historic_risk_analysis,
+        calculate_coincidence_factor,
+        get_user_load_profile
+    )
+    
+    # Validate file type
+    if not file.filename.endswith('.csv'):
+        raise HTTPException(status_code=400, detail="File must be a CSV")
+    
+    try:
+        # Read the uploaded CSV
+        contents = await file.read()
+        df = pd.read_csv(io.StringIO(contents.decode('utf-8')))
+        
+        # Validate CSV has required columns
+        if 'datetime' not in df.columns or 'value' not in df.columns:
+            raise HTTPException(
+                status_code=400, 
+                detail="CSV must have 'datetime' and 'value' columns"
+            )
+        
+        # Convert datetime column
+        df['datetime'] = pd.to_datetime(df['datetime'])
+        
+        # Determine app_data directory
+        app_data_dir = os.path.join(os.path.dirname(__file__), "app_data")
+        
+        # Calculate all risk metrics
+        historic_risk = create_historic_risk_analysis(df, days=days, app_data_dir=app_data_dir)
+        coincidence = calculate_coincidence_factor(df, days=days, expensive_hours_pct=20.0, app_data_dir=app_data_dir)
+        load_profile = get_user_load_profile(df, days=days, app_data_dir=app_data_dir)
+        
+        return {
+            "historic_risk": historic_risk,
+            "coincidence_factor": coincidence,
+            "load_profile": load_profile
+        }
+        
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error processing risk analysis: {str(e)}")
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)

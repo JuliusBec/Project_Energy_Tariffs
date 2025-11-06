@@ -765,51 +765,104 @@
               <BacktestChart :uploadedFile="uploadedFile" />
             </div>
 
-            <!-- Einsparungspotenzial Diagramm -->
+            <!-- Risk Analysis Box (replaces Einsparungspotenzial) -->
             <div class="chart-section">
-              <h4><i class="fas fa-piggy-bank"></i> Ihr Einsparungspotenzial</h4>
-              <div class="chart-placeholder">
+              <h4><i class="fas fa-shield-alt"></i> Risikoanalyse</h4>
+              
+              <div v-if="!uploadedFile" class="chart-placeholder">
                 <div class="placeholder-content">
-                  <div class="chart-header">
-                    <div class="chart-info">
-                      <span class="chart-period">Jährliche Analyse</span>
-                      <span class="chart-potential">{{ Math.round(selectedTariff.annual_cost * (0.10 + Math.random() * 0.15)) }}€ Potenzial</span>
+                  <div class="no-data-state">
+                    <i class="fas fa-chart-line"></i>
+                    <p>Laden Sie Ihre Verbrauchsdaten hoch, um eine Risikoanalyse zu sehen</p>
+                  </div>
+                </div>
+              </div>
+              
+              <div v-else-if="riskAnalysisLoading" class="chart-placeholder">
+                <div class="placeholder-content">
+                  <div class="loading-state">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <p>Lade Risikoanalyse...</p>
+                  </div>
+                </div>
+              </div>
+              
+              <div v-else-if="riskAnalysisError" class="chart-placeholder">
+                <div class="placeholder-content">
+                  <div class="error-state">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <p>{{ riskAnalysisError }}</p>
+                  </div>
+                </div>
+              </div>
+              
+              <div v-else-if="riskAnalysisData" class="risk-analysis-content">
+                <!-- Historic Risk Summary -->
+                <div class="risk-summary-card">
+                  <div class="risk-summary-header">
+                    <i class="fas fa-history"></i>
+                    <span>Historisches Risiko</span>
+                  </div>
+                  <div class="risk-summary-body">
+                    <div class="risk-stat">
+                      <span class="stat-label">Markt Ø</span>
+                      <span class="stat-value">{{ (riskAnalysisData.historic_risk.market_avg_price * 1000).toFixed(2) }} ct/kWh</span>
+                    </div>
+                    <div class="risk-stat">
+                      <span class="stat-label">Ihr Ø</span>
+                      <span class="stat-value">{{ (riskAnalysisData.historic_risk.user_weighted_price * 1000).toFixed(2) }} ct/kWh</span>
+                    </div>
+                    <div class="risk-stat highlight">
+                      <span class="stat-label">Differenz</span>
+                      <span class="stat-value" :class="{
+                        'text-success': riskAnalysisData.historic_risk.risk_exposure === 'favorable',
+                        'text-danger': riskAnalysisData.historic_risk.risk_exposure === 'unfavorable'
+                      }">
+                        {{ riskAnalysisData.historic_risk.price_differential_pct > 0 ? '+' : '' }}{{ riskAnalysisData.historic_risk.price_differential_pct.toFixed(1) }}%
+                      </span>
                     </div>
                   </div>
-                  <div class="placeholder-data">
-                    <div class="savings-visualization">
-                      <div class="savings-bar-container">
-                        <div class="savings-bar current" :style="{ width: '100%' }">
-                          <span class="bar-label">Aktuelle Kosten</span>
-                          <span class="bar-value">{{ Math.round(selectedTariff.annual_cost) }}€</span>
-                        </div>
-                        <div class="savings-bar optimized" :style="{ width: '75%' }">
-                          <span class="bar-label">Mit Optimierung</span>
-                          <span class="bar-value">{{ Math.round(selectedTariff.annual_cost * 0.75) }}€</span>
-                        </div>
-                        <div class="savings-bar potential" :style="{ width: '60%' }">
-                          <span class="bar-label">Maximales Potenzial</span>
-                          <span class="bar-value">{{ Math.round(selectedTariff.annual_cost * 0.60) }}€</span>
-                        </div>
+                </div>
+
+                <!-- Coincidence Factor Summary -->
+                <div class="risk-summary-card">
+                  <div class="risk-summary-header">
+                    <i class="fas fa-chart-pie"></i>
+                    <span>Koinzidenzfaktor</span>
+                  </div>
+                  <div class="risk-summary-body">
+                    <div class="coincidence-display">
+                      <div class="coincidence-circle-small" :class="{
+                        'circle-success': riskAnalysisData.coincidence_factor.coincidence_rating === 'low',
+                        'circle-warning': riskAnalysisData.coincidence_factor.coincidence_rating === 'medium',
+                        'circle-danger': riskAnalysisData.coincidence_factor.coincidence_rating === 'high'
+                      }">
+                        <span class="circle-value">{{ riskAnalysisData.coincidence_factor.consumption_coincidence_pct.toFixed(0) }}%</span>
                       </div>
-                    </div>
-                    <div class="optimization-tips">
-                      <div class="tip-item">
-                        <i class="fas fa-lightbulb tip-icon"></i>
-                        <span>Verbrauch in günstige Nachtstunden verschieben</span>
-                      </div>
-                      <div class="tip-item">
-                        <i class="fas fa-mobile-alt tip-icon"></i>
-                        <span>App-Benachrichtigungen für niedrige Preise nutzen</span>
-                      </div>
-                      <div class="tip-item">
-                        <i class="fas fa-home tip-icon"></i>
-                        <span>Smart Home Geräte zeitgesteuert einsetzen</span>
+                      <div class="coincidence-info">
+                        <div class="info-text">
+                          {{ riskAnalysisData.coincidence_factor.consumption_during_expensive_hours }} kWh in teuren Stunden
+                        </div>
+                        <div class="info-badge" :class="{
+                          'badge-success': riskAnalysisData.coincidence_factor.coincidence_rating === 'low',
+                          'badge-warning': riskAnalysisData.coincidence_factor.coincidence_rating === 'medium',
+                          'badge-danger': riskAnalysisData.coincidence_factor.coincidence_rating === 'high'
+                        }">
+                          {{ riskAnalysisData.coincidence_factor.coincidence_rating === 'low' ? 'Günstig' : riskAnalysisData.coincidence_factor.coincidence_rating === 'medium' ? 'Neutral' : 'Ungünstig' }}
+                        </div>
                       </div>
                     </div>
                   </div>
-                  <div class="chart-footer">
-                    <small>Personalisierte KI-Analyse basierend auf Ihrem Verbrauchsprofil</small>
+                </div>
+
+                <!-- Load Profile Chart -->
+                <div class="risk-chart-card">
+                  <div class="risk-summary-header">
+                    <i class="fas fa-chart-area"></i>
+                    <span>Lastprofil & Preiskorrelation</span>
+                  </div>
+                  <div class="risk-chart-body">
+                    <LoadProfileChart :loadProfileData="riskAnalysisData.load_profile" />
                   </div>
                 </div>
               </div>
@@ -833,14 +886,16 @@
 </template>
 
 <script>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import BacktestChart from '../components/BacktestChart.vue'
-// import { apiService } from '../services/api' // Deactivated for frontend-only mode
+import LoadProfileChart from '../components/LoadProfileChart.vue'
+import { apiService } from '../services/api'
 
 export default {
   name: 'TariffComparison',
   components: {
-    BacktestChart
+    BacktestChart,
+    LoadProfileChart
   },
   setup() {
     const formData = ref({
@@ -884,6 +939,11 @@ export default {
     const savingsPrediction = ref(null)
     const priceForecast = ref(null)
     
+    // Risk analysis data
+    const riskAnalysisData = ref(null)
+    const riskAnalysisLoading = ref(false)
+    const riskAnalysisError = ref(null)
+    
     // Modal functionality
     const showDetailsModal = ref(false)
     const selectedTariff = ref(null)
@@ -918,13 +978,8 @@ export default {
       try {
         // Fetch tariffs from backend API
         console.log('Fetching tariffs from backend...')
-        const response = await fetch('http://localhost:8000/api/tariffs')
-        
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`)
-        }
-        
-        const backendTariffs = await response.json()
+        const response = await apiService.getTariffs()
+        const backendTariffs = response.data
         console.log('Backend tariffs received:', backendTariffs)
         
         // Check if user uploaded a CSV file
@@ -933,51 +988,41 @@ export default {
           
           // Use the /api/calculate-with-csv endpoint
           try {
-            const formDataObj = new FormData()
-            formDataObj.append('file', uploadedFile.value)
+            const csvResponse = await apiService.calculateWithCsv(uploadedFile.value)
             
-            const csvResponse = await fetch('http://localhost:8000/api/calculate-with-csv', {
-              method: 'POST',
-              body: formDataObj
+            const csvResults = csvResponse.data
+            console.log('CSV calculation results:', csvResults)
+            
+            // Update formData with the calculated annual kWh from CSV
+            if (csvResults.annual_kwh) {
+              formData.value.annualKwh = Math.round(csvResults.annual_kwh)
+              console.log('Updated annualKwh from CSV:', formData.value.annualKwh)
+            }
+            
+            // Map the results to the tariffs
+            const calculatedTariffs = csvResults.results.map(result => {
+              const tariff = backendTariffs.find(t => t.name === result.tariff_name)
+              return {
+                ...tariff,
+                annual_cost: Math.round(result.annual_cost),
+                monthly_cost: Math.round(result.monthly_cost),
+                savings_potential: 0,
+                avg_kwh_price: result.avg_kwh_price,
+                tariff_type: result.tariff_type
+              }
             })
             
-            if (csvResponse.ok) {
-              const csvResults = await csvResponse.json()
-              console.log('CSV calculation results:', csvResults)
-              
-              // Update formData with the calculated annual kWh from CSV
-              if (csvResults.annual_kwh) {
-                formData.value.annualKwh = Math.round(csvResults.annual_kwh)
-                console.log('Updated annualKwh from CSV:', formData.value.annualKwh)
-              }
-              
-              // Map the results to the tariffs
-              const calculatedTariffs = csvResults.results.map(result => {
-                const tariff = backendTariffs.find(t => t.name === result.tariff_name)
-                return {
-                  ...tariff,
-                  annual_cost: Math.round(result.annual_cost),
-                  monthly_cost: Math.round(result.monthly_cost),
-                  savings_potential: 0,
-                  avg_kwh_price: result.avg_kwh_price,
-                  tariff_type: result.tariff_type
-                }
-              })
-              
-              results.value = calculatedTariffs
-              console.log('Final calculated tariffs from CSV:', calculatedTariffs)
-              
-              // Fetch predictions and forecasts
-              fetchSavingsPrediction()
-              fetchPriceForecast()
-              
-              loading.value = false
-              return
-            } else {
-              console.error('CSV calculation failed, falling back to manual calculation')
-            }
+            results.value = calculatedTariffs
+            console.log('Final calculated tariffs from CSV:', calculatedTariffs)
+            
+            // Fetch predictions and forecasts
+            fetchSavingsPrediction()
+            fetchPriceForecast()
+            
+            loading.value = false
+            return
           } catch (csvError) {
-            console.error('Error with CSV calculation:', csvError)
+            console.error('Error with CSV calculation, falling back to manual calculation:', csvError)
           }
         }
         
@@ -996,16 +1041,9 @@ export default {
             
             console.log('Calculating costs for tariff:', tariff.name, calculationData)
             
-            const calcResponse = await fetch('http://localhost:8000/api/calculate', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify(calculationData)
-            })
-            
-            if (calcResponse.ok) {
-              const calculation = await calcResponse.json()
+            try {
+              const calcResponse = await apiService.calculateTariffs(calculationData)
+              const calculation = calcResponse.data
               console.log('Calculation result:', calculation)
               
               calculatedTariffs.push({
@@ -1015,7 +1053,8 @@ export default {
                 savings_potential: calculation.savings_potential || 0,
                 cost_breakdown: calculation.cost_breakdown || {}
               })
-            } else {
+            } catch (apiError) {
+              console.error('API calculation failed, using fallback:', apiError)
               // Fallback to basic calculation if API call fails
               const basicCost = (tariff.base_price * 12) + (formData.value.annualKwh * (tariff.kwh_price || 0.30))
               calculatedTariffs.push({
@@ -1059,22 +1098,13 @@ export default {
     const fetchSavingsPrediction = async () => {
       try {
         console.log('Fetching savings prediction...')
-        const response = await fetch('http://localhost:8000/api/predict-savings', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            annual_kwh: formData.value.annualKwh,
-            has_smart_meter: formData.value.hasSmartMeter
-          })
+        const response = await apiService.predictSavings({
+          annual_kwh: formData.value.annualKwh,
+          has_smart_meter: formData.value.hasSmartMeter
         })
         
-        if (response.ok) {
-          const data = await response.json()
-          savingsPrediction.value = data.savings_potential
-          console.log('Savings prediction received:', data)
-        }
+        savingsPrediction.value = response.data.savings_potential
+        console.log('Savings prediction received:', response.data)
       } catch (error) {
         console.error('Error fetching savings prediction:', error)
       }
@@ -1084,13 +1114,10 @@ export default {
     const fetchPriceForecast = async () => {
       try {
         console.log('Fetching price forecast...')
-        const response = await fetch('http://localhost:8000/api/forecast')
+        const response = await apiService.getForecast()
         
-        if (response.ok) {
-          const data = await response.json()
-          priceForecast.value = data.forecast
-          console.log('Price forecast received:', data)
-        }
+        priceForecast.value = response.data.forecast
+        console.log('Price forecast received:', response.data)
       } catch (error) {
         console.error('Error fetching price forecast:', error)
       }
@@ -1285,11 +1312,37 @@ export default {
     const showTariffDetails = (tariff) => {
       selectedTariff.value = tariff
       showDetailsModal.value = true
+      // Fetch risk analysis data when modal opens
+      fetchRiskAnalysis()
     }
     
     const closeDetailsModal = () => {
       showDetailsModal.value = false
       selectedTariff.value = null
+    }
+    
+    const fetchRiskAnalysis = async () => {
+      // Only fetch if we have uploaded file
+      if (!uploadedFile.value) {
+        console.log('No uploaded file, skipping risk analysis')
+        riskAnalysisData.value = null
+        return
+      }
+      
+      console.log('Fetching risk analysis for file:', uploadedFile.value.name)
+      riskAnalysisLoading.value = true
+      riskAnalysisError.value = null
+      
+      try {
+        const response = await apiService.getRiskAnalysis(uploadedFile.value, 30)
+        riskAnalysisData.value = response.data
+        console.log('Risk analysis data loaded:', riskAnalysisData.value)
+      } catch (err) {
+        console.error('Error fetching risk analysis:', err)
+        riskAnalysisError.value = 'Fehler beim Laden der Risikoanalyse: ' + (err.response?.data?.detail || err.message)
+      } finally {
+        riskAnalysisLoading.value = false
+      }
     }
     
     // File upload functions
@@ -1462,6 +1515,9 @@ export default {
       isDragOver,
       savingsPrediction,
       priceForecast,
+      riskAnalysisData,
+      riskAnalysisLoading,
+      riskAnalysisError,
       showDetailsModal,
       selectedTariff,
       calculateTariffs,
@@ -1469,6 +1525,7 @@ export default {
       selectTariff,
       showTariffDetails,
       closeDetailsModal,
+      fetchRiskAnalysis,
       handleFileSelect,
       handleFileDrop,
       removeFile,
@@ -3480,6 +3537,227 @@ export default {
   border-top: 1px solid #e5e7eb;
 }
 
+/* Risk Analysis Styles */
+.risk-analysis-container {
+  margin-top: 2rem;
+  padding-top: 2rem;
+  border-top: 2px solid #e5e7eb;
+}
+
+.risk-analysis-container .loading-state,
+.risk-analysis-container .error-state,
+.risk-analysis-container .no-data-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 2rem;
+  color: #6b7280;
+  background: #f9fafb;
+  border-radius: 12px;
+  border: 1px dashed #d1d5db;
+}
+
+.risk-analysis-container .loading-state i {
+  font-size: 2.5rem;
+  margin-bottom: 1rem;
+  color: #3b82f6;
+}
+
+.risk-analysis-container .error-state {
+  color: #ef4444;
+  background: #fef2f2;
+  border-color: #fca5a5;
+}
+
+.risk-analysis-container .error-state i {
+  font-size: 2.5rem;
+  margin-bottom: 1rem;
+}
+
+.risk-analysis-container .no-data-state i {
+  font-size: 2.5rem;
+  margin-bottom: 1rem;
+  color: #9ca3af;
+}
+
+.section-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1f2937;
+  margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.section-title i {
+  color: #3b82f6;
+}
+
+.risk-analysis-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.5rem;
+}
+
+.chart-card {
+  grid-column: 1 / -1;
+}
+
+.risk-card {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  transition: box-shadow 0.3s ease;
+}
+
+.risk-card:hover {
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.risk-card-header {
+  background: linear-gradient(135deg, #f3f4f6, #e5e7eb);
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.risk-card-header h4 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #374151;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.risk-card-header i {
+  color: #3b82f6;
+}
+
+.risk-card-body {
+  padding: 1.5rem;
+}
+
+.risk-metric {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.risk-metric:last-of-type {
+  border-bottom: none;
+}
+
+.risk-metric.highlight {
+  background: #f9fafb;
+  padding: 1rem;
+  margin: 0.5rem -0.5rem;
+  border-radius: 8px;
+  border: none;
+}
+
+.metric-label {
+  font-size: 0.875rem;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.metric-value {
+  font-size: 1rem;
+  color: #1f2937;
+  font-weight: 600;
+}
+
+.text-success {
+  color: #10b981 !important;
+}
+
+.text-danger {
+  color: #ef4444 !important;
+}
+
+.risk-badge {
+  margin-top: 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.badge-success {
+  background: #d1fae5;
+  color: #065f46;
+  border: 1px solid #6ee7b7;
+}
+
+.badge-warning {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fcd34d;
+}
+
+.badge-danger {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fca5a5;
+}
+
+.coincidence-metric {
+  display: flex;
+  justify-content: center;
+  padding: 1rem 0;
+}
+
+.coincidence-circle {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 4px solid;
+  margin-bottom: 1rem;
+}
+
+.circle-success {
+  border-color: #10b981;
+  background: linear-gradient(135deg, #d1fae5, #a7f3d0);
+}
+
+.circle-warning {
+  border-color: #f59e0b;
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+}
+
+.circle-danger {
+  border-color: #ef4444;
+  background: linear-gradient(135deg, #fee2e2, #fecaca);
+}
+
+.circle-value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.circle-label {
+  font-size: 0.75rem;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 0.25rem;
+}
+
 .badge-dynamic {
   background: linear-gradient(135deg, #3b82f6, #1d4ed8);
   color: white;
@@ -3488,6 +3766,130 @@ export default {
 .badge-fixed {
   background: linear-gradient(135deg, #6b7280, #374151);
   color: white;
+}
+
+/* Compact Risk Analysis Content */
+.risk-analysis-content {
+  padding: 1rem;
+  background: #f9fafb;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.risk-summary-card {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.risk-summary-header {
+  background: linear-gradient(135deg, #f3f4f6, #e5e7eb);
+  padding: 0.75rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: #374151;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.risk-summary-header i {
+  color: #3b82f6;
+}
+
+.risk-summary-body {
+  padding: 1rem;
+}
+
+.risk-stat {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0;
+  font-size: 0.875rem;
+}
+
+.risk-stat:not(:last-child) {
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.risk-stat.highlight {
+  background: #f9fafb;
+  padding: 0.75rem;
+  margin: 0.5rem -1rem;
+  border-bottom: none;
+}
+
+.stat-label {
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.stat-value {
+  color: #1f2937;
+  font-weight: 600;
+}
+
+.coincidence-display {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.5rem 0;
+}
+
+.coincidence-circle-small {
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 3px solid;
+  flex-shrink: 0;
+}
+
+.coincidence-circle-small .circle-value {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.coincidence-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.info-text {
+  font-size: 0.875rem;
+  color: #4b5563;
+}
+
+.info-badge {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  align-self: flex-start;
+}
+
+.risk-chart-card {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.risk-chart-body {
+  padding: 1rem;
 }
 
 /* Responsive Modal */
@@ -3504,6 +3906,10 @@ export default {
   
   .cost-display {
     text-align: center;
+  }
+  
+  .risk-analysis-grid {
+    grid-template-columns: 1fr;
   }
 }
 

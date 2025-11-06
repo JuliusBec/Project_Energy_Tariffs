@@ -24,6 +24,7 @@
 
 <script>
 import { Chart, ArcElement, Tooltip, Legend } from 'chart.js';
+import { apiService } from '../services/api';
 
 // Register Chart.js components
 Chart.register(ArcElement, Tooltip, Legend);
@@ -61,13 +62,8 @@ export default {
         this.loading = true;
         this.error = null;
         
-        const response = await fetch('http://localhost:8000/api/price-breakdown');
-        
-        if (!response.ok) {
-          throw new Error('Fehler beim Laden der Preisdaten');
-        }
-        
-        this.breakdown = await response.json();
+        const response = await apiService.getPriceBreakdown();
+        this.breakdown = response.data;
         
       } catch (err) {
         console.error('Error fetching price breakdown:', err);

@@ -47,9 +47,28 @@ export const apiService = {
     return api.post('/calculate', data)
   },
   
+  calculateWithCsv: (file) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    return api.post('/calculate-with-csv', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    })
+  },
+  
   // Market data endpoints
   getMarketPrices: () => {
     return api.get('/market-prices')
+  },
+  
+  // Forecast endpoints
+  getForecast: () => {
+    return api.get('/forecast')
+  },
+  
+  predictSavings: (data) => {
+    return api.post('/predict-savings', data)
   },
   
   // Tips endpoints
@@ -66,6 +85,27 @@ export const apiService = {
         'Content-Type': 'multipart/form-data'
       }
     })
+  },
+
+  // Risk analysis endpoints
+  getRiskAnalysis: (file, days = 30) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('days', days)
+    return api.post('/risk-analysis', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    })
+  },
+  
+  // Chart data endpoints
+  getPriceChartData: () => {
+    return api.get('/price-chart-data')
+  },
+  
+  getPriceBreakdown: () => {
+    return api.get('/price-breakdown')
   },
   
   // Generic request method

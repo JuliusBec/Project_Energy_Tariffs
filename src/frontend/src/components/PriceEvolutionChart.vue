@@ -67,6 +67,7 @@ import {
   Legend,
   Filler
 } from 'chart.js';
+import { apiService } from '../services/api';
 
 // Register Chart.js components
 Chart.register(
@@ -106,13 +107,9 @@ export default {
         this.loading = true;
         this.error = null;
         
-        const response = await fetch('http://localhost:8000/api/price-chart-data');
+        const response = await apiService.getPriceChartData();
+        const data = response.data;
         
-        if (!response.ok) {
-          throw new Error('Fehler beim Laden der Preisdaten');
-        }
-        
-        const data = await response.json();
         this.chartData = data;
         this.metrics = data.metrics;
         
