@@ -940,5 +940,370 @@ async def get_risk_analysis(file: UploadFile = File(...), days: int = Form(30)):
         print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=error_msg)
 
+
+# =============================================================================
+# SCRAPER ENDPOINTS - EnBW, Tado, Tibber
+# =============================================================================
+
+# ============================================================
+# EnBW Dynamic Tariff Scraper Endpoint (NEW)
+# ============================================================
+
+class EnbwScraperRequest(BaseModel):
+    """Request model for EnBW scraper"""
+    zip_code: str  # Postleitzahl (5-stellig)
+    annual_consumption: float  # Jahresverbrauch in kWh
+    headless: bool = True  # Browser im Headless-Modus
+    debug_mode: bool = False  # Debug-Ausgaben und Screenshots
+
+class EnbwScraperResponse(BaseModel):
+    """Response model for EnBW scraper"""
+    success: bool
+    provider: str
+    tariff_name: str
+    base_price_monthly: Optional[float] = None
+    markup_ct_kwh: Optional[float] = None
+    exchange_price_ct_kwh: Optional[float] = None
+    total_kwh_price_ct: Optional[float] = None
+    monthly_cost_example: Optional[float] = None
+    zip_code: str
+    annual_consumption: float
+    timestamp: str
+    source_url: str
+    error: Optional[str] = None
+
+@app.post("/api/scrape/enbw")
+async def scrape_enbw_tariff(request: EnbwScraperRequest):
+    """
+    Scrape real-time pricing from EnBW dynamic tariff page
+    
+    This endpoint uses Selenium to scrape actual prices from the EnBW website
+    for the given zip code and annual consumption.
+    
+    - **zip_code**: German postal code (5 digits, e.g., "71065")
+    - **annual_consumption**: Annual consumption in kWh (e.g., 2250)
+    - **headless**: Run browser in headless mode (default: True)
+    - **debug_mode**: Enable debug output and screenshots (default: False)
+    
+    Returns real-time pricing data including:
+    - Base price (monthly, €)
+    - Markup price (ct/kWh)
+    - Average exchange price (ct/kWh, variable)
+    - Total kWh price (ct/kWh)
+    - Example monthly cost (€)
+    """
+    try:
+        # Import EnBW scraper
+        from src.Webscraping.scraper_enbw import EnbwScraper
+        
+        print(f"\n{'='*60}")
+        print(f"🔍 EnBW Scraper API Request")
+        print(f"   PLZ: {request.zip_code}, Verbrauch: {request.annual_consumption} kWh")
+        print(f"{'='*60}\n")
+        
+        # Initialize scraper
+        scraper = EnbwScraper(
+            headless=request.headless,
+            debug=request.debug_mode
+        )
+        
+        # Scrape data (method name is scrape_tariff, not scrape)
+        result = scraper.scrape_tariff(
+            zip_code=request.zip_code,
+            annual_consumption=request.annual_consumption
+        )
+        
+        if result and 'provider' in result:
+            # Success
+            response = EnbwScraperResponse(
+                success=True,
+                provider=result.get('provider', 'EnBW'),
+                tariff_name=result.get('tariff_name', 'Dynamischer Stromtarif'),
+                base_price_monthly=result.get('base_price_monthly'),
+                markup_ct_kwh=result.get('markup_ct_kwh'),
+                exchange_price_ct_kwh=result.get('exchange_price_ct_kwh'),
+                total_kwh_price_ct=result.get('total_kwh_price_ct'),
+                monthly_cost_example=result.get('monthly_cost_example'),
+                zip_code=result.get('zip_code', request.zip_code),
+                annual_consumption=result.get('annual_consumption', request.annual_consumption),
+                timestamp=result.get('timestamp', datetime.now().isoformat()),
+                source_url=result.get('source_url', 'https://www.enbw.com/strom/dynamischer-stromtarif')
+            )
+            
+            print(f"\n✅ Scraping erfolgreich:")
+            print(f"   Grundpreis: {response.base_price_monthly} €/Monat")
+            print(f"   Arbeitspreis: {response.markup_ct_kwh} ct/kWh")
+            print(f"   Börsenpreis: {response.exchange_price_ct_kwh} ct/kWh")
+            print(f"   Gesamt: {response.total_kwh_price_ct} ct/kWh")
+            print(f"   Monatskosten: {response.monthly_cost_example} €\n")
+            
+            return response
+        else:
+            # Scraping failed
+            raise HTTPException(
+                status_code=500,
+                detail="Scraping fehlgeschlagen - keine Daten erhalten"
+            )
+            
+    except ImportError as e:
+        print(f"❌ Import Error: {e}")
+        raise HTTPException(
+            status_code=503,
+            detail=f"EnBW Scraper nicht verfügbar: {str(e)}"
+        )
+    except Exception as e:
+        print(f"❌ Scraping Error: {e}")
+        import traceback
+        traceback.print_exc()
+        
+        # Return error response
+        return EnbwScraperResponse(
+            success=False,
+            provider="EnBW",
+            tariff_name="Dynamischer Stromtarif",
+            zip_code=request.zip_code,
+            annual_consumption=request.annual_consumption,
+            timestamp=datetime.now().isoformat(),
+            source_url="https://www.enbw.com/strom/dynamischer-stromtarif",
+            error=str(e)
+        )
+
+
+# ============================================================
+# Tado Energy Tariff Scraper Endpoint (NEW)
+# ============================================================
+
+class TadoScraperRequest(BaseModel):
+    """Request model for Tado scraper"""
+    zip_code: str
+    annual_consumption: float
+    headless: bool = True
+    debug_mode: bool = False
+
+class TadoScraperResponse(BaseModel):
+    """Response model for Tado scraper"""
+    success: bool
+    provider: str
+    tariff_name: str
+    base_price_monthly: Optional[float] = None
+    kwh_price_ct: Optional[float] = None
+    monthly_cost: Optional[float] = None
+    annual_cost: Optional[float] = None
+    zip_code: str
+    annual_consumption: float
+    timestamp: str
+    source_url: str
+    note: Optional[str] = None
+    error: Optional[str] = None
+
+@app.post("/api/scrape/tado")
+async def scrape_tado_tariff(request: TadoScraperRequest):
+    """
+    Scrape/fetch pricing from Tado Energy (awattar.de)
+    
+    This endpoint retrieves Tado Energy tariff data for the given zip code
+    and annual consumption.
+    
+    - **zip_code**: German postal code (5 digits, e.g., "71065")
+    - **annual_consumption**: Annual consumption in kWh (e.g., 2500)
+    - **headless**: Not used currently (default: True)
+    - **debug_mode**: Enable debug output (default: False)
+    
+    Returns pricing data including:
+    - Base price (monthly, €)
+    - kWh price (ct/kWh, variable)
+    - Monthly cost (€)
+    - Annual cost (€)
+    """
+    try:
+        # Import Tado scraper
+        from src.Webscraping.scraper_tado import TadoScraper
+        
+        print(f"\n{'='*60}")
+        print(f"🔍 Tado Energy API Request")
+        print(f"   PLZ: {request.zip_code}, Verbrauch: {request.annual_consumption} kWh")
+        print(f"{'='*60}\n")
+        
+        # Initialize scraper
+        scraper = TadoScraper(
+            headless=request.headless,
+            debug_mode=request.debug_mode
+        )
+        
+        # Get tariff data
+        result = scraper.scrape_tariff(
+            zip_code=request.zip_code,
+            annual_consumption=request.annual_consumption
+        )
+        
+        if result and result.get('success'):
+            # Success
+            response = TadoScraperResponse(
+                success=True,
+                provider=result.get('provider', 'Tado Energy'),
+                tariff_name=result.get('tariff_name', 'Tado Dynamic'),
+                base_price_monthly=result.get('base_price_monthly'),
+                kwh_price_ct=result.get('kwh_price_ct'),
+                monthly_cost=result.get('monthly_cost'),
+                annual_cost=result.get('annual_cost'),
+                zip_code=result.get('zip_code', request.zip_code),
+                annual_consumption=result.get('annual_consumption', request.annual_consumption),
+                timestamp=result.get('timestamp', datetime.now().isoformat()),
+                source_url=result.get('source_url', 'https://energy.tado.com'),
+                note=result.get('note')
+            )
+            
+            print(f"\n✅ Tarif-Abruf erfolgreich:")
+            print(f"   Grundpreis: {response.base_price_monthly} €/Monat")
+            print(f"   Arbeitspreis: {response.kwh_price_ct} ct/kWh")
+            print(f"   Monatskosten: {response.monthly_cost} €")
+            if response.note:
+                print(f"   Hinweis: {response.note}\n")
+            
+            return response
+        else:
+            # Failed
+            error_msg = result.get('error', 'Unbekannter Fehler')
+            raise HTTPException(
+                status_code=500,
+                detail=f"Tarif-Abruf fehlgeschlagen: {error_msg}"
+            )
+            
+    except ImportError as e:
+        print(f"❌ Import Error: {e}")
+        raise HTTPException(
+            status_code=503,
+            detail=f"Tado Scraper nicht verfügbar: {str(e)}"
+        )
+    except Exception as e:
+        print(f"❌ Error: {e}")
+        import traceback
+        traceback.print_exc()
+        
+        # Return error response
+        return TadoScraperResponse(
+            success=False,
+            provider="Tado Energy",
+            tariff_name="Tado Dynamic",
+            zip_code=request.zip_code,
+            annual_consumption=request.annual_consumption,
+            timestamp=datetime.now().isoformat(),
+            source_url="https://energy.tado.com",
+            error=str(e)
+        )
+
+
+# =============================================================================
+# TIBBER SCRAPER ENDPOINT
+# =============================================================================
+
+class TibberScraperRequest(BaseModel):
+    """Request-Modell für Tibber Scraper"""
+    zip_code: str = Field(..., description="Deutsche Postleitzahl")
+    annual_consumption: int = Field(..., description="Jahresverbrauch in kWh", gt=0)
+    headless: bool = Field(default=True, description="Browser im Headless-Modus")
+    debug_mode: bool = Field(default=False, description="Debug-Ausgaben aktivieren")
+
+
+class TibberScraperResponse(BaseModel):
+    """Response-Modell für Tibber Scraper"""
+    success: bool
+    kwh_price_ct: float = Field(..., description="Arbeitspreis in ct/kWh")
+    exchange_price_ct: float = Field(..., description="Börsenstrompreis in ct/kWh")
+    additional_price_ct: float = Field(..., description="Weitere Preisbestandteile (Steuern, Abgaben) in ct/kWh")
+    average_price_12m_ct: float = Field(..., description="Durchschnittspreis letzte 12 Monate in ct/kWh")
+    network_fees_monthly: float = Field(..., description="Netznutzungs- und Messstellengebühren pro Monat in €")
+    tibber_fee_monthly: float = Field(..., description="Tibber-Gebühr pro Monat in €")
+    total_base_monthly: float = Field(..., description="Summe Grundpreis pro Monat in €")
+    monthly_cost_example: float = Field(..., description="Beispiel-Monatskosten von Webseite in €")
+    calculated_monthly_cost: float = Field(..., description="Berechnete Monatskosten in €")
+    calculated_annual_cost: float = Field(..., description="Berechnete Jahreskosten in €")
+    timestamp: str
+    note: Optional[str] = Field(default=None, description="Hinweis bei Fallback-Daten")
+
+
+@app.post(
+    "/api/scrape/tibber",
+    response_model=TibberScraperResponse,
+    tags=["scraper"],
+    summary="Tibber Energiepreise scrapen",
+    description="Extrahiert aktuelle Preisdaten von Tibber für eine PLZ und Jahresverbrauch"
+)
+async def scrape_tibber_tariff(request: TibberScraperRequest):
+    """
+    Scraped Tibber Energiepreise
+    
+    **Parameter:**
+    - zip_code: Deutsche Postleitzahl (5 Stellen)
+    - annual_consumption: Jahresverbrauch in kWh
+    - headless: Browser ohne GUI (Standard: True)
+    - debug_mode: Erweiterte Logs (Standard: False)
+    
+    **Rückgabe:**
+    - Preisdaten inkl. Arbeitspreis, Börsenstrompreis, Grundpreise
+    - Berechnete Monats- und Jahreskosten
+    - Bei Scraping-Fehler: Realistische Fallback-Beispieldaten
+    
+    **Beispiel:**
+    ```
+    curl -X POST "http://localhost:8000/api/scrape/tibber" \\
+         -H "Content-Type: application/json" \\
+         -d '{
+               "zip_code": "71065",
+               "annual_consumption": 2500,
+               "headless": true,
+               "debug_mode": false
+             }'
+    ```
+    """
+    try:
+        logger.info(f"📞 Tibber-Scraper API-Request: PLZ {request.zip_code}, {request.annual_consumption} kWh/Jahr")
+        
+        # Import Scraper
+        from src.Webscraping.scraper_tibber import TibberScraper
+        
+        # Scraper initialisieren und ausführen
+        scraper = TibberScraper(
+            debug_mode=request.debug_mode
+        )
+        
+        result = scraper.scrape_tariff(
+            zip_code=request.zip_code,
+            annual_consumption=request.annual_consumption
+        )
+        
+        # Response formatieren
+        response = TibberScraperResponse(
+            success=result['success'],
+            kwh_price_ct=result['kwh_price_ct'],
+            exchange_price_ct=result['exchange_price_ct'],
+            additional_price_ct=result['additional_price_ct'],
+            average_price_12m_ct=result['average_price_12m_ct'],
+            network_fees_monthly=result['network_fees_monthly'],
+            tibber_fee_monthly=result['tibber_fee_monthly'],
+            total_base_monthly=result['total_base_monthly'],
+            monthly_cost_example=result['monthly_cost_example'],
+            calculated_monthly_cost=result['calculated_monthly_cost'],
+            calculated_annual_cost=result['calculated_annual_cost'],
+            timestamp=result['timestamp'],
+            note=result.get('note')
+        )
+        
+        logger.info(f"✅ Tibber-Scraper erfolgreich: {response.calculated_monthly_cost} €/Monat")
+        return response
+        
+    except Exception as e:
+        logger.error(f"❌ Fehler beim Tibber-Scraping: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Tibber-Scraping fehlgeschlagen: {str(e)}"
+        )
+
+
+# =============================================================================
+# RUN SERVER
+# =============================================================================
+
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
+

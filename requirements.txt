@@ -17,3 +17,5 @@ lightgbm==4.0.0
 catboost==1.2
 requests==2.32.5
 seaborn==0.13.2
+selenium==4.27.1
+webdriver-manager==4.0.2

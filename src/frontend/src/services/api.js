@@ -108,6 +108,40 @@ export const apiService = {
     return api.get('/price-breakdown')
   },
   
+  // Scraper endpoints for real-time tariff data
+  scrapeEnbwTariff: (zipCode, annualConsumption, options = {}) => {
+    return api.post('/scrape/enbw', {
+      zip_code: zipCode,
+      annual_consumption: annualConsumption,
+      headless: options.headless !== false,
+      debug_mode: options.debug_mode || false
+    }, {
+      timeout: 90000  // 90 seconds for scraping
+    })
+  },
+  
+  scrapeTadoTariff: (zipCode, annualConsumption, options = {}) => {
+    return api.post('/scrape/tado', {
+      zip_code: zipCode,
+      annual_consumption: annualConsumption,
+      headless: options.headless !== false,
+      debug_mode: options.debug_mode || false
+    }, {
+      timeout: 120000  // 120 seconds
+    })
+  },
+  
+  scrapeTibberTariff: (zipCode, annualConsumption, options = {}) => {
+    return api.post('/scrape/tibber', {
+      zip_code: zipCode,
+      annual_consumption: annualConsumption,
+      headless: options.headless !== undefined ? options.headless : true,
+      debug_mode: options.debugMode || false
+    }, {
+      timeout: 120000  // 120 seconds
+    })
+  },
+  
   // Generic request method
   request: (method, url, data = null, config = {}) => {
     return api.request({
