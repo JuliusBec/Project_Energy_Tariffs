@@ -977,11 +977,35 @@ export default {
       
       try {
         const zipCode = formData.value.zipCode
-        const annualConsumption = formData.value.annualKwh
+        let annualConsumption = formData.value.annualKwh
+        let csvAnalysis = null
+        
+        // Check if user uploaded a CSV file - analyze it FIRST
+        if (formData.value.hasSmartMeter && uploadedFile.value) {
+          console.log('📊 Analyzing uploaded CSV file:', uploadedFile.value.name)
+          
+          try {
+            const csvResponse = await apiService.calculateWithCsv(uploadedFile.value)
+            const csvData = csvResponse.data
+            console.log('✅ CSV analysis complete:', csvData)
+            
+            // Extract annual consumption from CSV
+            if (csvData.annual_kwh) {
+              annualConsumption = Math.round(csvData.annual_kwh)
+              formData.value.annualKwh = annualConsumption
+              console.log(`📈 Updated annual consumption from CSV: ${annualConsumption} kWh`)
+            }
+            
+            // Store CSV analysis for later use
+            csvAnalysis = csvData
+          } catch (csvError) {
+            console.error('⚠️ CSV analysis failed:', csvError)
+          }
+        }
         
         console.log(`🔍 Scraping tariffs for PLZ: ${zipCode}, Consumption: ${annualConsumption} kWh`)
         
-        // Call combined scraper endpoint
+        // Call combined scraper endpoint with actual consumption data
         const scraperResponse = await apiService.scrapeAllTariffs(zipCode, annualConsumption)
         const scraperData = scraperResponse.data
         
@@ -1008,12 +1032,15 @@ export default {
               price_forecast: true,
               automation_ready: true,  // Smart Home Integration
               special_features: tariff.features || [],
-              markup: tariff.markup
+              markup: tariff.markup,
+              // Add CSV-based metrics if available
+              csv_based: csvAnalysis !== null,
+              actual_annual_consumption: csvAnalysis ? annualConsumption : null
             }
           })
           
           results.value = scrapedTariffs
-          console.log('📊 Scraped tariffs:', scrapedTariffs)
+          console.log('📊 Scraped tariffs with CSV data:', scrapedTariffs)
           
           // Fetch predictions and forecasts
           fetchSavingsPrediction()

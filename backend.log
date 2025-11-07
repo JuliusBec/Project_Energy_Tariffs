@@ -70,3 +70,37 @@ Sliced 30 days of data: 1440 rows, total consumption: 227.24 kWh
 INFO:     84.167.138.50:0 - "POST /api/calculate HTTP/1.1" 200 OK
 INFO:     84.167.138.50:0 - "POST /api/predict-savings HTTP/1.1" 200 OK
 INFO:     84.167.138.50:0 - "GET /api/forecast HTTP/1.1" 200 OK
+INFO:src.Webscraping.scraper_tibber:🔍 Starte Tibber-Scraping für PLZ 71065, 3500.0 kWh/Jahr
+INFO:src.Webscraping.scraper_tibber:📡 Sende Request an: https://tibber.com/de/preisrechner?postalCode=71065&averageConsumption=3500.0
+INFO:src.Webscraping.scraper_tibber:✅ __NEXT_DATA__ erfolgreich geparst
+INFO:src.Webscraping.scraper_tibber:ℹ️  Preise werden clientseitig nachgeladen (GraphQL API)
+INFO:src.Webscraping.scraper_tibber:ℹ️  Verwende PLZ-basierte Schätzungen als Fallback
+WARNING:src.Webscraping.scraper_tibber:⚠️ Real-Scraping nicht möglich, verwende PLZ-Schätzungen
+INFO:src.Webscraping.scraper_tibber:📊 Generiere PLZ-basierte Schätzungen für 71065
+INFO:src.Webscraping.scraper_tibber:   PLZ-Präfix: 71
+INFO:src.Webscraping.scraper_tibber:   Netznutzung: 9.9 €/Mon
+INFO:src.Webscraping.scraper_tibber:   Ø kWh-Preis: 29.32 ct/kWh
+INFO:src.Webscraping.scraper_tibber:   Monatlich: 101.41 €
+INFO:     84.167.138.50:0 - "POST /api/scrape/tariffs HTTP/1.1" 200 OK
+INFO:     84.167.138.50:0 - "POST /api/predict-savings HTTP/1.1" 200 OK
+INFO:     84.167.138.50:0 - "GET /api/forecast HTTP/1.1" 200 OK
+Error generating price chart data: cannot import name 'create_chart_data' from 'src.backend.forecasting.EnergyPriceForecast' (/workspaces/Project_Energy_Tariffs/src/backend/forecasting/EnergyPriceForecast.py)
+INFO:     84.167.138.50:0 - "GET /api/price-chart-data HTTP/1.1" 500 Internal Server Error
+Error generating price breakdown: cannot import name 'get_price_breakdown' from 'src.backend.forecasting.EnergyPriceForecast' (/workspaces/Project_Energy_Tariffs/src/backend/forecasting/EnergyPriceForecast.py)
+INFO:     84.167.138.50:0 - "GET /api/price-breakdown HTTP/1.1" 500 Internal Server Error
+Error generating price chart data: cannot import name 'create_chart_data' from 'src.backend.forecasting.EnergyPriceForecast' (/workspaces/Project_Energy_Tariffs/src/backend/forecasting/EnergyPriceForecast.py)
+INFO:     84.167.138.50:0 - "GET /api/price-chart-data HTTP/1.1" 500 Internal Server Error
+Error generating price breakdown: cannot import name 'get_price_breakdown' from 'src.backend.forecasting.EnergyPriceForecast' (/workspaces/Project_Energy_Tariffs/src/backend/forecasting/EnergyPriceForecast.py)
+INFO:     84.167.138.50:0 - "GET /api/price-breakdown HTTP/1.1" 500 Internal Server Error
+INFO:src.Webscraping.scraper_tibber:🔍 Starte Tibber-Scraping für PLZ , 3500.0 kWh/Jahr
+INFO:src.Webscraping.scraper_tibber:📡 Sende Request an: https://tibber.com/de/preisrechner?postalCode=&averageConsumption=3500.0
+INFO:src.Webscraping.scraper_tibber:✅ __NEXT_DATA__ erfolgreich geparst
+INFO:src.Webscraping.scraper_tibber:ℹ️  Preise werden clientseitig nachgeladen (GraphQL API)
+INFO:src.Webscraping.scraper_tibber:ℹ️  Verwende PLZ-basierte Schätzungen als Fallback
+WARNING:src.Webscraping.scraper_tibber:⚠️ Real-Scraping nicht möglich, verwende PLZ-Schätzungen
+INFO:src.Webscraping.scraper_tibber:📊 Generiere PLZ-basierte Schätzungen für 
+INFO:src.Webscraping.scraper_tibber:   PLZ-Präfix: 
+INFO:src.Webscraping.scraper_tibber:   Netznutzung: 9.85 €/Mon
+INFO:src.Webscraping.scraper_tibber:   Ø kWh-Preis: 28.5 ct/kWh
+INFO:src.Webscraping.scraper_tibber:   Monatlich: 98.97 €
+INFO:     84.167.138.50:0 - "POST /api/scrape/tariffs HTTP/1.1" 200 OK
