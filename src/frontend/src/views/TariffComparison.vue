@@ -1028,10 +1028,61 @@ export default {
         console.log('✅ Scraper response:', scraperData)
         
         if (scraperData.success && scraperData.tariffs && scraperData.tariffs.length > 0) {
+          // Lade Forecast-Daten für dynamische Preisberechnung
+          let forecastAvgPrice = 0.25  // Default fallback in €/kWh
+          try {
+            const forecastResponse = await apiService.getPriceForecast()
+            if (forecastResponse && forecastResponse.data && forecastResponse.data.data) {
+              const forecastData = forecastResponse.data.data
+              const prices = forecastData.map(item => item.price)
+              forecastAvgPrice = prices.reduce((a, b) => a + b, 0) / prices.length
+              console.log(`📈 Forecast average price: ${forecastAvgPrice.toFixed(4)} €/kWh`)
+            }
+          } catch (forecastError) {
+            console.warn('⚠️ Could not fetch forecast data, using fallback price:', forecastError)
+          }
+          
           // Convert EnergyTariff format to frontend display format
           const scrapedTariffs = scraperData.tariffs.map(tariff => {
-            const monthlyCost = tariff.base_price + ((annualConsumption / 12) * tariff.kwh_rate)
-            const annualCost = monthlyCost * 12
+            // Berechnung für dynamische Tarife:
+            const monthlyConsumption = annualConsumption / 12
+            
+            // Spezielle Berechnung für Tibber (mit additional_kwh_rate)
+            let monthlyCost, annualCost
+            
+            if (tariff.provider === "Tibber" && tariff.additional_kwh_rate) {
+              // Tibber: Grundpreis + (Verbrauch × 0,184) + (Verbrauch × Forecast)
+              // Formel: 15,89 + (monatl. kWh × 0,184) + (monatl. kWh × Forecast-Preis)
+              const additionalCost = forecastAvgPrice * monthlyConsumption
+              const taxesCost = tariff.additional_kwh_rate * monthlyConsumption
+              monthlyCost = tariff.base_price + additionalCost + taxesCost
+              annualCost = (tariff.base_price * 12) + (forecastAvgPrice * annualConsumption) + (tariff.additional_kwh_rate * annualConsumption)
+              
+              console.log(`💰 ${tariff.provider} Berechnung:`)
+              console.log(`   Grundpreis: ${tariff.base_price}€/Monat`)
+              console.log(`   Weitere Preisbestandteile (Umlagen/Steuern): ${tariff.additional_kwh_rate}€/kWh`)
+              console.log(`   Forecast-Preis (Börsenstrom): ${forecastAvgPrice.toFixed(4)}€/kWh`)
+              console.log(`   Monatlicher Verbrauch: ${monthlyConsumption.toFixed(2)} kWh`)
+              console.log(`   Umlagen/Steuern-Kosten/Monat: ${taxesCost.toFixed(2)}€`)
+              console.log(`   Börsenstrom-Kosten/Monat: ${additionalCost.toFixed(2)}€`)
+              console.log(`   Monatspreis gesamt: ${monthlyCost.toFixed(2)}€`)
+              console.log(`   Jahrespreis gesamt: ${annualCost.toFixed(2)}€`)
+            } else {
+              // Tado, EnBW: Grundpreis + (Forecast × Verbrauch) + (Netzgebühr / 12)
+              const forecastCost = forecastAvgPrice * monthlyConsumption
+              const networkFeeMonthly = (tariff.network_fee || 0) / 12
+              monthlyCost = tariff.base_price + forecastCost + networkFeeMonthly
+              annualCost = (tariff.base_price * 12) + (forecastAvgPrice * annualConsumption) + (tariff.network_fee || 0)
+              
+              console.log(`💰 ${tariff.provider} Berechnung:`)
+              console.log(`   Grundpreis: ${tariff.base_price}€/Monat`)
+              console.log(`   Netzgebühr (einmalig): ${tariff.network_fee}€`)
+              console.log(`   Forecast-Preis: ${forecastAvgPrice.toFixed(4)}€/kWh`)
+              console.log(`   Monatlicher Verbrauch: ${monthlyConsumption.toFixed(2)} kWh`)
+              console.log(`   Forecast-Kosten/Monat: ${forecastCost.toFixed(2)}€`)
+              console.log(`   Monatspreis gesamt: ${monthlyCost.toFixed(2)}€`)
+              console.log(`   Jahrespreis gesamt: ${annualCost.toFixed(2)}€`)
+            }
             
             return {
               id: `${tariff.provider.toLowerCase()}-dynamic`,
@@ -1040,7 +1091,8 @@ export default {
               monthly_cost: Math.round(monthlyCost),
               annual_cost: Math.round(annualCost),
               base_price: tariff.base_price,
-              kwh_price: tariff.kwh_rate,
+              network_fee: tariff.network_fee,
+              kwh_price: forecastAvgPrice,  // Zeige Forecast-Preis an
               is_dynamic: tariff.is_dynamic,
               smart_meter_required: true,
               green_energy: true,
@@ -1048,7 +1100,6 @@ export default {
               price_forecast: true,
               automation_ready: true,  // Smart Home Integration
               special_features: tariff.features || [],
-              markup: tariff.markup,
               // Add CSV-based metrics if available
               csv_based: csvAnalysis !== null,
               actual_annual_consumption: csvAnalysis ? annualConsumption : null
@@ -1065,122 +1116,16 @@ export default {
           loading.value = false
           return
         } else {
-          console.warn('⚠️ No scraped tariffs available, falling back to backend tariffs')
+          // Keine gescrapten Tarife verfügbar
+          console.error('❌ Keine Tarife von Scrapern verfügbar')
+          results.value = []
+          loading.value = false
+          return
         }
-        
-        // Fallback: Use backend tariffs if scraping fails
-        console.log('Fetching tariffs from backend...')
-        const response = await apiService.getTariffs()
-        const backendTariffs = response.data
-        console.log('Backend tariffs received:', backendTariffs)
-        
-        // Check if user uploaded a CSV file
-        if (formData.value.hasSmartMeter && uploadedFile.value) {
-          console.log('Using uploaded CSV file for calculations:', uploadedFile.value.name)
-          
-          // Use the /api/calculate-with-csv endpoint
-          try {
-            const csvResponse = await apiService.calculateWithCsv(uploadedFile.value)
-            
-            const csvResults = csvResponse.data
-            console.log('CSV calculation results:', csvResults)
-            
-            // Update formData with the calculated annual kWh from CSV
-            if (csvResults.annual_kwh) {
-              formData.value.annualKwh = Math.round(csvResults.annual_kwh)
-              console.log('Updated annualKwh from CSV:', formData.value.annualKwh)
-            }
-            
-            // Map the results to the tariffs
-            const calculatedTariffs = csvResults.results.map(result => {
-              const tariff = backendTariffs.find(t => t.name === result.tariff_name)
-              return {
-                ...tariff,
-                annual_cost: Math.round(result.annual_cost),
-                monthly_cost: Math.round(result.monthly_cost),
-                savings_potential: 0,
-                avg_kwh_price: result.avg_kwh_price,
-                tariff_type: result.tariff_type
-              }
-            })
-            
-            results.value = calculatedTariffs
-            console.log('Final calculated tariffs from CSV:', calculatedTariffs)
-            
-            // Fetch predictions and forecasts
-            fetchSavingsPrediction()
-            fetchPriceForecast()
-            
-            loading.value = false
-            return
-          } catch (csvError) {
-            console.error('Error with CSV calculation, falling back to manual calculation:', csvError)
-          }
-        }
-        
-        // Fallback: Manual calculation (no CSV file or CSV failed)
-        console.log('Using manual calculation without CSV')
-        const calculatedTariffs = []
-        
-        for (const tariff of backendTariffs) {
-          try {
-            const calculationData = {
-              tariff_id: tariff.id,
-              annual_kwh: formData.value.annualKwh,
-              has_smart_meter: formData.value.hasSmartMeter,
-              usage_pattern: 'manual'
-            }
-            
-            console.log('Calculating costs for tariff:', tariff.name, calculationData)
-            
-            try {
-              const calcResponse = await apiService.calculateTariffs(calculationData)
-              const calculation = calcResponse.data
-              console.log('Calculation result:', calculation)
-              
-              calculatedTariffs.push({
-                ...tariff,
-                annual_cost: Math.round(calculation.annual_cost),
-                monthly_cost: Math.round(calculation.annual_cost / 12),
-                savings_potential: calculation.savings_potential || 0,
-                cost_breakdown: calculation.cost_breakdown || {}
-              })
-            } catch (apiError) {
-              console.error('API calculation failed, using fallback:', apiError)
-              // Fallback to basic calculation if API call fails
-              const basicCost = (tariff.base_price * 12) + (formData.value.annualKwh * (tariff.kwh_price || 0.30))
-              calculatedTariffs.push({
-                ...tariff,
-                annual_cost: Math.round(basicCost),
-                monthly_cost: Math.round(basicCost / 12),
-                savings_potential: 0
-              })
-            }
-          } catch (calcError) {
-            console.error('Error calculating tariff:', tariff.name, calcError)
-            // Fallback calculation
-            const basicCost = (tariff.base_price * 12) + (formData.value.annualKwh * (tariff.kwh_price || 0.30))
-            calculatedTariffs.push({
-              ...tariff,
-              annual_cost: Math.round(basicCost),
-              monthly_cost: Math.round(basicCost / 12),
-              savings_potential: 0
-            })
-          }
-        }
-        
-        results.value = calculatedTariffs
-        console.log('Final calculated tariffs:', calculatedTariffs)
-        
-        // Fetch predictions and forecasts after tariffs are loaded
-        fetchSavingsPrediction()
-        fetchPriceForecast()
         
       } catch (error) {
-        console.error('Error fetching tariffs from backend:', error)
-        console.log('Falling back to mock data...')
-        // Fallback to mock data if backend is not available
-        generateMockTariffs()
+        console.error('❌ Fehler beim Laden der Tarife:', error)
+        results.value = []
       } finally {
         loading.value = false
       }

@@ -12,9 +12,13 @@ class EnergyTariff(ABC):
     """
 
     def __init__(self, name: str, base_price: float, is_dynamic: bool, start_date: datetime, kwh_rate: Optional[float] = None, 
-                 provider: Optional[str] = None, min_duration: Optional[int] = None, features: Optional[list] = None):
+                 provider: Optional[str] = None, min_duration: Optional[int] = None, features: Optional[list] = None,
+                 postal_code: Optional[str] = None):
         """
         Initialize the energy tariff.
+        
+        Args:
+            postal_code: German postal code (Postleitzahl) for location-specific pricing or availability
         """
         self.name = name
         self.provider = provider
@@ -24,6 +28,7 @@ class EnergyTariff(ABC):
         self.start_date = start_date
         self.is_dynamic = is_dynamic
         self.features = features if features else []
+        self.postal_code = postal_code
 
     def calculate_billing_period_days(self) -> int:
         """
@@ -80,12 +85,17 @@ class FixedTariff(EnergyTariff):
     """
 
     def __init__(self, name: str, base_price: float, kwh_rate: float, start_date: datetime, provider: Optional[str] = None, 
-                 min_duration: Optional[int] = None, is_dynamic: bool = False, features: Optional[list] = None):
+                 min_duration: Optional[int] = None, is_dynamic: bool = False, features: Optional[list] = None,
+                 postal_code: Optional[str] = None):
         """
         Initialize the fixed tariff with base price and kWh rate.
+        
+        Args:
+            postal_code: German postal code (Postleitzahl) for location-specific pricing or availability
         """
         super().__init__(name=name, base_price=base_price, is_dynamic=False, start_date=start_date,
-                         kwh_rate=kwh_rate, provider=provider, min_duration=min_duration, features=features)
+                         kwh_rate=kwh_rate, provider=provider, min_duration=min_duration, features=features,
+                         postal_code=postal_code)
 
     def calculate_cost_split(self, total_consumption_kwh: float) -> dict:
         """
@@ -207,9 +217,11 @@ class DynamicTariff(EnergyTariff):
     Represents a dynamic energy tariff.
     """
 
-    def __init__(self, name: str, base_price: float, start_date: datetime, provider: Optional[str] = None, is_dynamic: bool = True, markup: float = 0.20, features: Optional[list] = None):
+    def __init__(self, name: str, base_price: float, start_date: datetime, provider: Optional[str] = None, 
+                 is_dynamic: bool = True, network_fee: float = 0.0, features: Optional[list] = None,
+                 postal_code: Optional[str] = None):
         """
-        Initialize the dynamic tariff with base price and markup.
+        Initialize the dynamic tariff with base price and one-time network fee.
         
         Args:
             name: Name of the tariff
@@ -217,16 +229,19 @@ class DynamicTariff(EnergyTariff):
             start_date: Start date for the tariff
             provider: Energy provider name
             is_dynamic: Whether this is a dynamic tariff (always True for this class)
-            markup: Markup added to wholesale prices in €/kWh (default 0.20 for grid fees, taxes, etc.)
+            network_fee: One-time network usage fee (einmalige Zahlung für Netznutzung) in €
             features: List of tariff features (e.g., ["dynamic", "green"])
+            postal_code: German postal code (Postleitzahl) for location-specific pricing or availability
         """
-        super().__init__(name, base_price=base_price, start_date=start_date, provider=provider, is_dynamic=True, features=features)
-        self.markup = markup  # €/kWh markup added to wholesale prices
+        super().__init__(name, base_price=base_price, start_date=start_date, provider=provider, is_dynamic=True, 
+                         features=features, postal_code=postal_code)
+        self.network_fee = network_fee  # One-time fee for network usage
 
     def _get_average_forecast_price(self) -> float:
         """
         Get average price from the latest forecast data.
         Returns a default value if forecast data is not available.
+        Note: Returns wholesale price without markup (network fee is handled separately as one-time charge).
         """
         import os
         try:
@@ -246,8 +261,8 @@ class DynamicTariff(EnergyTariff):
             forecast_data = pd.read_csv(price_data_path)
             
             if 'yhat' in forecast_data.columns:
-                # Convert €/MWh to €/kWh and add markup, then return average
-                return (forecast_data['yhat'].mean() / 1000) + self.markup
+                # Convert €/MWh to €/kWh (no markup added here)
+                return forecast_data['yhat'].mean() / 1000
             else:
                 return 0.25  # Default fallback price in €/kWh
                 
@@ -270,15 +285,16 @@ class DynamicTariff(EnergyTariff):
         # The actual cost calculation with time-dependent pricing is handled in calculate_cost
         billing_period_days = self.calculate_billing_period_days()
         
-        # Get average price from latest forecast data
+        # Get average price from latest forecast data (without markup)
         estimated_avg_kwh_price = self._get_average_forecast_price()
         
         variable_cost = total_consumption_kwh * estimated_avg_kwh_price
-        total_cost = variable_cost + self.base_price
+        total_cost = variable_cost + self.base_price + self.network_fee
         
         return {
             "base_price": self.base_price,
             "variable_cost": variable_cost,
+            "network_fee": self.network_fee,
             "total_cost": total_cost,
             "total_consumption_kwh": total_consumption_kwh,
             "estimated_avg_kwh_price": estimated_avg_kwh_price,
@@ -333,8 +349,8 @@ class DynamicTariff(EnergyTariff):
                 standard_profile_path = os.path.join(project_root, "app_data", "standard_profile", "Standard_Load_Profile_2025_2026.csv")
                 consumption_data = pd.read_csv(standard_profile_path)
             except Exception as e:
-                # Return just base price if data loading fails
-                return {'total_cost': self.base_price, 'avg_kwh_price': 0.0}
+                # Return just base price and network fee if data loading fails
+                return {'total_cost': self.base_price + self.network_fee, 'avg_kwh_price': 0.0}
                 
             consumption_data['datetime'] = pd.to_datetime(consumption_data['datetime'])
             
@@ -371,14 +387,15 @@ class DynamicTariff(EnergyTariff):
             future_prices = pd.read_csv(price_data_path)
             
             # Use 'yhat' column from Prophet forecast and convert from €/MWh to €/kWh
+            # No per-kWh markup - network fee is handled separately as one-time charge
             if 'yhat' not in future_prices.columns:
                 raise ValueError(f"Expected 'yhat' column in forecast data, found columns: {list(future_prices.columns)}")
             
-            future_prices['predicted_mean'] = (future_prices['yhat'] / 1000) + self.markup  # Convert €/MWh to €/kWh and add markup
+            future_prices['predicted_mean'] = future_prices['yhat'] / 1000  # Convert €/MWh to €/kWh (no markup)
             future_prices = future_prices.rename(columns={'ds': 'datetime'})  # Prophet uses 'ds' for datetime
         except Exception as e:
-            # Return just base price if price data loading fails
-            return {'total_cost': self.base_price, 'avg_kwh_price': 0.0}
+            # Return just base price and network fee if price data loading fails
+            return {'total_cost': self.base_price + self.network_fee, 'avg_kwh_price': 0.0}
             
         future_prices['datetime'] = pd.to_datetime(future_prices['datetime'])
         
@@ -400,7 +417,7 @@ class DynamicTariff(EnergyTariff):
         # Calculate consumption costs
         consumption_costs = future_data.apply(lambda row: row[consumption_column] * row['predicted_mean'], axis=1)
         total_consumption_cost = consumption_costs.sum()
-        total_cost = total_consumption_cost + self.base_price
+        total_cost = total_consumption_cost + self.base_price + self.network_fee  # Add one-time network fee
         
         # Calculate average kWh price
         total_consumption = future_data[consumption_column].sum()
@@ -410,6 +427,7 @@ class DynamicTariff(EnergyTariff):
         print(f"Total consumption cost: {total_consumption_cost}€")
         print(f"Average kWh price: {avg_kwh_price:.4f}€/kWh")
         print(f"Base price: {self.base_price}€")
+        print(f"Network fee (one-time): {self.network_fee}€")
         print(f"Total cost: {total_cost}€")
         
         return {

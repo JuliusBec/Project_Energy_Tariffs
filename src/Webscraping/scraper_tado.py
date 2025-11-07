@@ -203,11 +203,15 @@ class TadoScraper:
                 self.driver.save_screenshot(screenshot_path)
                 print(f"📸 Screenshot: {screenshot_path}")
             
+            # Netznutzung, Umlagen, Steuern, Beschaffungskosten (einmalige Zahlung)
+            network_fee = 51.85
+            
             result = {
                 'success': True,
                 'provider': 'Tado Energy',
                 'tariff_name': 'Tado Dynamic',
                 'base_price_monthly': base_price_monthly,
+                'network_fee': network_fee,  # Einmalige Zahlung für Netznutzung, Umlagen, Steuern
                 'kwh_price_ct': kwh_price_ct,
                 'monthly_cost': round(monthly_cost, 2),
                 'annual_cost': round(monthly_cost * 12, 2),
@@ -221,6 +225,7 @@ class TadoScraper:
             if self.debug_mode:
                 print("✅ Scraping erfolgreich:")
                 print(f"   Grundpreis: {base_price_monthly} €/Monat")
+                print(f"   Netznutzungsgebühr (einmalig): {network_fee} €")
                 print(f"   Arbeitspreis: {kwh_price_ct} ct/kWh")
                 print(f"   Monatskosten: {monthly_cost:.2f} €")
             
@@ -235,6 +240,7 @@ class TadoScraper:
             
             # Beispiel-Daten basierend auf typischen Tado-Tarifen
             base_price_monthly = 16.01  # Realistischer Grundpreis
+            network_fee = 51.85  # Netznutzung, Umlagen, Steuern, Beschaffungskosten (einmalig)
             kwh_price_ct = 30.81  # Typischer Arbeitspreis
             monthly_cost = base_price_monthly + (annual_consumption / 12 * kwh_price_ct / 100)
             
@@ -243,6 +249,7 @@ class TadoScraper:
                 'provider': 'Tado Energy',
                 'tariff_name': 'Tado Dynamic',
                 'base_price_monthly': base_price_monthly,
+                'network_fee': network_fee,  # Einmalige Zahlung für Netznutzung
                 'kwh_price_ct': kwh_price_ct,
                 'monthly_cost': round(monthly_cost, 2),
                 'annual_cost': round(monthly_cost * 12, 2),

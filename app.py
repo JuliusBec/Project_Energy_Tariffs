@@ -89,7 +89,7 @@ def create_enbw_tariffs():
             base_price=14.90,
             start_date=start_date,
             is_dynamic=True,
-            markup=0.18,  # 18ct/kWh markup for premium dynamic tariff
+            network_fee=18.00,  # 18€ one-time network fee for premium dynamic tariff
             features=["dynamic", "green"]
         ),
         DynamicTariff(
@@ -98,7 +98,7 @@ def create_enbw_tariffs():
             base_price=9.90,
             start_date=start_date,
             is_dynamic=True,
-            markup=0.22,  # 22ct/kWh markup for standard dynamic tariff
+            network_fee=22.00,  # 22€ one-time network fee for standard dynamic tariff
             features=["dynamic", "green"]
         ),
         FixedTariff(
@@ -971,25 +971,29 @@ def scraper_to_tariff(scraper_data: dict, provider: str, tariff_type: str = "dyn
     
     # Provider-specific data mapping
     if provider == "EnBW":
+        # EnBW: Netznutzungsgebühr aus Markup berechnen (z.B. 5ct/kWh * Jahresverbrauch / 12 für monatlich)
+        network_fee = scraper_data.get("markup_ct_kwh", 0) / 100 * scraper_data.get("annual_consumption", 0) / 12
         tariff_dict.update({
             "base_price": scraper_data.get("base_price_monthly", 0),
-            "kwh_rate": scraper_data.get("total_kwh_price_ct", 0) / 100,  # Convert ct to €
-            "min_duration": None,
-            "markup": scraper_data.get("markup_ct_kwh", 0) / 100 if "markup_ct_kwh" in scraper_data else None,
-            "exchange_price": scraper_data.get("exchange_price_ct_kwh", 0) / 100 if "exchange_price_ct_kwh" in scraper_data else None
+            "kwh_rate": scraper_data.get("exchange_price_ct_kwh", 0) / 100 if "exchange_price_ct_kwh" in scraper_data else 0,  # Nur Börsenpreis
+            "network_fee": network_fee,  # Einmalige Netznutzungsgebühr
+            "min_duration": None
         })
     elif provider == "Tado":
         tariff_dict.update({
             "base_price": scraper_data.get("base_price_monthly", 0),
-            "kwh_rate": scraper_data.get("kwh_price_ct", 0) / 100,
+            "kwh_rate": 0,  # Forecast-Preis wird später verwendet
+            "network_fee": scraper_data.get("network_fee", 0),  # Einmalige Netznutzungsgebühr (51,85€)
             "min_duration": None
         })
     elif provider == "Tibber":
+        # Tibber: Grundpreis + additional_price_ct (18,4 ct/kWh für Umlagen/Steuern)
+        # Forecast-Preis kommt später dazu
         tariff_dict.update({
-            "base_price": scraper_data.get("total_base_monthly", 0),
-            "kwh_rate": scraper_data.get("kwh_price_ct", 0) / 100,
-            "min_duration": None,
-            "markup": scraper_data.get("additional_price_ct", 0) / 100 if "additional_price_ct" in scraper_data else None
+            "base_price": scraper_data.get("total_base_monthly", 0),  # 15,89€ (Netz + Tibber-Gebühr)
+            "kwh_rate": 0,  # Forecast-Preis wird später verwendet
+            "additional_kwh_rate": scraper_data.get("additional_price_ct", 18.4) / 100,  # 0,184€/kWh für Umlagen/Steuern
+            "min_duration": None
         })
     
     return tariff_dict
