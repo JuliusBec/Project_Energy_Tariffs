@@ -1351,15 +1351,6 @@ async def scrape_tibber_tariff(request: TibberScraperRequest):
 
 
 # =============================================================================
-# RUN SERVER
-# =============================================================================
-
-if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
-
-
-
-# =============================================================================
 # COMBINED SCRAPER ENDPOINT - Returns EnergyTariff-compatible format
 # =============================================================================
 
@@ -1427,3 +1418,14 @@ async def scrape_all_tariffs(request: ScraperTariffRequest):
         "errors": errors if errors else None,
         "timestamp": datetime.now().isoformat()
     }
+
+
+# RUN SERVER
+# =============================================================================
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=8000)
+
+
+
+# =============================================================================
