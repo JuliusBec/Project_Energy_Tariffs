@@ -56,6 +56,22 @@
               <div v-if="formData.hasSmartMeter === true" class="smart-meter-section">
                
                 <div class="form-group">
+                  <label class="form-label">Postleitzahl *</label>
+                  <input 
+                    type="text" 
+                    v-model="formData.zipCode" 
+                    class="form-input"
+                    placeholder="z.B. 70173"
+                    pattern="[0-9]{5}"
+                    maxlength="5"
+                    required
+                  >
+                  <div class="form-help">
+                    Für Tarifverfügbarkeit in Ihrer Region
+                  </div>
+                </div>
+               
+                <div class="form-group">
                   <label class="form-label">Verbrauchsdaten hochladen *</label>
                   <div class="upload-section">
                     <div class="upload-area" :class="{ 'dragover': isDragOver, 'has-file': uploadedFile }" 
