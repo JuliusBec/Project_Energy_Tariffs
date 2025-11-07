@@ -976,7 +976,56 @@ export default {
       searchPerformed.value = true
       
       try {
-        // Fetch tariffs from backend API
+        const zipCode = formData.value.zipCode
+        const annualConsumption = formData.value.annualKwh
+        
+        console.log(`🔍 Scraping tariffs for PLZ: ${zipCode}, Consumption: ${annualConsumption} kWh`)
+        
+        // Call combined scraper endpoint
+        const scraperResponse = await apiService.scrapeAllTariffs(zipCode, annualConsumption)
+        const scraperData = scraperResponse.data
+        
+        console.log('✅ Scraper response:', scraperData)
+        
+        if (scraperData.success && scraperData.tariffs && scraperData.tariffs.length > 0) {
+          // Convert EnergyTariff format to frontend display format
+          const scrapedTariffs = scraperData.tariffs.map(tariff => {
+            const monthlyCost = tariff.base_price + ((annualConsumption / 12) * tariff.kwh_rate)
+            const annualCost = monthlyCost * 12
+            
+            return {
+              id: `${tariff.provider.toLowerCase()}-dynamic`,
+              name: tariff.name,
+              provider: tariff.provider,
+              monthly_cost: Math.round(monthlyCost),
+              annual_cost: Math.round(annualCost),
+              base_price: tariff.base_price,
+              kwh_price: tariff.kwh_rate,
+              is_dynamic: tariff.is_dynamic,
+              smart_meter_required: true,
+              green_energy: true,
+              app_available: true,
+              price_forecast: true,
+              automation_ready: true,  // Smart Home Integration
+              special_features: tariff.features || [],
+              markup: tariff.markup
+            }
+          })
+          
+          results.value = scrapedTariffs
+          console.log('📊 Scraped tariffs:', scrapedTariffs)
+          
+          // Fetch predictions and forecasts
+          fetchSavingsPrediction()
+          fetchPriceForecast()
+          
+          loading.value = false
+          return
+        } else {
+          console.warn('⚠️ No scraped tariffs available, falling back to backend tariffs')
+        }
+        
+        // Fallback: Use backend tariffs if scraping fails
         console.log('Fetching tariffs from backend...')
         const response = await apiService.getTariffs()
         const backendTariffs = response.data

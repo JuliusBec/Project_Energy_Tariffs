@@ -142,6 +142,19 @@ export const apiService = {
     })
   },
   
+  // Combined scraper endpoint - returns all tariffs in EnergyTariff format
+  scrapeAllTariffs: (zipCode, annualConsumption, providers = ['enbw', 'tado', 'tibber'], options = {}) => {
+    return api.post('/scrape/tariffs', {
+      zip_code: zipCode,
+      annual_consumption: annualConsumption,
+      providers: providers,
+      headless: options.headless !== false,
+      debug_mode: options.debug_mode || false
+    }, {
+      timeout: 180000  // 180 seconds for all scrapers
+    })
+  },
+  
   // Generic request method
   request: (method, url, data = null, config = {}) => {
     return api.request({
