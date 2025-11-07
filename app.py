@@ -945,6 +945,56 @@ async def get_risk_analysis(file: UploadFile = File(...), days: int = Form(30)):
 # SCRAPER ENDPOINTS - EnBW, Tado, Tibber
 # =============================================================================
 
+# Helper function to convert scraper data to EnergyTariff objects
+def scraper_to_tariff(scraper_data: dict, provider: str, tariff_type: str = "dynamic") -> dict:
+    """
+    Convert scraper response data to EnergyTariff-compatible format.
+    
+    Args:
+        scraper_data: Raw scraper response dictionary
+        provider: Provider name (e.g., "EnBW", "Tado", "Tibber")
+        tariff_type: Type of tariff ("dynamic" or "fixed")
+    
+    Returns:
+        dict: EnergyTariff-compatible data structure
+    """
+    from datetime import datetime
+    
+    # Base tariff data
+    tariff_dict = {
+        "name": scraper_data.get("tariff_name", f"{provider} Dynamic"),
+        "provider": provider,
+        "is_dynamic": tariff_type == "dynamic",
+        "start_date": datetime.now().isoformat(),
+        "features": ["dynamic", "real-time-pricing", "smart-meter-required"]
+    }
+    
+    # Provider-specific data mapping
+    if provider == "EnBW":
+        tariff_dict.update({
+            "base_price": scraper_data.get("base_price_monthly", 0),
+            "kwh_rate": scraper_data.get("total_kwh_price_ct", 0) / 100,  # Convert ct to €
+            "min_duration": None,
+            "markup": scraper_data.get("markup_ct_kwh", 0) / 100 if "markup_ct_kwh" in scraper_data else None,
+            "exchange_price": scraper_data.get("exchange_price_ct_kwh", 0) / 100 if "exchange_price_ct_kwh" in scraper_data else None
+        })
+    elif provider == "Tado":
+        tariff_dict.update({
+            "base_price": scraper_data.get("base_price_monthly", 0),
+            "kwh_rate": scraper_data.get("kwh_price_ct", 0) / 100,
+            "min_duration": None
+        })
+    elif provider == "Tibber":
+        tariff_dict.update({
+            "base_price": scraper_data.get("total_base_monthly", 0),
+            "kwh_rate": scraper_data.get("kwh_price_ct", 0) / 100,
+            "min_duration": None,
+            "markup": scraper_data.get("additional_price_ct", 0) / 100 if "additional_price_ct" in scraper_data else None
+        })
+    
+    return tariff_dict
+
+
 # ============================================================
 # EnBW Dynamic Tariff Scraper Endpoint (NEW)
 # ============================================================
@@ -1307,3 +1357,73 @@ async def scrape_tibber_tariff(request: TibberScraperRequest):
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
 
+
+
+# =============================================================================
+# COMBINED SCRAPER ENDPOINT - Returns EnergyTariff-compatible format
+# =============================================================================
+
+class ScraperTariffRequest(BaseModel):
+    """Request for getting scraped tariffs in EnergyTariff format"""
+    zip_code: str
+    annual_consumption: float
+    providers: List[str] = ["enbw", "tado", "tibber"]
+    headless: bool = True
+    debug_mode: bool = False
+
+
+@app.post("/api/scrape/tariffs")
+async def scrape_all_tariffs(request: ScraperTariffRequest):
+    """
+    Scrape multiple providers and return data in EnergyTariff-compatible format.
+    
+    Returns tariff objects with fields matching EnergyTariff class structure:
+    - name, provider, base_price, kwh_rate, is_dynamic, start_date, features
+    """
+    tariffs = []
+    errors = []
+    
+    for provider in request.providers:
+        try:
+            if provider.lower() == "enbw":
+                from src.Webscraping.scraper_enbw import EnbwScraper
+                scraper = EnbwScraper(headless=request.headless, debug=request.debug_mode)
+                result = scraper.scrape_tariff(
+                    zip_code=request.zip_code,
+                    annual_consumption=request.annual_consumption
+                )
+                if result and result.get('success'):
+                    tariff_data = scraper_to_tariff(result, "EnBW", "dynamic")
+                    tariffs.append(tariff_data)
+                    
+            elif provider.lower() == "tado":
+                from src.Webscraping.scraper_tado import TadoScraper
+                scraper = TadoScraper(headless=request.headless, debug_mode=request.debug_mode)
+                result = scraper.scrape_tariff(
+                    zip_code=request.zip_code,
+                    annual_consumption=request.annual_consumption
+                )
+                if result and result.get('success'):
+                    tariff_data = scraper_to_tariff(result, "Tado", "dynamic")
+                    tariffs.append(tariff_data)
+                    
+            elif provider.lower() == "tibber":
+                from src.Webscraping.scraper_tibber import TibberScraper
+                scraper = TibberScraper(debug_mode=request.debug_mode)
+                result = scraper.scrape_tariff(
+                    zip_code=request.zip_code,
+                    annual_consumption=request.annual_consumption
+                )
+                if result and result.get('success'):
+                    tariff_data = scraper_to_tariff(result, "Tibber", "dynamic")
+                    tariffs.append(tariff_data)
+                    
+        except Exception as e:
+            errors.append({"provider": provider, "error": str(e)})
+    
+    return {
+        "success": len(tariffs) > 0,
+        "tariffs": tariffs,
+        "errors": errors if errors else None,
+        "timestamp": datetime.now().isoformat()
+    }
