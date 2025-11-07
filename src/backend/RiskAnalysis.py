@@ -104,10 +104,10 @@ def _calculate_weighted_average_price(prices: pd.DataFrame, consumption: pd.Data
     weighted_avg_price = total_cost / total_consumption if total_consumption > 0 else 0
     
     return {
-        'weighted_avg_price': weighted_avg_price,
-        'total_consumption': total_consumption,
-        'total_cost': total_cost,
-        'num_hours': len(merged)
+        'weighted_avg_price': float(weighted_avg_price),
+        'total_consumption': float(total_consumption),
+        'total_cost': float(total_cost),
+        'num_hours': int(len(merged))
     }
 
 
@@ -200,17 +200,17 @@ def create_historic_risk_analysis(consumption_data: pd.DataFrame, days: int = 30
     days_analyzed = (price_end - price_start).days
     
     return {
-        'market_avg_price': round(market_avg_price, 4),
-        'user_weighted_price': round(user_weighted_price, 4),
-        'price_differential': round(price_differential, 4),
-        'price_differential_pct': round(price_differential_pct, 2),
+        'market_avg_price': round(float(market_avg_price), 4),
+        'user_weighted_price': round(float(user_weighted_price), 4),
+        'price_differential': round(float(price_differential), 4),
+        'price_differential_pct': round(float(price_differential_pct), 2),
         'risk_exposure': risk_exposure,
         'risk_message': risk_message,
-        'total_consumption': round(weighted_results['total_consumption'], 2),
-        'total_cost': round(weighted_results['total_cost'], 2),
-        'price_volatility': round(price_volatility, 4),
-        'days_analyzed': days_analyzed,
-        'num_hours': weighted_results['num_hours'],
+        'total_consumption': round(float(weighted_results['total_consumption']), 2),
+        'total_cost': round(float(weighted_results['total_cost']), 2),
+        'price_volatility': round(float(price_volatility), 4),
+        'days_analyzed': int(days_analyzed),
+        'num_hours': int(weighted_results['num_hours']),
         'price_file_used': price_file_name,
         'analysis_period': {
             'start': price_start.strftime('%Y-%m-%d'),
@@ -336,8 +336,17 @@ def calculate_coincidence_factor(consumption_data: pd.DataFrame, days: int = 30,
     avg_price_expensive = merged[merged['is_expensive']]['price_eur_per_kwh'].mean()
     avg_price_cheap = merged[~merged['is_expensive']]['price_eur_per_kwh'].mean()
     
+    # Handle NaN values (can occur if all hours are in one category)
+    if pd.isna(avg_price_expensive):
+        avg_price_expensive = 0.0
+    if pd.isna(avg_price_cheap):
+        avg_price_cheap = 0.0
+    
     # Calculate correlation coefficient
     correlation = merged['value'].corr(merged['price_eur_per_kwh'])
+    # Handle NaN correlation (can occur with insufficient variance)
+    if pd.isna(correlation):
+        correlation = 0.0
     
     # Determine coincidence rating
     if consumption_coincidence_pct > expensive_hours_pct + 10:
@@ -351,24 +360,24 @@ def calculate_coincidence_factor(consumption_data: pd.DataFrame, days: int = 30,
         rating_message = f"Low coincidence: {consumption_coincidence_pct:.1f}% of consumption during {expensive_hours_pct:.0f}% most expensive hours (favorable)"
     
     return {
-        'expensive_hours_pct': expensive_hours_pct,
-        'num_expensive_hours': num_expensive_hours,
-        'total_hours': total_hours,
-        'consumption_during_expensive_hours': round(consumption_expensive, 2),
-        'consumption_during_cheap_hours': round(consumption_cheap, 2),
-        'total_consumption': round(total_consumption, 2),
-        'consumption_coincidence_pct': round(consumption_coincidence_pct, 2),
-        'cost_during_expensive_hours': round(cost_expensive, 2),
-        'cost_during_cheap_hours': round(cost_cheap, 2),
-        'total_cost': round(total_cost, 2),
-        'cost_coincidence_pct': round(cost_coincidence_pct, 2),
-        'avg_price_expensive_hours': round(avg_price_expensive, 4),
-        'avg_price_cheap_hours': round(avg_price_cheap, 4),
-        'price_threshold': round(price_threshold, 4),
-        'correlation': round(correlation, 4),
+        'expensive_hours_pct': float(expensive_hours_pct),
+        'num_expensive_hours': int(num_expensive_hours),
+        'total_hours': int(total_hours),
+        'consumption_during_expensive_hours': round(float(consumption_expensive), 2),
+        'consumption_during_cheap_hours': round(float(consumption_cheap), 2),
+        'total_consumption': round(float(total_consumption), 2),
+        'consumption_coincidence_pct': round(float(consumption_coincidence_pct), 2),
+        'cost_during_expensive_hours': round(float(cost_expensive), 2),
+        'cost_during_cheap_hours': round(float(cost_cheap), 2),
+        'total_cost': round(float(total_cost), 2),
+        'cost_coincidence_pct': round(float(cost_coincidence_pct), 2),
+        'avg_price_expensive_hours': round(float(avg_price_expensive), 4),
+        'avg_price_cheap_hours': round(float(avg_price_cheap), 4),
+        'price_threshold': round(float(price_threshold), 4),
+        'correlation': round(float(correlation), 4),
         'coincidence_rating': coincidence_rating,
         'rating_message': rating_message,
-        'days_analyzed': days,
+        'days_analyzed': int(days),
         'analysis_period': {
             'start': price_start.strftime('%Y-%m-%d'),
             'end': price_end.strftime('%Y-%m-%d')
@@ -467,6 +476,7 @@ def get_user_load_profile(consumption_data: pd.DataFrame, days: int = 30, app_da
     # Fill missing hours with 0 for consumption (prices should be complete)
     hourly_combined = hourly_combined.set_index('hour').reindex(range(24), fill_value=0).reset_index()
     hourly_combined['avg_consumption'] = hourly_combined['avg_consumption'].fillna(0)
+    hourly_combined['avg_price'] = hourly_combined['avg_price'].fillna(0)
     hourly_combined['count'] = hourly_combined['count'].fillna(0).astype(int)
     
     # Build hourly data list for response
@@ -497,8 +507,11 @@ def get_user_load_profile(consumption_data: pd.DataFrame, days: int = 30, app_da
     hourly_with_data = hourly_combined[hourly_combined['avg_consumption'] > 0].copy()
     if len(hourly_with_data) > 1:
         correlation = hourly_with_data['avg_consumption'].corr(hourly_with_data['avg_price'])
+        # Handle NaN correlation (can occur with insufficient variance)
+        if pd.isna(correlation):
+            correlation = 0.0
     else:
-        correlation = 0
+        correlation = 0.0
     
     # Calculate actual days analyzed
     actual_days = (consumption_filtered['datetime'].max() - consumption_filtered['datetime'].min()).days
@@ -506,12 +519,12 @@ def get_user_load_profile(consumption_data: pd.DataFrame, days: int = 30, app_da
     return {
         'hourly_data': hourly_data,
         'summary': {
-            'total_days_analyzed': actual_days,
-            'peak_consumption_hour': peak_consumption_hour,
-            'lowest_consumption_hour': lowest_consumption_hour,
-            'peak_price_hour': peak_price_hour,
-            'lowest_price_hour': lowest_price_hour,
-            'correlation': round(correlation, 4),
+            'total_days_analyzed': int(actual_days),
+            'peak_consumption_hour': int(peak_consumption_hour),
+            'lowest_consumption_hour': int(lowest_consumption_hour),
+            'peak_price_hour': int(peak_price_hour),
+            'lowest_price_hour': int(lowest_price_hour),
+            'correlation': round(float(correlation), 4),
             'analysis_period': {
                 'start': consumption_filtered['datetime'].min().strftime('%Y-%m-%d'),
                 'end': consumption_filtered['datetime'].max().strftime('%Y-%m-%d')

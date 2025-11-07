@@ -841,7 +841,7 @@
                       </div>
                       <div class="coincidence-info">
                         <div class="info-text">
-                          {{ riskAnalysisData.coincidence_factor.consumption_during_expensive_hours }} kWh in teuren Stunden
+                          Sie verbrauchen {{ riskAnalysisData.coincidence_factor.consumption_during_expensive_hours }} kWh, das sind {{ riskAnalysisData.coincidence_factor.consumption_coincidence_pct.toFixed(0) }}% Ihres täglichen Verbrauchs, in den teuersten Stunden.
                         </div>
                         <div class="info-badge" :class="{
                           'badge-success': riskAnalysisData.coincidence_factor.coincidence_rating === 'low',
@@ -3855,7 +3855,30 @@ export default {
 .coincidence-circle-small .circle-value {
   font-size: 1.25rem;
   font-weight: 700;
-  color: #1f2937;
+}
+
+.coincidence-circle-small.circle-success {
+  border-color: #047857;
+}
+
+.coincidence-circle-small.circle-success .circle-value {
+  color: #047857;
+}
+
+.coincidence-circle-small.circle-warning {
+  border-color: #d97706;
+}
+
+.coincidence-circle-small.circle-warning .circle-value {
+  color: #d97706;
+}
+
+.coincidence-circle-small.circle-danger {
+  border-color: #dc2626;
+}
+
+.coincidence-circle-small.circle-danger .circle-value {
+  color: #dc2626;
 }
 
 .coincidence-info {

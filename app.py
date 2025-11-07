@@ -882,6 +882,7 @@ async def get_risk_analysis(file: UploadFile = File(...), days: int = Form(30)):
     Perform comprehensive risk analysis on user consumption data.
     Returns historic risk analysis, coincidence factor, and load profile data.
     """
+    import traceback
     from src.backend.RiskAnalysis import (
         create_historic_risk_analysis,
         calculate_coincidence_factor,
@@ -922,11 +923,22 @@ async def get_risk_analysis(file: UploadFile = File(...), days: int = Form(30)):
         }
         
     except FileNotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        error_msg = str(e)
+        print(f"FileNotFoundError in risk analysis: {error_msg}")
+        traceback.print_exc()
+        raise HTTPException(status_code=404, detail=error_msg)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        error_msg = str(e)
+        print(f"ValueError in risk analysis: {error_msg}")
+        traceback.print_exc()
+        raise HTTPException(status_code=400, detail=error_msg)
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error processing risk analysis: {str(e)}")
+        error_msg = f"Error processing risk analysis: {str(e)}"
+        print(f"Unexpected error in risk analysis: {error_msg}")
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=error_msg)
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
