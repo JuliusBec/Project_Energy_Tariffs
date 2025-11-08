@@ -324,6 +324,200 @@ async def calculate_yearly_usage(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing file: {str(e)}")
 
+
+# =============================================================================
+# NEW: CSV + PLZ-specific Scraper Integration
+# =============================================================================
+
+class TariffComparisonRequest(BaseModel):
+    """Request for tariff comparison with CSV and PLZ"""
+    zip_code: str  # Postleitzahl (5-stellig)
+    providers: List[str] = ["tibber", "enbw"]  # Anbieter zum Vergleich
+
+@app.post("/api/compare-tariffs-with-csv")
+async def compare_tariffs_with_csv(
+    file: UploadFile = File(...),
+    zip_code: str = Form(...),
+    providers: str = Form("tibber,enbw")  # Comma-separated
+):
+    """
+    Tarifvergleich mit hochgeladenen Verbrauchsdaten (CSV) und PLZ-spezifischen Preisen
+    
+    **Dieser Endpunkt kombiniert:**
+    - Hochgeladene CSV-Verbrauchsdaten (echte Smart-Meter Daten)
+    - PLZ-spezifische Preise von verschiedenen Anbietern (gescrapt)
+    - Prophet-Forecast für zukünftige Börsenstrompreise
+    
+    **Parameter:**
+    - file: CSV-Datei mit Verbrauchsdaten (Spalten: datetime, value)
+    - zip_code: Deutsche Postleitzahl (5 Stellen, z.B. "68167")
+    - providers: Komma-separierte Liste von Anbietern (z.B. "tibber,enbw")
+    
+    **Rückgabe:**
+    - Tarifvergleich mit realistischen, PLZ-spezifischen Preisen
+    - Basierend auf ECHTEN Verbrauchsdaten aus CSV
+    """
+    try:
+        # 1. CSV-Datei validieren und einlesen
+        if not file.filename.endswith('.csv'):
+            raise HTTPException(status_code=400, detail="File must be a CSV")
+        
+        contents = await file.read()
+        df = pd.read_csv(io.StringIO(contents.decode('utf-8')))
+        
+        if 'datetime' not in df.columns or 'value' not in df.columns:
+            raise HTTPException(
+                status_code=400, 
+                detail="CSV must have 'datetime' and 'value' columns"
+            )
+        
+        df['datetime'] = pd.to_datetime(df['datetime'])
+        
+        # 2. Jahresverbrauch aus CSV berechnen
+        total_consumption = df['value'].sum() / 4  # 15-min intervals → kWh
+        date_range_years = (df['datetime'].max() - df['datetime'].min()).total_seconds() / (365.25 * 24 * 3600)
+        
+        if 0 < date_range_years < 1:
+            annual_kwh = total_consumption / date_range_years
+        else:
+            annual_kwh = total_consumption
+        
+        print(f"\n{'='*80}")
+        print(f"📊 CSV-VERBRAUCHSDATEN ANALYSE")
+        print(f"{'='*80}")
+        print(f"Datei: {file.filename}")
+        print(f"PLZ: {zip_code}")
+        print(f"Zeitraum: {df['datetime'].min()} bis {df['datetime'].max()}")
+        print(f"Daten: {len(df)} Einträge ({date_range_years:.2f} Jahre)")
+        print(f"Jahresverbrauch: {annual_kwh:.2f} kWh")
+        print(f"{'='*80}\n")
+        
+        # 3. Anbieter scrapen und Tarife erstellen
+        provider_list = [p.strip() for p in providers.split(",")]
+        tariffs = []
+        start_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        
+        for provider in provider_list:
+            try:
+                print(f"\n🔍 Scrape {provider.upper()} für PLZ {zip_code}...")
+                
+                if provider.lower() == "tibber":
+                    from src.Webscraping.scraper_tibber import TibberScraper
+                    scraper = TibberScraper(debug_mode=False)
+                    scraped_data = scraper.scrape_tariff(
+                        zip_code=zip_code,
+                        annual_consumption=int(annual_kwh)
+                    )
+                    
+                    tariff = DynamicTariff(
+                        name="Tibber Dynamic",
+                        provider="Tibber",
+                        base_price=scraped_data['total_base_monthly'],
+                        start_date=start_date,
+                        network_fee=0,
+                        postal_code=zip_code,
+                        additional_price_ct_kwh=scraped_data['additional_price_ct']
+                    )
+                    tariffs.append(('Tibber', tariff, scraped_data))
+                    print(f"   ✓ Grundpreis: {scraped_data['total_base_monthly']:.2f} €/Mon")
+                    print(f"   ✓ Zusatz-Komponenten: {scraped_data['additional_price_ct']:.2f} ct/kWh")
+                    
+                elif provider.lower() == "enbw":
+                    from src.Webscraping.scraper_enbw import EnbwScraper
+                    scraper = EnbwScraper(headless=True, debug=False, use_edge=False)
+                    scraped_data = scraper.scrape_tariff(
+                        zip_code=zip_code,
+                        annual_consumption=int(annual_kwh)
+                    )
+                    
+                    tariff = DynamicTariff(
+                        name="EnBW Dynamisch",
+                        provider="EnBW",
+                        base_price=scraped_data['base_price_monthly'],
+                        start_date=start_date,
+                        network_fee=0,
+                        postal_code=zip_code,
+                        additional_price_ct_kwh=scraped_data['markup_ct_kwh']
+                    )
+                    tariffs.append(('EnBW', tariff, scraped_data))
+                    print(f"   ✓ Grundpreis: {scraped_data['base_price_monthly']:.2f} €/Mon")
+                    print(f"   ✓ Zusatz-Komponenten: {scraped_data['markup_ct_kwh']:.2f} ct/kWh")
+                
+            except Exception as e:
+                print(f"   ❌ Fehler beim Scrapen von {provider}: {e}")
+                continue
+        
+        # 4. Kosten für jeden Tarif mit ECHTEN CSV-Daten berechnen
+        results = []
+        
+        for provider_name, tariff, scraped_data in tariffs:
+            try:
+                print(f"\n💰 Berechne Kosten für {provider_name} mit CSV-Daten...")
+                
+                # Verwende die ECHTEN Verbrauchsdaten aus der CSV!
+                result = tariff.calculate_cost_with_breakdown(df)
+                
+                results.append({
+                    "provider": provider_name,
+                    "tariff_name": tariff.name,
+                    "base_price_monthly": tariff.base_price,
+                    "additional_price_ct_kwh": tariff.additional_price_ct_kwh,
+                    "avg_kwh_price_ct": result['avg_kwh_price'] * 100,
+                    "monthly_cost": result['total_cost'],
+                    "annual_cost": result['total_cost'] * 12,
+                    "postal_code": zip_code,
+                    "data_source": "csv_uploaded"
+                })
+                
+                print(f"   ✓ Durchschnitt: {result['avg_kwh_price']*100:.2f} ct/kWh")
+                print(f"   ✓ Monatliche Kosten: {result['total_cost']:.2f} €")
+                
+            except Exception as e:
+                print(f"   ❌ Fehler bei Berechnung für {provider_name}: {e}")
+                import traceback
+                traceback.print_exc()
+                continue
+        
+        # 5. Sortiere nach Kosten
+        results.sort(key=lambda x: x['monthly_cost'])
+        
+        # 6. Berechne Ersparnis
+        if len(results) > 1:
+            cheapest = results[0]['monthly_cost']
+            for r in results[1:]:
+                r['savings_monthly'] = r['monthly_cost'] - cheapest
+                r['savings_annual'] = r['savings_monthly'] * 12
+        
+        print(f"\n{'='*80}")
+        print(f"✅ VERGLEICH ABGESCHLOSSEN")
+        print(f"{'='*80}\n")
+        
+        return {
+            "success": True,
+            "zip_code": zip_code,
+            "annual_consumption_kwh": round(annual_kwh, 2),
+            "data_source": "uploaded_csv",
+            "csv_filename": file.filename,
+            "csv_date_range": {
+                "start": df['datetime'].min().isoformat(),
+                "end": df['datetime'].max().isoformat(),
+                "days": (df['datetime'].max() - df['datetime'].min()).days
+            },
+            "tariffs": results,
+            "cheapest_provider": results[0]['provider'] if results else None
+        }
+        
+    except Exception as e:
+        print(f"❌ Fehler: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
+
+
+# =============================================================================
+# Original CSV endpoint (ohne Scraper-Integration)
+# =============================================================================
+
 @app.post("/api/calculate-with-csv")
 async def calculate_with_csv(
     file: UploadFile = File(...)
@@ -945,7 +1139,68 @@ async def get_risk_analysis(file: UploadFile = File(...), days: int = Form(30)):
 # SCRAPER ENDPOINTS - EnBW, Tado, Tibber
 # =============================================================================
 
-# Helper function to convert scraper data to EnergyTariff objects
+# Helper function to create DynamicTariff objects from scraper data
+def create_dynamic_tariff_from_scraper(scraper_data: dict, provider: str) -> DynamicTariff:
+    """
+    Create a DynamicTariff object from scraper response data.
+    
+    Args:
+        scraper_data: Raw scraper response dictionary
+        provider: Provider name (e.g., "EnBW", "Tado", "Tibber")
+    
+    Returns:
+        DynamicTariff: Configured tariff object with scraped pricing data
+    """
+    from datetime import datetime
+    
+    # Extract common fields
+    base_price = scraper_data.get("total_base_monthly", scraper_data.get("base_price_monthly", 0))
+    start_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    
+    # Extract provider-specific additional_price_ct_kwh
+    additional_price_ct_kwh = None
+    network_fee = 0
+    
+    if provider.lower() == "tibber":
+        # Tibber: additional_price_ct enthält Netzentgelte, Steuern, Umlagen (~18.4 ct/kWh)
+        additional_price_ct_kwh = scraper_data.get("additional_price_ct", 18.4)
+        network_fee = 0  # Bei Tibber in base_price enthalten
+        
+    elif provider.lower() == "enbw":
+        # EnBW: markup_ct_kwh enthält die festen Komponenten (Netzentgelte + Steuern + Umlagen)
+        # Diese werden direkt als ct/kWh berechnet, NICHT als einmalige network_fee!
+        additional_price_ct_kwh = scraper_data.get("markup_ct_kwh", 18.4)
+        network_fee = 0  # EnBW hat keine einmalige Netzgebühr, alles ist im markup_ct_kwh
+        
+    elif provider.lower() == "tado":
+        # Tado: Monatliche Netzgebühr umrechnen in ct/kWh
+        annual_consumption = scraper_data.get("annual_consumption", 2500)
+        network_fee_monthly = scraper_data.get("network_fee_monthly", 51.85)
+        # (51.85€/Monat * 12) / annual_consumption * 100 = ct/kWh
+        additional_price_ct_kwh = (network_fee_monthly * 12 / annual_consumption * 100) if annual_consumption > 0 else 18.4
+        network_fee = 0  # Bei Tado monatlich, nicht einmalig
+    
+    # Fallback auf default, falls nicht gesetzt
+    if additional_price_ct_kwh is None:
+        additional_price_ct_kwh = 18.4
+    
+    # Create DynamicTariff object
+    tariff = DynamicTariff(
+        name=scraper_data.get("tariff_name", f"{provider} Dynamic"),
+        provider=provider,
+        base_price=base_price,
+        start_date=start_date,
+        is_dynamic=True,
+        network_fee=network_fee,
+        features=["dynamic", "real-time-pricing", "smart-meter-required"],
+        postal_code=scraper_data.get("zip_code"),
+        additional_price_ct_kwh=additional_price_ct_kwh  # ← NEUE PARAMETER!
+    )
+    
+    return tariff
+
+
+# Helper function to convert scraper data to EnergyTariff-compatible dict (legacy)
 def scraper_to_tariff(scraper_data: dict, provider: str, tariff_type: str = "dynamic") -> dict:
     """
     Convert scraper response data to EnergyTariff-compatible format.
@@ -977,22 +1232,33 @@ def scraper_to_tariff(scraper_data: dict, provider: str, tariff_type: str = "dyn
             "base_price": scraper_data.get("base_price_monthly", 0),
             "kwh_rate": scraper_data.get("exchange_price_ct_kwh", 0) / 100 if "exchange_price_ct_kwh" in scraper_data else 0,  # Nur Börsenpreis
             "network_fee": network_fee,  # Einmalige Netznutzungsgebühr
+            "additional_price_ct_kwh": scraper_data.get("markup_ct_kwh", 18.4),  # Netzentgelte, Steuern, Umlagen in ct/kWh
             "min_duration": None
         })
     elif provider == "Tado":
+        # Tado: Monatliche Netzgebühr + zusätzliche Komponenten
+        # Berechne ct/kWh basierend auf Jahresverbrauch für Vergleichbarkeit
+        annual_consumption = scraper_data.get("annual_consumption", 2500)
+        network_fee_monthly = scraper_data.get("network_fee_monthly", 51.85)
+        # Umrechnung: Monatliche Gebühr → ct/kWh
+        # (51.85€/Monat * 12 Monate) / annual_consumption kWh * 100 = ct/kWh
+        additional_ct_kwh = (network_fee_monthly * 12 / annual_consumption * 100) if annual_consumption > 0 else 18.4
+        
         tariff_dict.update({
             "base_price": scraper_data.get("base_price_monthly", 0),
             "kwh_rate": 0,  # Forecast-Preis wird später verwendet
-            "network_fee": scraper_data.get("network_fee", 0),  # Einmalige Netznutzungsgebühr (51,85€)
+            "network_fee": 0,  # Bei Tado ist es monatlich, nicht einmalig
+            "additional_price_ct_kwh": additional_ct_kwh,  # Umgerechnete Netzgebühr + Steuern
             "min_duration": None
         })
     elif provider == "Tibber":
         # Tibber: Grundpreis + additional_price_ct (18,4 ct/kWh für Umlagen/Steuern)
-        # Forecast-Preis kommt später dazu
+        # Diese 18,4 ct/kWh enthalten: Netzentgelte, Steuern, Umlagen, Herkunftsnachweise
         tariff_dict.update({
             "base_price": scraper_data.get("total_base_monthly", 0),  # 15,89€ (Netz + Tibber-Gebühr)
             "kwh_rate": 0,  # Forecast-Preis wird später verwendet
-            "additional_kwh_rate": scraper_data.get("additional_price_ct", 18.4) / 100,  # 0,184€/kWh für Umlagen/Steuern
+            "network_fee": 0,  # Bei Tibber in base_price enthalten
+            "additional_price_ct_kwh": scraper_data.get("additional_price_ct", 18.4),  # Netzentgelte + Steuern + Umlagen
             "min_duration": None
         })
     

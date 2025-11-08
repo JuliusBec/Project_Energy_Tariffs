@@ -185,6 +185,104 @@ def to_eur_per_kwh(df: pd.DataFrame) -> pd.DataFrame:
     out["price_eur_per_kwh"] = out["price_eur_per_mwh"] / 1000.0
     return out
 
+def apply_retail_pricing(forecast: pd.DataFrame, 
+                        profile_costs: float = 10.0,
+                        risk_premium: float = 5.0,
+                        margin: float = 55.0,
+                        floor_eur_per_mwh: float = 0.0,
+                        use_probabilistic: bool = True) -> pd.DataFrame:
+    """
+    Apply retail pricing logic to wholesale price forecasts with proper zero-censoring
+    
+    Two-stage approach:
+    1. Market Forecast: Day-ahead prices as-is (can be negative)
+    2. Tariff Mapping: Convert to retail prices with business logic
+    
+    Retail price components per kWh:
+        - Zero-censored wholesale price (E[max(0, Y_t)])
+        - Profile/management costs (Profilkosten/Bewirtschaftungskosten)
+        - Risk premium (Risikoprämie)
+        - Supplier margin (Marge)
+    
+    Args:
+        forecast: DataFrame with 'yhat', 'yhat_lower', 'yhat_upper' columns
+        profile_costs: Profile/management costs in EUR/MWh (default: 10 = 1 ct/kWh)
+        risk_premium: Risk premium in EUR/MWh (default: 5 = 0.5 ct/kWh)
+        margin: Supplier margin in EUR/MWh (default: 55 = 5.5 ct/kWh)
+        floor_eur_per_mwh: Minimum price floor for wholesale component (default: 0)
+        use_probabilistic: Use probabilistic expectation E[max(0,Y)] instead of max(0, E[Y])
+    
+    Returns:
+        DataFrame with retail prices:
+        - yhat_energy: Zero-censored wholesale component
+        - yhat_retail: Full retail price (energy + costs + premium + margin)
+        - yhat_retail_lower/upper: Confidence intervals
+    
+    Mathematical approach:
+        If use_probabilistic=True and we have prediction intervals:
+            Assume Y_t ~ N(μ_t, σ_t²) where:
+            μ_t = yhat
+            σ_t ≈ (yhat_upper - yhat_lower) / (2 * 1.96)  # 95% CI
+            
+            Then: E[max(0, Y_t)] = μ_t * Φ(μ_t/σ_t) + σ_t * φ(μ_t/σ_t)
+            where Φ is standard normal CDF, φ is standard normal PDF
+        
+        Otherwise: Simple clipping max(0, μ_t)
+    
+    Note:
+        - Wholesale prices can be negative (wind/solar surplus)
+        - Suppliers apply floor at 0 for energy component
+        - Costs/premium/margin always >= 0
+        - Total: 70 EUR/MWh ≈ 7 ct/kWh markup (typical for dynamic tariffs)
+    """
+    from scipy import stats
+    
+    retail = forecast.copy()
+    
+    if use_probabilistic and 'yhat_lower' in retail.columns and 'yhat_upper' in retail.columns:
+        # Probabilistic approach: E[max(0, Y)] with Normal approximation
+        mu = retail['yhat'].values
+        # Estimate sigma from 95% confidence interval
+        sigma = (retail['yhat_upper'].values - retail['yhat_lower'].values) / (2 * 1.96)
+        sigma = np.maximum(sigma, 1e-6)  # Avoid division by zero
+        
+        # Standardized value
+        z = mu / sigma
+        
+        # E[max(0, Y)] = μ * Φ(z) + σ * φ(z)
+        # Where Φ is CDF and φ is PDF of standard normal
+        phi_z = stats.norm.cdf(z)  # CDF
+        pdf_z = stats.norm.pdf(z)  # PDF
+        
+        expected_positive = mu * phi_z + sigma * pdf_z
+        retail['yhat_energy'] = np.maximum(expected_positive, floor_eur_per_mwh)
+        
+        # For confidence intervals, use simpler clipping approach
+        retail['yhat_energy_lower'] = np.maximum(retail['yhat_lower'] + profile_costs + risk_premium + margin, 
+                                                  floor_eur_per_mwh + profile_costs + risk_premium + margin)
+        retail['yhat_energy_upper'] = np.maximum(retail['yhat_upper'] + profile_costs + risk_premium + margin,
+                                                  floor_eur_per_mwh + profile_costs + risk_premium + margin)
+    else:
+        # Simple approach: max(0, point estimate)
+        retail['yhat_energy'] = np.maximum(retail['yhat'], floor_eur_per_mwh)
+        
+        if 'yhat_lower' in retail.columns:
+            retail['yhat_energy_lower'] = np.maximum(retail['yhat_lower'], floor_eur_per_mwh)
+        if 'yhat_upper' in retail.columns:
+            retail['yhat_energy_upper'] = np.maximum(retail['yhat_upper'], floor_eur_per_mwh)
+    
+    # Add fixed components (always >= 0)
+    total_markup = profile_costs + risk_premium + margin
+    
+    retail['yhat_retail'] = retail['yhat_energy'] + total_markup
+    
+    if 'yhat_energy_lower' in retail.columns:
+        retail['yhat_retail_lower'] = retail['yhat_energy_lower'] + total_markup
+    if 'yhat_energy_upper' in retail.columns:
+        retail['yhat_retail_upper'] = retail['yhat_energy_upper'] + total_markup
+    
+    return retail
+
 def train_prophet(df_hourly: pd.DataFrame, 
                  seasonality_mode: str = "multiplicative",
                  changepoint_prior_scale: float = 0.05,  # Reduced for more stable long-term trends
@@ -435,9 +533,20 @@ def main():
             return_components=True
         )
 
-        # Save forecast results with descriptive filename
+        # Apply retail pricing (converts wholesale to realistic end-customer prices)
+        logging.info("Applying retail pricing logic (probabilistic zero-censoring + markup)...")
+        forecast_retail = apply_retail_pricing(
+            forecast,
+            profile_costs=10.0,    # 1.0 ct/kWh profile/management costs
+            risk_premium=5.0,      # 0.5 ct/kWh risk premium
+            margin=55.0,           # 5.5 ct/kWh supplier margin
+            floor_eur_per_mwh=0.0, # No negative prices to customers
+            use_probabilistic=True # Use E[max(0,Y)] instead of max(0,E[Y])
+        )
+
+        # Save wholesale forecast results with descriptive filename
         forecast_path = os.path.join(output_dir, f'germany_price_forecast_{args.horizon_hours}h.csv')
-        forecast.to_csv(forecast_path, index=False)
+        forecast_retail.to_csv(forecast_path, index=False)
         logging.info(f"Forecast saved to {forecast_path}")
 
         # Create visualization
@@ -445,12 +554,42 @@ def main():
         plot_forecast_analysis(model, forecast, df)
         logging.info("Analysis plots saved to forecast_analysis.png")
 
-        # Print forecast statistics
+        # Print forecast statistics for BOTH wholesale and retail
         future_forecast = forecast[forecast['ds'] > df['ds'].max()]
-        logging.info("\nForecast Statistics (next period):")
-        logging.info(f"Average Price: {future_forecast['yhat'].mean():.2f} EUR/MWh")
-        logging.info(f"Max Price: {future_forecast['yhat'].max():.2f} EUR/MWh")
-        logging.info(f"Min Price: {future_forecast['yhat'].min():.2f} EUR/MWh")
+        future_retail = forecast_retail[forecast_retail['ds'] > df['ds'].max()]
+        
+        logging.info("\n" + "="*70)
+        logging.info("WHOLESALE FORECAST (Day-Ahead Market - uncensored):")
+        logging.info("="*70)
+        logging.info(f"Average Price: {future_forecast['yhat'].mean():7.2f} EUR/MWh ({future_forecast['yhat'].mean()/10:5.2f} ct/kWh)")
+        logging.info(f"Max Price:     {future_forecast['yhat'].max():7.2f} EUR/MWh")
+        logging.info(f"Min Price:     {future_forecast['yhat'].min():7.2f} EUR/MWh")
+        negative_wholesale = (future_forecast['yhat'] < 0).sum()
+        logging.info(f"Negative:      {negative_wholesale:3d} hours ({negative_wholesale/len(future_forecast)*100:.1f}%)")
+        
+        logging.info("\n" + "="*70)
+        logging.info("RETAIL FORECAST (End Customer - with business logic):")
+        logging.info("="*70)
+        logging.info("Components:")
+        logging.info("  • Zero-censored wholesale: E[max(0, Y_t)]")
+        logging.info("  • Profile costs:     10 EUR/MWh (1.0 ct/kWh)")
+        logging.info("  • Risk premium:       5 EUR/MWh (0.5 ct/kWh)")
+        logging.info("  • Supplier margin:   55 EUR/MWh (5.5 ct/kWh)")
+        logging.info("  • Total markup:      70 EUR/MWh (7.0 ct/kWh)")
+        logging.info("")
+        logging.info(f"Average Energy: {future_retail['yhat_energy'].mean():7.2f} EUR/MWh ({future_retail['yhat_energy'].mean()/10:5.2f} ct/kWh)")
+        logging.info(f"Average Retail: {future_retail['yhat_retail'].mean():7.2f} EUR/MWh ({future_retail['yhat_retail'].mean()/10:5.2f} ct/kWh)")
+        logging.info(f"Max Price:      {future_retail['yhat_retail'].max():7.2f} EUR/MWh ({future_retail['yhat_retail'].max()/10:5.2f} ct/kWh)")
+        logging.info(f"Min Price:      {future_retail['yhat_retail'].min():7.2f} EUR/MWh ({future_retail['yhat_retail'].min()/10:5.2f} ct/kWh)")
+        
+        zero_price = (future_retail['yhat_energy'] == 0).sum()
+        if zero_price > 0:
+            logging.info(f"\nFree energy hours (negative wholesale → 0): {zero_price} hours ({zero_price/len(future_retail)*100:.1f}%)")
+            logging.info(f"Customer price in those hours: {70:.2f} EUR/MWh (7.0 ct/kWh) - markup only")
+        
+        logging.info("\n" + "="*70)
+        logging.info("Note: This uses probabilistic E[max(0,Y)] calculation")
+        logging.info("      instead of naive max(0, E[Y]) for unbiased estimates.")
         
         logging.info("Forecasting completed successfully!")
 
