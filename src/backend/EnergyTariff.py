@@ -403,7 +403,7 @@ class DynamicTariff(EnergyTariff):
             future_prices = pd.read_csv(price_data_path)
             
             # Use 'yhat_energy' column (zero-censored wholesale) + add fixed components
-            # This gives us: Börsenpreis + Anbieterkosten + Netzentgelte/Steuern
+            # This gives us: Börsenpreis + Arbeitspreis (vom Scraper)
             if 'yhat_energy' in future_prices.columns:
                 # New format: Start with zero-censored energy price (in EUR/MWh)
                 # yhat_energy already contains E[max(0,Y)] - the probabilistic zero-censored wholesale price
@@ -411,55 +411,56 @@ class DynamicTariff(EnergyTariff):
                 # Convert to ct/kWh for easier understanding
                 wholesale_ct_kwh = future_prices['yhat_energy'] / 10  # EUR/MWh → ct/kWh
                 
-                # Add fixed markup components (in ct/kWh):
-                # 1. Anbieter-Kosten (from our model): 7.0 ct/kWh
-                #    - Profilkosten: 1.0 ct/kWh
-                #    - Risikoprämie: 0.5 ct/kWh  
-                #    - Marge: 5.5 ct/kWh
-                supplier_costs_ct = 7.0
-                
-                # 2. Netzentgelte, Steuern, Umlagen (scraped from provider or default)
-                #    Get from tariff object if available (from scraper), else use default
+                # Add Arbeitspreis (work price) from scraper
+                # This already includes ALL fixed components:
+                #    - Anbieterkosten (supplier costs): ~7 ct/kWh
+                #    - Netzentgelte (network fees): ~7-8 ct/kWh
+                #    - Stromsteuer (electricity tax): 2.05 ct/kWh
+                #    - Konzessionsabgabe (concession fee): ~1.5 ct/kWh
+                #    - MwSt (VAT 19%): ~4-5 ct/kWh
+                #    - Herkunftsnachweise (certificates): ~0.1-0.5 ct/kWh
                 if hasattr(self, 'additional_price_ct_kwh') and self.additional_price_ct_kwh is not None:
-                    fixed_components_ct = self.additional_price_ct_kwh
+                    # Use scraped Arbeitspreis (already contains ALL markups)
+                    arbeitspreis_ct = self.additional_price_ct_kwh
                 else:
-                    # Default fallback: ~18.4 ct/kWh (typical German average)
-                    #    - Netzentgelte: ~7-8 ct/kWh
-                    #    - Stromsteuer: 2.05 ct/kWh
-                    #    - Konzessionsabgabe: ~1.5 ct/kWh
-                    #    - MwSt (19%): ~4-5 ct/kWh (berechnet auf Gesamtpreis)
-                    #    - Herkunftsnachweise: ~0.1-0.5 ct/kWh
-                    fixed_components_ct = 18.4
+                    # Default fallback for non-dynamic tariffs: ~25.4 ct/kWh
+                    #    - Supplier costs: 7.0 ct/kWh
+                    #    - Network/taxes/levies: 18.4 ct/kWh
+                    arbeitspreis_ct = 25.4
                 
-                # Total price = wholesale + supplier costs + fixed components
-                total_price_ct = wholesale_ct_kwh + supplier_costs_ct + fixed_components_ct
+                # Total price = wholesale (Börsenpreis) + Arbeitspreis (all other components)
+                # For dynamic tariffs: ~11 ct (wholesale) + ~15 ct (markup) = ~26 ct/kWh
+                total_price_ct = wholesale_ct_kwh + arbeitspreis_ct
                 future_prices['predicted_mean'] = total_price_ct / 100  # ct/kWh → €/kWh
                 
             elif 'yhat_retail' in future_prices.columns:
-                # Fallback: Use retail price (only has supplier markup, missing gov. fees)
+                # Fallback: Use retail price (already has supplier markup included)
                 # yhat_retail = yhat_energy + 7.0 ct/kWh (supplier costs)
-                # Still need to add the taxes/network fees
+                # We still need to add the Arbeitspreis from scraper (taxes/network fees)
                 retail_ct_kwh = future_prices['yhat_retail'] / 10  # EUR/MWh → ct/kWh
                 
                 if hasattr(self, 'additional_price_ct_kwh') and self.additional_price_ct_kwh is not None:
-                    fixed_components_ct = self.additional_price_ct_kwh
+                    # Arbeitspreis from scraper
+                    arbeitspreis_ct = self.additional_price_ct_kwh
                 else:
-                    fixed_components_ct = 18.4  # Default
+                    # Default: Only add taxes/network (no supplier costs, already in yhat_retail)
+                    arbeitspreis_ct = 18.4
                     
-                future_prices['predicted_mean'] = (retail_ct_kwh + fixed_components_ct) / 100  # → €/kWh
+                future_prices['predicted_mean'] = (retail_ct_kwh + arbeitspreis_ct) / 100  # → €/kWh
                 
             elif 'yhat' in future_prices.columns:
-                # Old format: Raw wholesale (can be negative) + all markups
+                # Old format: Raw wholesale (can be negative) + add all markups
                 wholesale_eur_mwh = future_prices['yhat'].clip(lower=0)  # Simple zero-floor
                 wholesale_ct_kwh = wholesale_eur_mwh / 10
-                supplier_costs_ct = 7.0
                 
                 if hasattr(self, 'additional_price_ct_kwh') and self.additional_price_ct_kwh is not None:
-                    fixed_components_ct = self.additional_price_ct_kwh
+                    # Use scraped Arbeitspreis (contains all markups)
+                    arbeitspreis_ct = self.additional_price_ct_kwh
                 else:
-                    fixed_components_ct = 18.4
+                    # Default: supplier + taxes/network
+                    arbeitspreis_ct = 25.4
                     
-                future_prices['predicted_mean'] = (wholesale_ct_kwh + supplier_costs_ct + fixed_components_ct) / 100
+                future_prices['predicted_mean'] = (wholesale_ct_kwh + arbeitspreis_ct) / 100
             else:
                 raise ValueError(f"Expected 'yhat_energy', 'yhat_retail' or 'yhat' column in forecast data, found columns: {list(future_prices.columns)}")
             

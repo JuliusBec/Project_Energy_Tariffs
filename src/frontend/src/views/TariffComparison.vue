@@ -1051,8 +1051,8 @@ export default {
             let monthlyCost, annualCost
             
             if (tariff.provider === "Tibber" && tariff.additional_kwh_rate) {
-              // Tibber: Grundpreis + (Verbrauch × 0,184) + (Verbrauch × Forecast)
-              // Formel: 15,89 + (monatl. kWh × 0,184) + (monatl. kWh × Forecast-Preis)
+              // Tibber: Grundpreis + (Verbrauch × Arbeitspreis) + (Verbrauch × Forecast)
+              // Formel: 15,89 + (monatl. kWh × 0,184€) + (monatl. kWh × Forecast-Preis)
               const additionalCost = forecastAvgPrice * monthlyConsumption
               const taxesCost = tariff.additional_kwh_rate * monthlyConsumption
               monthlyCost = tariff.base_price + additionalCost + taxesCost
@@ -1060,29 +1060,36 @@ export default {
               
               console.log(`💰 ${tariff.provider} Berechnung:`)
               console.log(`   Grundpreis: ${tariff.base_price}€/Monat`)
-              console.log(`   Weitere Preisbestandteile (Umlagen/Steuern): ${tariff.additional_kwh_rate}€/kWh`)
-              console.log(`   Forecast-Preis (Börsenstrom): ${forecastAvgPrice.toFixed(4)}€/kWh`)
+              console.log(`   Arbeitspreis (Umlagen/Steuern): ${tariff.additional_kwh_rate}€/kWh = ${(tariff.additional_kwh_rate * 100).toFixed(2)} ct/kWh`)
+              console.log(`   Börsenpreis (Forecast): ${forecastAvgPrice.toFixed(4)}€/kWh = ${(forecastAvgPrice * 100).toFixed(2)} ct/kWh`)
+              console.log(`   ➜ Gesamt-kWh-Preis: ${(forecastAvgPrice + tariff.additional_kwh_rate).toFixed(4)}€/kWh = ${((forecastAvgPrice + tariff.additional_kwh_rate) * 100).toFixed(2)} ct/kWh`)
               console.log(`   Monatlicher Verbrauch: ${monthlyConsumption.toFixed(2)} kWh`)
               console.log(`   Umlagen/Steuern-Kosten/Monat: ${taxesCost.toFixed(2)}€`)
               console.log(`   Börsenstrom-Kosten/Monat: ${additionalCost.toFixed(2)}€`)
               console.log(`   Monatspreis gesamt: ${monthlyCost.toFixed(2)}€`)
               console.log(`   Jahrespreis gesamt: ${annualCost.toFixed(2)}€`)
             } else {
-              // Tado, EnBW: Grundpreis + (Forecast × Verbrauch) + (Netzgebühr / 12)
+              // EnBW, Tado: Grundpreis + (Forecast × Verbrauch) + (Arbeitspreis × Verbrauch)
               const forecastCost = forecastAvgPrice * monthlyConsumption
-              const networkFeeMonthly = (tariff.network_fee || 0) / 12
-              monthlyCost = tariff.base_price + forecastCost + networkFeeMonthly
-              annualCost = (tariff.base_price * 12) + (forecastAvgPrice * annualConsumption) + (tariff.network_fee || 0)
+              const arbeitspreisCtKwh = (tariff.additional_price_ct_kwh || 0) / 100  // ct/kWh → €/kWh
+              const arbeitspreisCost = arbeitspreisCtKwh * monthlyConsumption
+              monthlyCost = tariff.base_price + forecastCost + arbeitspreisCost
+              annualCost = (tariff.base_price * 12) + (forecastAvgPrice * annualConsumption) + (arbeitspreisCtKwh * annualConsumption)
               
               console.log(`💰 ${tariff.provider} Berechnung:`)
               console.log(`   Grundpreis: ${tariff.base_price}€/Monat`)
-              console.log(`   Netzgebühr (einmalig): ${tariff.network_fee}€`)
-              console.log(`   Forecast-Preis: ${forecastAvgPrice.toFixed(4)}€/kWh`)
+              console.log(`   Arbeitspreis (vom Scraper): ${tariff.additional_price_ct_kwh || 0} ct/kWh = ${arbeitspreisCtKwh.toFixed(4)}€/kWh`)
+              console.log(`   Börsenpreis (Forecast): ${forecastAvgPrice.toFixed(4)}€/kWh = ${(forecastAvgPrice * 100).toFixed(2)} ct/kWh`)
+              console.log(`   ➜ Gesamt-kWh-Preis: ${(forecastAvgPrice + arbeitspreisCtKwh).toFixed(4)}€/kWh = ${((forecastAvgPrice + arbeitspreisCtKwh) * 100).toFixed(2)} ct/kWh`)
               console.log(`   Monatlicher Verbrauch: ${monthlyConsumption.toFixed(2)} kWh`)
+              console.log(`   Arbeitspreis-Kosten/Monat: ${arbeitspreisCost.toFixed(2)}€`)
               console.log(`   Forecast-Kosten/Monat: ${forecastCost.toFixed(2)}€`)
               console.log(`   Monatspreis gesamt: ${monthlyCost.toFixed(2)}€`)
               console.log(`   Jahrespreis gesamt: ${annualCost.toFixed(2)}€`)
             }
+            
+            // Berechne Gesamt-kWh-Preis: Börsenpreis + Arbeitspreis
+            const totalKwhPrice = forecastAvgPrice + ((tariff.additional_kwh_rate || tariff.additional_price_ct_kwh || 0) / 100)
             
             return {
               id: `${tariff.provider.toLowerCase()}-dynamic`,
@@ -1092,7 +1099,7 @@ export default {
               annual_cost: Math.round(annualCost),
               base_price: tariff.base_price,
               network_fee: tariff.network_fee,
-              kwh_price: forecastAvgPrice,  // Zeige Forecast-Preis an
+              kwh_price: totalKwhPrice,  // Zeige GESAMT-Preis an (Börse + Arbeitspreis)
               is_dynamic: tariff.is_dynamic,
               smart_meter_required: true,
               green_energy: true,
