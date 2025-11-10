@@ -3,7 +3,7 @@ import axios from 'axios'
 // Create axios instance with base configuration
 const api = axios.create({
   baseURL: '/api',
-  timeout: 10000,
+  timeout: 120000,  // 120 seconds for CSV processing and scraping
   headers: {
     'Content-Type': 'application/json'
   }
@@ -51,6 +51,19 @@ export const apiService = {
     const formData = new FormData()
     formData.append('file', file)
     return api.post('/calculate-with-csv', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    })
+  },
+
+  // New integrated endpoint: CSV + PLZ + Scraper
+  compareTariffsWithCsv: (file, zipCode, providers = ['tibber', 'enbw']) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('zip_code', zipCode)
+    formData.append('providers', providers.join(','))
+    return api.post('/compare-tariffs-with-csv', formData, {
       headers: {
         'Content-Type': 'multipart/form-data'
       }

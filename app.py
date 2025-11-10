@@ -9,8 +9,13 @@ import pandas as pd
 import io
 import sys
 import os
+import logging
 from src.backend.EnergyTariff import FixedTariff, DynamicTariff
 from src.backend.forecasting.UsageForecast import create_backtest
+
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
@@ -365,16 +370,69 @@ async def compare_tariffs_with_csv(
         contents = await file.read()
         df = pd.read_csv(io.StringIO(contents.decode('utf-8')))
         
-        if 'datetime' not in df.columns or 'value' not in df.columns:
+        print(f"\n{'='*80}")
+        print(f"📊 CSV-DATEI ANALYSE")
+        print(f"{'='*80}")
+        print(f"Datei: {file.filename}")
+        print(f"Spalten: {list(df.columns)}")
+        print(f"Zeilen: {len(df)}")
+        print(f"Erste 3 Zeilen:")
+        print(df.head(3))
+        
+        # Flexible Spaltenerkennung
+        time_col = None
+        value_col = None
+        
+        # Suche Zeitstempel-Spalte
+        for col in df.columns:
+            col_lower = col.lower()
+            if any(keyword in col_lower for keyword in ['time', 'date', 'zeit', 'datum', 'timestamp']):
+                time_col = col
+                break
+        
+        # Suche Verbrauchs-Spalte
+        for col in df.columns:
+            col_lower = col.lower()
+            if any(keyword in col_lower for keyword in ['value', 'consumption', 'verbrauch', 'kwh', 'wh', 'leistung']):
+                value_col = col
+                break
+        
+        if not time_col or not value_col:
             raise HTTPException(
-                status_code=400, 
-                detail="CSV must have 'datetime' and 'value' columns"
+                status_code=400,
+                detail=f"CSV-Spalten nicht erkannt. Gefunden: {list(df.columns)}. Erwartet: Zeitstempel + Verbrauchswert"
             )
         
-        df['datetime'] = pd.to_datetime(df['datetime'])
+        print(f"✓ Erkannte Zeitstempel-Spalte: '{time_col}'")
+        print(f"✓ Erkannte Verbrauchs-Spalte: '{value_col}'")
+        
+        # Normalisiere Spaltennamen
+        df['datetime'] = pd.to_datetime(df[time_col])
+        df['value'] = pd.to_numeric(df[value_col], errors='coerce')
+        
+        # Entferne NaN-Werte
+        original_len = len(df)
+        df = df.dropna(subset=['datetime', 'value'])
+        if len(df) < original_len:
+            print(f"⚠️  {original_len - len(df)} Zeilen mit ungültigen Werten entfernt")
+        
+        if len(df) == 0:
+            raise HTTPException(status_code=400, detail="Keine gültigen Daten in CSV gefunden")
         
         # 2. Jahresverbrauch aus CSV berechnen
-        total_consumption = df['value'].sum() / 4  # 15-min intervals → kWh
+        # Erkenne automatisch das Intervall
+        if len(df) > 1:
+            time_diff_seconds = (df['datetime'].iloc[1] - df['datetime'].iloc[0]).total_seconds()
+            if time_diff_seconds <= 900:  # 15 Minuten
+                interval_factor = 4  # 4 x 15min = 1 Stunde
+            elif time_diff_seconds <= 3600:  # 1 Stunde
+                interval_factor = 1  # Werte sind bereits kWh
+            else:
+                interval_factor = 1  # Fallback
+        else:
+            interval_factor = 1
+        
+        total_consumption = df['value'].sum() / interval_factor
         date_range_years = (df['datetime'].max() - df['datetime'].min()).total_seconds() / (365.25 * 24 * 3600)
         
         if 0 < date_range_years < 1:
@@ -972,51 +1030,109 @@ async def get_price_breakdown():
 
 @app.get("/api/forecast")
 async def get_price_forecast():
-    """Get price forecast for the next 7 days"""
-    import random
-    from datetime import datetime, timedelta
+    """Get price forecast for the next 7 days from Prophet model"""
+    import os
+    import pandas as pd
+    from datetime import datetime
     
-    forecast_data = []
-    base_date = datetime.now()
-    
-    for day in range(7):
-        current_date = base_date + timedelta(days=day)
-        daily_prices = []
+    try:
+        # Load the actual Prophet forecast data
+        project_root = os.path.dirname(os.path.abspath(__file__))
+        app_data_path = os.path.join(project_root, "app_data")
         
-        # Simulate realistic hourly price patterns
-        for hour in range(24):
-            # Lower prices at night (23-6h), higher during peak times (17-20h)
-            if 23 <= hour or hour <= 6:  # Night hours
-                base_price = random.uniform(0.05, 0.12)
-            elif 17 <= hour <= 20:  # Peak hours
-                base_price = random.uniform(0.20, 0.35)
-            else:  # Regular hours
-                base_price = random.uniform(0.12, 0.22)
+        # Find the most recent price forecast file
+        forecast_files = [f for f in os.listdir(app_data_path) if f.startswith('germany_price_forecast_') and f.endswith('.csv')]
+        if not forecast_files:
+            raise FileNotFoundError("No price forecast files found")
+        
+        latest_forecast_file = sorted(forecast_files)[-1]
+        forecast_path = os.path.join(app_data_path, latest_forecast_file)
+        
+        # Read forecast data
+        df = pd.read_csv(forecast_path)
+        df['ds'] = pd.to_datetime(df['ds'])
+        
+        # Use only next 7 days (168 hours)
+        df = df.head(168)
+        
+        # Convert yhat_energy from EUR/MWh to EUR/kWh
+        df['price_eur_kwh'] = df['yhat_energy'] / 10 / 100  # EUR/MWh -> ct/kWh -> EUR/kWh
+        
+        # Group by day
+        forecast_data = []
+        for date in df['ds'].dt.date.unique()[:7]:
+            day_data = df[df['ds'].dt.date == date]
             
-            # Add some volatility
-            price = base_price + random.uniform(-0.03, 0.03)
-            price = max(0.02, price)  # Minimum price
+            hourly_prices = []
+            for _, row in day_data.iterrows():
+                hourly_prices.append({
+                    "hour": row['ds'].hour,
+                    "price": round(row['price_eur_kwh'], 4),
+                    "datetime": row['ds'].isoformat()
+                })
             
-            daily_prices.append({
-                "hour": hour,
-                "price": round(price, 4),
-                "datetime": current_date.replace(hour=hour).isoformat()
+            forecast_data.append({
+                "date": str(date),
+                "day_name": pd.Timestamp(date).strftime("%A"),
+                "hourly_prices": hourly_prices,
+                "avg_price": round(day_data['price_eur_kwh'].mean(), 4),
+                "min_price": round(day_data['price_eur_kwh'].min(), 4),
+                "max_price": round(day_data['price_eur_kwh'].max(), 4)
             })
         
-        forecast_data.append({
-            "date": current_date.strftime("%Y-%m-%d"),
-            "day_name": current_date.strftime("%A"),
-            "hourly_prices": daily_prices,
-            "avg_price": round(sum(p["price"] for p in daily_prices) / 24, 4),
-            "min_price": round(min(p["price"] for p in daily_prices), 4),
-            "max_price": round(max(p["price"] for p in daily_prices), 4)
-        })
+        return {
+            "forecast": forecast_data,
+            "generated_at": datetime.now().isoformat(),
+            "currency": "EUR/kWh",
+            "source": "prophet_model"
+        }
+        
+    except Exception as e:
+        # Fallback to mock data if Prophet data not available
+        import random
+        from datetime import datetime, timedelta
+        print(f"⚠️ Could not load Prophet forecast: {e}, using mock data")
+        forecast_data = []
+        base_date = datetime.now()
     
-    return {
-        "forecast": forecast_data,
-        "generated_at": datetime.now().isoformat(),
-        "currency": "EUR/kWh"
-    }
+        for day in range(7):
+            current_date = base_date + timedelta(days=day)
+            daily_prices = []
+            
+            # Simulate realistic hourly price patterns
+            for hour in range(24):
+                # Lower prices at night (23-6h), higher during peak times (17-20h)
+                if 23 <= hour or hour <= 6:  # Night hours
+                    base_price = random.uniform(0.05, 0.12)
+                elif 17 <= hour <= 20:  # Peak hours
+                    base_price = random.uniform(0.20, 0.35)
+                else:  # Regular hours
+                    base_price = random.uniform(0.12, 0.22)
+                
+                # Add some volatility
+                price = base_price + random.uniform(-0.03, 0.03)
+                price = max(0.02, price)  # Minimum price
+                
+                daily_prices.append({
+                    "hour": hour,
+                    "price": round(price, 4),
+                    "datetime": current_date.replace(hour=hour).isoformat()
+                })
+            
+            forecast_data.append({
+                "date": current_date.strftime("%Y-%m-%d"),
+                "day_name": current_date.strftime("%A"),
+                "hourly_prices": daily_prices,
+                "avg_price": round(sum(p["price"] for p in daily_prices) / 24, 4),
+                "min_price": round(min(p["price"] for p in daily_prices), 4),
+                "max_price": round(max(p["price"] for p in daily_prices), 4)
+            })
+        
+        return {
+            "forecast": forecast_data,
+            "generated_at": datetime.now().isoformat(),
+            "currency": "EUR/kWh"
+        }
 
 @app.post("/api/predict-savings")
 async def predict_savings(usage_data: dict):
@@ -1579,37 +1695,45 @@ async def scrape_tibber_tariff(request: TibberScraperRequest):
     try:
         logger.info(f"📞 Tibber-Scraper API-Request: PLZ {request.zip_code}, {request.annual_consumption} kWh/Jahr")
         
-        # Import Scraper
-        from src.Webscraping.scraper_tibber import TibberScraper
+        # Import Scraper function
+        from src.Webscraping.scraper_tibber import scrape_tibber_price
         
-        # Scraper initialisieren und ausführen
-        scraper = TibberScraper(
-            debug_mode=request.debug_mode
+        # Scrape prices (async)
+        result = await scrape_tibber_price(
+            postal_code=request.zip_code,
+            annual_consumption_kwh=request.annual_consumption
         )
         
-        result = scraper.scrape_tariff(
-            zip_code=request.zip_code,
-            annual_consumption=request.annual_consumption
-        )
+        # Calculate costs
+        monthly_consumption_kwh = request.annual_consumption / 12
+        base_price_monthly = result['base_price_monthly']
+        additional_price_ct_kwh = result['additional_price_ct_kwh']
+        
+        # Get current exchange price (estimate from source)
+        exchange_price_ct = 9.15  # From Prophet forecast
+        total_kwh_price_ct = exchange_price_ct + additional_price_ct_kwh
+        
+        monthly_cost = base_price_monthly + (monthly_consumption_kwh * total_kwh_price_ct / 100)
+        annual_cost = monthly_cost * 12
         
         # Response formatieren
         response = TibberScraperResponse(
-            success=result['success'],
-            kwh_price_ct=result['kwh_price_ct'],
-            exchange_price_ct=result['exchange_price_ct'],
-            additional_price_ct=result['additional_price_ct'],
-            average_price_12m_ct=result['average_price_12m_ct'],
-            network_fees_monthly=result['network_fees_monthly'],
-            tibber_fee_monthly=result['tibber_fee_monthly'],
-            total_base_monthly=result['total_base_monthly'],
-            monthly_cost_example=result['monthly_cost_example'],
-            calculated_monthly_cost=result['calculated_monthly_cost'],
-            calculated_annual_cost=result['calculated_annual_cost'],
-            timestamp=result['timestamp'],
-            note=result.get('note')
+            success=True,
+            kwh_price_ct=total_kwh_price_ct,
+            exchange_price_ct=exchange_price_ct,
+            additional_price_ct=additional_price_ct_kwh,
+            average_price_12m_ct=total_kwh_price_ct,  # Simplified
+            network_fees_monthly=base_price_monthly * 0.65,  # Rough estimate
+            tibber_fee_monthly=5.99,  # Tibber's fixed fee
+            total_base_monthly=base_price_monthly,
+            monthly_cost_example=monthly_cost,
+            calculated_monthly_cost=monthly_cost,
+            calculated_annual_cost=annual_cost,
+            timestamp=datetime.now().isoformat(),
+            note=f"Datenquelle: {result['source']}"
         )
         
-        logger.info(f"✅ Tibber-Scraper erfolgreich: {response.calculated_monthly_cost} €/Monat")
+        logger.info(f"✅ Tibber-Scraper erfolgreich: {response.calculated_monthly_cost:.2f} €/Monat")
         return response
         
     except Exception as e:
@@ -1653,7 +1777,7 @@ async def scrape_all_tariffs(request: ScraperTariffRequest):
                     zip_code=request.zip_code,
                     annual_consumption=request.annual_consumption
                 )
-                if result and result.get('success'):
+                if result and result.get('base_price_monthly') is not None:
                     tariff_data = scraper_to_tariff(result, "EnBW", "dynamic")
                     tariffs.append(tariff_data)
                     

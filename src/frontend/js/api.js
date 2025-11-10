@@ -1,4 +1,5 @@
-const API_BASE_URL = 'http://localhost:8000';
+// Use relative URL for API calls (works in development and production)
+const API_BASE_URL = window.location.port === '3000' ? 'http://localhost:8000' : '';
 
 // Function to handle CSV file upload
 async function handleCSVUpload(file, householdSize = 2) {

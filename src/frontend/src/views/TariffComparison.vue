@@ -315,8 +315,8 @@
                   </div>
 
                   <div class="tariff-price">
-                    <div class="monthly-cost-main">{{ Math.round(tariff.monthly_cost) }}€/Monat</div>
-                    <div class="annual-cost-small">{{ Math.round(tariff.annual_cost) }}€/Jahr</div>
+                    <div class="monthly-cost-main">{{ tariff.monthly_cost.toFixed(2) }}€/Monat</div>
+                    <div class="annual-cost-small">{{ tariff.annual_cost.toFixed(2) }}€/Jahr</div>
                   </div>
                 </div>
 
@@ -329,11 +329,11 @@
                   <div class="detail-grid">
                     <div class="detail-item">
                       <i class="fas fa-euro-sign"></i>
-                      <span>Grundpreis: {{ tariff.base_price }}€/Monat</span>
+                      <span>Grundpreis: {{ tariff.base_price.toFixed(2) }}€/Monat</span>
                     </div>
                     <div class="detail-item">
                       <i class="fas fa-bolt"></i>
-                      <span>Aufschlag: {{ tariff.kwh_price }}€/kWh</span>
+                      <span>Gesamt-kWh-Preis: {{ tariff.kwh_price.toFixed(4) }}€/kWh</span>
                     </div>
                     <div class="detail-item">
                       <i class="fas fa-calendar"></i>
@@ -359,20 +359,20 @@
                     <div class="breakdown-grid">
                       <div class="breakdown-item">
                         <span class="breakdown-label">Grundgebühr/Jahr:</span>
-                        <span class="breakdown-value">{{ Math.round(tariff.base_price * 12) }}€</span>
+                        <span class="breakdown-value">{{ (tariff.base_price * 12).toFixed(2) }}€</span>
                       </div>
                       <div class="breakdown-item">
                         <span class="breakdown-label">Verbrauchskosten/Jahr:</span>
-                        <span class="breakdown-value">{{ Math.round(tariff.annual_cost - (tariff.base_price * 12)) }}€</span>
+                        <span class="breakdown-value">{{ (tariff.annual_cost - (tariff.base_price * 12)).toFixed(2) }}€</span>
                       </div>
                       <div class="breakdown-item">
                         <span class="breakdown-label">Kosten pro kWh (Ø):</span>
-                        <span class="breakdown-value">{{ (tariff.annual_cost / formData.annualKwh).toFixed(3) }}€</span>
+                        <span class="breakdown-value">{{ (tariff.annual_cost / formData.annualKwh).toFixed(4) }}€</span>
                       </div>
                       <div v-if="tariff.is_dynamic" class="breakdown-item highlight">
                         <span class="breakdown-label">Einsparungspotenzial:</span>
                         <span class="breakdown-value savings">
-                          bis zu {{ Math.round(tariff.annual_cost * 0.15) }}€/Jahr
+                          bis zu {{ (tariff.annual_cost * 0.15).toFixed(2) }}€/Jahr
                         </span>
                       </div>
                     </div>
@@ -436,7 +436,7 @@
                     </div>
                     <div class="optimization-item">
                       <i class="fas fa-piggy-bank"></i>
-                      <span>Zusätzliche Ersparnis: {{ Math.round(tariff.annual_cost * (0.10 + Math.random() * 0.15)) }}€/Jahr</span>
+                      <span>Zusätzliche Ersparnis: {{ (tariff.annual_cost * (0.10 + Math.random() * 0.15)).toFixed(2) }}€/Jahr</span>
                     </div>
                   </div>
                 </div>
@@ -448,13 +448,13 @@
                     <span>Ihre Ersparnis gegenüber aktuellem Tarif</span>
                   </div>
                   <div class="savings-amount-large">
-                    {{ Math.round(formData.currentCost - tariff.annual_cost) }}€ pro Jahr
+                    {{ (formData.currentCost - tariff.annual_cost).toFixed(2) }}€ pro Jahr
                   </div>
                   <div class="savings-breakdown-small">
-                    <span>Das sind {{ Math.round((formData.currentCost - tariff.annual_cost) / 12) }}€ pro Monat weniger</span>
+                    <span>Das sind {{ ((formData.currentCost - tariff.annual_cost) / 12).toFixed(2) }}€ pro Monat weniger</span>
                   </div>
                   <div class="savings-percentage">
-                    {{ Math.round(((formData.currentCost - tariff.annual_cost) / formData.currentCost) * 100) }}% Ersparnis
+                    {{ (((formData.currentCost - tariff.annual_cost) / formData.currentCost) * 100).toFixed(1) }}% Ersparnis
                   </div>
                 </div>
 
@@ -1031,12 +1031,18 @@ export default {
           // Lade Forecast-Daten für dynamische Preisberechnung
           let forecastAvgPrice = 0.25  // Default fallback in €/kWh
           try {
-            const forecastResponse = await apiService.getPriceForecast()
-            if (forecastResponse && forecastResponse.data && forecastResponse.data.data) {
-              const forecastData = forecastResponse.data.data
-              const prices = forecastData.map(item => item.price)
-              forecastAvgPrice = prices.reduce((a, b) => a + b, 0) / prices.length
-              console.log(`📈 Forecast average price: ${forecastAvgPrice.toFixed(4)} €/kWh`)
+            const forecastResponse = await apiService.getForecast()
+            if (forecastResponse && forecastResponse.data && forecastResponse.data.forecast) {
+              const forecastData = forecastResponse.data.forecast
+              // Calculate average from all hourly prices across all days
+              let allPrices = []
+              forecastData.forEach(day => {
+                day.hourly_prices.forEach(hour => {
+                  allPrices.push(hour.price)
+                })
+              })
+              forecastAvgPrice = allPrices.reduce((a, b) => a + b, 0) / allPrices.length
+              console.log(`📈 Forecast average price: ${forecastAvgPrice.toFixed(4)} €/kWh (${(forecastAvgPrice * 100).toFixed(2)} ct/kWh)`)
             }
           } catch (forecastError) {
             console.warn('⚠️ Could not fetch forecast data, using fallback price:', forecastError)

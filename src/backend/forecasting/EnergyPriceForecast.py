@@ -304,6 +304,7 @@ def train_prophet(df_hourly: pd.DataFrame,
     try:
         # Create and configure Prophet model optimized for long-term forecasting
         model = Prophet(
+            growth='flat',  # No trend - only seasonal patterns
             yearly_seasonality=20,  # Increased Fourier terms for better yearly pattern modeling
             weekly_seasonality=10,  # Increased Fourier terms for weekly patterns
             daily_seasonality=season_daily,
@@ -570,13 +571,6 @@ def main():
         logging.info("\n" + "="*70)
         logging.info("RETAIL FORECAST (End Customer - with business logic):")
         logging.info("="*70)
-        logging.info("Components:")
-        logging.info("  • Zero-censored wholesale: E[max(0, Y_t)]")
-        logging.info("  • Profile costs:     10 EUR/MWh (1.0 ct/kWh)")
-        logging.info("  • Risk premium:       5 EUR/MWh (0.5 ct/kWh)")
-        logging.info("  • Supplier margin:   55 EUR/MWh (5.5 ct/kWh)")
-        logging.info("  • Total markup:      70 EUR/MWh (7.0 ct/kWh)")
-        logging.info("")
         logging.info(f"Average Energy: {future_retail['yhat_energy'].mean():7.2f} EUR/MWh ({future_retail['yhat_energy'].mean()/10:5.2f} ct/kWh)")
         logging.info(f"Average Retail: {future_retail['yhat_retail'].mean():7.2f} EUR/MWh ({future_retail['yhat_retail'].mean()/10:5.2f} ct/kWh)")
         logging.info(f"Max Price:      {future_retail['yhat_retail'].max():7.2f} EUR/MWh ({future_retail['yhat_retail'].max()/10:5.2f} ct/kWh)")
