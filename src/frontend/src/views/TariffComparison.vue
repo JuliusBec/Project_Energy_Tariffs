@@ -337,7 +337,7 @@
                     </div>
                     <div class="detail-item">
                       <i class="fas fa-calendar"></i>
-                      <span>Laufzeit: {{ tariff.contract_duration }} Monate</span>
+                      <span>Laufzeit: 1 Monat</span>
                     </div>
                     <div class="detail-item" v-if="tariff.volatility">
                       <i class="fas fa-wave-square"></i>
@@ -723,7 +723,7 @@
                 <i class="fas fa-calendar-alt"></i>
                 <div class="contract-content">
                   <div class="contract-title">Mindestlaufzeit</div>
-                  <div class="contract-value">{{ selectedTariff.contract_duration }} {{ selectedTariff.contract_duration === 1 ? 'Monat' : 'Monate' }}</div>
+                  <div class="contract-value">1 Monat</div>
                 </div>
               </div>
               <div class="contract-item">

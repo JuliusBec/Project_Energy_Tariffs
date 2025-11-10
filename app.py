@@ -1342,39 +1342,31 @@ def scraper_to_tariff(scraper_data: dict, provider: str, tariff_type: str = "dyn
     
     # Provider-specific data mapping
     if provider == "EnBW":
-        # EnBW: Netznutzungsgebühr aus Markup berechnen (z.B. 5ct/kWh * Jahresverbrauch / 12 für monatlich)
-        network_fee = scraper_data.get("markup_ct_kwh", 0) / 100 * scraper_data.get("annual_consumption", 0) / 12
+        # EnBW: markup_ct_kwh enthält Netznutzung, Steuern, Umlagen
         tariff_dict.update({
             "base_price": scraper_data.get("base_price_monthly", 0),
-            "kwh_rate": scraper_data.get("exchange_price_ct_kwh", 0) / 100 if "exchange_price_ct_kwh" in scraper_data else 0,  # Nur Börsenpreis
-            "network_fee": network_fee,  # Einmalige Netznutzungsgebühr
-            "additional_price_ct_kwh": scraper_data.get("markup_ct_kwh", 18.4),  # Netzentgelte, Steuern, Umlagen in ct/kWh
+            "kwh_rate": scraper_data.get("exchange_price_ct_kwh", 0) / 100 if scraper_data.get("exchange_price_ct_kwh") else 0,  # Börsenpreis
+            "network_fee": 0,  # Bei EnBW nicht separat
+            "additional_price_ct_kwh": scraper_data.get("markup_ct_kwh", 15.36),  # Netzentgelte, Steuern, Umlagen in ct/kWh
             "min_duration": None
         })
     elif provider == "Tado":
-        # Tado: Monatliche Netzgebühr + zusätzliche Komponenten
-        # Berechne ct/kWh basierend auf Jahresverbrauch für Vergleichbarkeit
-        annual_consumption = scraper_data.get("annual_consumption", 2500)
-        network_fee_monthly = scraper_data.get("network_fee_monthly", 51.85)
-        # Umrechnung: Monatliche Gebühr → ct/kWh
-        # (51.85€/Monat * 12 Monate) / annual_consumption kWh * 100 = ct/kWh
-        additional_ct_kwh = (network_fee_monthly * 12 / annual_consumption * 100) if annual_consumption > 0 else 18.4
-        
+        # Tado: markup_ct_kwh enthält nur Netzentgelte/Steuern (ohne aktuellen Börsenpreis)
+        # Der Scraper berechnet: kwh_price_ct (gesamt) - tatsächlicher Börsenpreis = markup_ct_kwh
         tariff_dict.update({
             "base_price": scraper_data.get("base_price_monthly", 0),
             "kwh_rate": 0,  # Forecast-Preis wird später verwendet
-            "network_fee": 0,  # Bei Tado ist es monatlich, nicht einmalig
-            "additional_price_ct_kwh": additional_ct_kwh,  # Umgerechnete Netzgebühr + Steuern
+            "network_fee": 0,  # Bei Tado im markup_ct_kwh enthalten
+            "additional_price_ct_kwh": scraper_data.get("markup_ct_kwh", 18.0),  # Nur Markup (Netz + Steuern, ohne Börse)
             "min_duration": None
         })
     elif provider == "Tibber":
-        # Tibber: Grundpreis + additional_price_ct (18,4 ct/kWh für Umlagen/Steuern)
-        # Diese 18,4 ct/kWh enthalten: Netzentgelte, Steuern, Umlagen, Herkunftsnachweise
+        # Tibber: additional_price_ct_kwh enthält alle Zusatzkosten (18,25 ct/kWh)
         tariff_dict.update({
-            "base_price": scraper_data.get("total_base_monthly", 0),  # 15,89€ (Netz + Tibber-Gebühr)
+            "base_price": scraper_data.get("base_price_monthly", 0),  # Grundpreis
             "kwh_rate": 0,  # Forecast-Preis wird später verwendet
-            "network_fee": 0,  # Bei Tibber in base_price enthalten
-            "additional_price_ct_kwh": scraper_data.get("additional_price_ct", 18.4),  # Netzentgelte + Steuern + Umlagen
+            "network_fee": 0,  # Bei Tibber in additional_price_ct_kwh enthalten
+            "additional_price_ct_kwh": scraper_data.get("additional_price_ct_kwh", 18.25),  # Netzentgelte + Steuern + Umlagen
             "min_duration": None
         })
     
@@ -1519,74 +1511,57 @@ class TadoScraperResponse(BaseModel):
 @app.post("/api/scrape/tado")
 async def scrape_tado_tariff(request: TadoScraperRequest):
     """
-    Scrape/fetch pricing from Tado Energy (awattar.de)
+    Scrape real-time pricing from Tado Energy using Playwright
     
-    This endpoint retrieves Tado Energy tariff data for the given zip code
-    and annual consumption.
+    This endpoint uses Playwright to scrape actual prices from the Tado Energy website
+    for the given zip code and annual consumption.
     
     - **zip_code**: German postal code (5 digits, e.g., "71065")
     - **annual_consumption**: Annual consumption in kWh (e.g., 2500)
-    - **headless**: Not used currently (default: True)
-    - **debug_mode**: Enable debug output (default: False)
     
     Returns pricing data including:
     - Base price (monthly, €)
-    - kWh price (ct/kWh, variable)
+    - kWh price (ct/kWh, dynamic/variable)
     - Monthly cost (€)
     - Annual cost (€)
     """
     try:
         # Import Tado scraper
-        from src.Webscraping.scraper_tado import TadoScraper
+        from src.Webscraping.scraper_tado import scrape_tado_tariff as scrape_tariff
         
-        print(f"\n{'='*60}")
-        print(f"🔍 Tado Energy API Request")
-        print(f"   PLZ: {request.zip_code}, Verbrauch: {request.annual_consumption} kWh")
-        print(f"{'='*60}\n")
+        logger.info(f"🔍 Tado Energy API Request: PLZ {request.zip_code}, {request.annual_consumption} kWh")
         
-        # Initialize scraper
-        scraper = TadoScraper(
-            headless=request.headless,
-            debug_mode=request.debug_mode
-        )
-        
-        # Get tariff data
-        result = scraper.scrape_tariff(
+        # Scrape data using async function
+        result = await scrape_tariff(
             zip_code=request.zip_code,
             annual_consumption=request.annual_consumption
         )
         
-        if result and result.get('success'):
+        if result and 'provider' in result:
             # Success
             response = TadoScraperResponse(
                 success=True,
                 provider=result.get('provider', 'Tado Energy'),
-                tariff_name=result.get('tariff_name', 'Tado Dynamic'),
+                tariff_name=result.get('tariff_name', 'Tado Hourly'),
                 base_price_monthly=result.get('base_price_monthly'),
                 kwh_price_ct=result.get('kwh_price_ct'),
-                monthly_cost=result.get('monthly_cost'),
-                annual_cost=result.get('annual_cost'),
+                monthly_cost=result.get('monthly_cost_estimated'),
+                annual_cost=result.get('annual_cost_estimated'),
                 zip_code=result.get('zip_code', request.zip_code),
-                annual_consumption=result.get('annual_consumption', request.annual_consumption),
-                timestamp=result.get('timestamp', datetime.now().isoformat()),
-                source_url=result.get('source_url', 'https://energy.tado.com'),
-                note=result.get('note')
+                annual_consumption=result.get('annual_consumption_kwh', request.annual_consumption),
+                timestamp=result.get('scraped_at', datetime.now().isoformat()),
+                source_url=result.get('url', 'https://energy.tado.com'),
+                note=f"Quelle: {result.get('data_source')}"
             )
             
-            print(f"\n✅ Tarif-Abruf erfolgreich:")
-            print(f"   Grundpreis: {response.base_price_monthly} €/Monat")
-            print(f"   Arbeitspreis: {response.kwh_price_ct} ct/kWh")
-            print(f"   Monatskosten: {response.monthly_cost} €")
-            if response.note:
-                print(f"   Hinweis: {response.note}\n")
+            logger.info(f"✅ Tado scraping erfolgreich: {response.base_price_monthly} €/Mon, {response.kwh_price_ct} ct/kWh (Quelle: {result.get('data_source')})")
             
             return response
         else:
             # Failed
-            error_msg = result.get('error', 'Unbekannter Fehler')
             raise HTTPException(
                 status_code=500,
-                detail=f"Tarif-Abruf fehlgeschlagen: {error_msg}"
+                detail="Scraping fehlgeschlagen - keine Daten erhalten"
             )
             
     except ImportError as e:
@@ -1752,43 +1727,54 @@ async def scrape_all_tariffs(request: ScraperTariffRequest):
     tariffs = []
     errors = []
     
+    logger.info(f"🔍 Scraping tariffs for providers: {request.providers}, PLZ: {request.zip_code}, {request.annual_consumption} kWh")
+    
     for provider in request.providers:
         try:
             if provider.lower() == "enbw":
-                from src.Webscraping.scraper_enbw import EnbwScraper
-                scraper = EnbwScraper(headless=request.headless, debug=request.debug_mode)
-                result = scraper.scrape_tariff(
+                from src.Webscraping.scraper_enbw import scrape_enbw_tariff
+                result = await scrape_enbw_tariff(
                     zip_code=request.zip_code,
                     annual_consumption=request.annual_consumption
                 )
                 if result and result.get('base_price_monthly') is not None:
                     tariff_data = scraper_to_tariff(result, "EnBW", "dynamic")
                     tariffs.append(tariff_data)
+                    logger.info(f"✅ EnBW: {result.get('base_price_monthly')} €/Mon, {result.get('markup_ct_kwh')} ct/kWh")
+                else:
+                    errors.append({"provider": "EnBW", "error": "No data returned"})
                     
             elif provider.lower() == "tado":
-                from src.Webscraping.scraper_tado import TadoScraper
-                scraper = TadoScraper(headless=request.headless, debug_mode=request.debug_mode)
-                result = scraper.scrape_tariff(
+                from src.Webscraping.scraper_tado import scrape_tado_tariff
+                result = await scrape_tado_tariff(
                     zip_code=request.zip_code,
                     annual_consumption=request.annual_consumption
                 )
-                if result and result.get('success'):
+                if result and result.get('base_price_monthly') is not None:
                     tariff_data = scraper_to_tariff(result, "Tado", "dynamic")
                     tariffs.append(tariff_data)
+                    logger.info(f"✅ Tado: {result.get('base_price_monthly')} €/Mon, {result.get('markup_ct_kwh')} ct/kWh markup (gesamt: {result.get('kwh_price_ct')} ct/kWh)")
+                else:
+                    errors.append({"provider": "Tado", "error": "No data returned"})
                     
             elif provider.lower() == "tibber":
-                from src.Webscraping.scraper_tibber import TibberScraper
-                scraper = TibberScraper(debug_mode=request.debug_mode)
-                result = scraper.scrape_tariff(
-                    zip_code=request.zip_code,
-                    annual_consumption=request.annual_consumption
+                from src.Webscraping.scraper_tibber import scrape_tibber_price
+                result = await scrape_tibber_price(
+                    postal_code=request.zip_code,
+                    annual_consumption_kwh=request.annual_consumption
                 )
-                if result and result.get('success'):
+                if result and result.get('base_price_monthly') is not None:
                     tariff_data = scraper_to_tariff(result, "Tibber", "dynamic")
                     tariffs.append(tariff_data)
+                    logger.info(f"✅ Tibber: {result.get('base_price_monthly')} €/Mon, {result.get('additional_price_ct_kwh')} ct/kWh")
+                else:
+                    errors.append({"provider": "Tibber", "error": "No data returned"})
                     
         except Exception as e:
+            logger.error(f"❌ Error scraping {provider}: {e}")
             errors.append({"provider": provider, "error": str(e)})
+    
+    logger.info(f"✅ Scraped {len(tariffs)} tariffs successfully, {len(errors)} errors")
     
     return {
         "success": len(tariffs) > 0,
