@@ -1411,15 +1411,13 @@ class EnbwScraperResponse(BaseModel):
 @app.post("/api/scrape/enbw")
 async def scrape_enbw_tariff(request: EnbwScraperRequest):
     """
-    Scrape real-time pricing from EnBW dynamic tariff page
+    Scrape real-time pricing from EnBW dynamic tariff page using Playwright
     
-    This endpoint uses Selenium to scrape actual prices from the EnBW website
+    This endpoint uses Playwright to scrape actual prices from the EnBW website
     for the given zip code and annual consumption.
     
     - **zip_code**: German postal code (5 digits, e.g., "71065")
     - **annual_consumption**: Annual consumption in kWh (e.g., 2250)
-    - **headless**: Run browser in headless mode (default: True)
-    - **debug_mode**: Enable debug output and screenshots (default: False)
     
     Returns real-time pricing data including:
     - Base price (monthly, €)
@@ -1430,21 +1428,12 @@ async def scrape_enbw_tariff(request: EnbwScraperRequest):
     """
     try:
         # Import EnBW scraper
-        from src.Webscraping.scraper_enbw import EnbwScraper
+        from src.Webscraping.scraper_enbw import scrape_enbw_tariff as scrape_tariff
         
-        print(f"\n{'='*60}")
-        print(f"🔍 EnBW Scraper API Request")
-        print(f"   PLZ: {request.zip_code}, Verbrauch: {request.annual_consumption} kWh")
-        print(f"{'='*60}\n")
+        logger.info(f"🔍 EnBW Scraper API Request: PLZ {request.zip_code}, {request.annual_consumption} kWh")
         
-        # Initialize scraper
-        scraper = EnbwScraper(
-            headless=request.headless,
-            debug=request.debug_mode
-        )
-        
-        # Scrape data (method name is scrape_tariff, not scrape)
-        result = scraper.scrape_tariff(
+        # Scrape data using async function
+        result = await scrape_tariff(
             zip_code=request.zip_code,
             annual_consumption=request.annual_consumption
         )
@@ -1462,16 +1451,11 @@ async def scrape_enbw_tariff(request: EnbwScraperRequest):
                 monthly_cost_example=result.get('monthly_cost_example'),
                 zip_code=result.get('zip_code', request.zip_code),
                 annual_consumption=result.get('annual_consumption', request.annual_consumption),
-                timestamp=result.get('timestamp', datetime.now().isoformat()),
-                source_url=result.get('source_url', 'https://www.enbw.com/strom/dynamischer-stromtarif')
+                timestamp=result.get('scraped_at', datetime.now().isoformat()),
+                source_url=result.get('url', 'https://www.enbw.com/strom/dynamischer-stromtarif')
             )
             
-            print(f"\n✅ Scraping erfolgreich:")
-            print(f"   Grundpreis: {response.base_price_monthly} €/Monat")
-            print(f"   Arbeitspreis: {response.markup_ct_kwh} ct/kWh")
-            print(f"   Börsenpreis: {response.exchange_price_ct_kwh} ct/kWh")
-            print(f"   Gesamt: {response.total_kwh_price_ct} ct/kWh")
-            print(f"   Monatskosten: {response.monthly_cost_example} €\n")
+            logger.info(f"✅ EnBW Scraping erfolgreich: {response.base_price_monthly} €/Mon, {response.markup_ct_kwh} ct/kWh (Quelle: {result.get('data_source')})")
             
             return response
         else:
