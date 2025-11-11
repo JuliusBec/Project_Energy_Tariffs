@@ -99,6 +99,17 @@ export const apiService = {
     })
   },
   
+  getRiskScore: (file, days = 30) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('days', days)
+    return api.post('/risk-score', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    })
+  },
+  
   // Chart data endpoints
   getPriceChartData: () => {
     return api.get('/price-chart-data')

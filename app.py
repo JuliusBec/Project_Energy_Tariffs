@@ -940,5 +940,67 @@ async def get_risk_analysis(file: UploadFile = File(...), days: int = Form(30)):
         print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=error_msg)
 
+@app.post("/api/risk-score")
+async def get_risk_score(file: UploadFile = File(...), days: int = Form(30)):
+    """
+    Get aggregated risk score for dynamic tariff suitability.
+    Returns a simple low/moderate/high risk assessment.
+    """
+    import traceback
+    from src.backend.RiskAnalysis import (
+        create_historic_risk_analysis,
+        calculate_coincidence_factor,
+        get_aggregated_risk_score
+    )
+    
+    # Validate file type
+    if not file.filename.endswith('.csv'):
+        raise HTTPException(status_code=400, detail="File must be a CSV")
+    
+    try:
+        # Read the uploaded CSV
+        contents = await file.read()
+        df = pd.read_csv(io.StringIO(contents.decode('utf-8')))
+        
+        # Validate CSV has required columns
+        if 'datetime' not in df.columns or 'value' not in df.columns:
+            raise HTTPException(
+                status_code=400, 
+                detail="CSV must have 'datetime' and 'value' columns"
+            )
+        
+        # Convert datetime column
+        df['datetime'] = pd.to_datetime(df['datetime'])
+        
+        # Determine app_data directory
+        app_data_dir = os.path.join(os.path.dirname(__file__), "app_data")
+        
+        # Calculate risk metrics
+        historic_risk = create_historic_risk_analysis(df, days=days, app_data_dir=app_data_dir)
+        coincidence = calculate_coincidence_factor(df, days=days, expensive_hours_pct=20.0, app_data_dir=app_data_dir)
+        
+        # Get aggregated risk score
+        risk_assessment = get_aggregated_risk_score(historic_risk, coincidence)
+        
+        return risk_assessment
+        
+    except FileNotFoundError as e:
+        error_msg = str(e)
+        print(f"FileNotFoundError in risk score: {error_msg}")
+        traceback.print_exc()
+        raise HTTPException(status_code=404, detail=error_msg)
+    except ValueError as e:
+        error_msg = str(e)
+        print(f"ValueError in risk score: {error_msg}")
+        traceback.print_exc()
+        raise HTTPException(status_code=400, detail=error_msg)
+    except HTTPException:
+        raise
+    except Exception as e:
+        error_msg = f"Error calculating risk score: {str(e)}"
+        print(f"Unexpected error in risk score: {error_msg}")
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=error_msg)
+
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)

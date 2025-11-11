@@ -283,6 +283,23 @@
                         <i class="fas fa-leaf"></i>
                         Ökostrom
                       </span>
+                      <!-- Risk indicator badge (inline with other badges) -->
+                      <!-- For dynamic tariffs: show calculated risk from uploaded data -->
+                      <span v-if="tariff.is_dynamic && riskScore" class="badge" :class="'badge-risk-' + riskScore.risk_level">
+                        <i class="fas" :class="{
+                          'fa-check-circle': riskScore.risk_level === 'low',
+                          'fa-exclamation-circle': riskScore.risk_level === 'moderate',
+                          'fa-times-circle': riskScore.risk_level === 'high'
+                        }"></i>
+                        {{ riskScore.risk_level === 'low' ? 'Niedriges Risiko' : 
+                           riskScore.risk_level === 'moderate' ? 'Moderates Risiko' : 
+                           'Höheres Risiko' }}
+                      </span>
+                      <!-- For fixed tariffs: always show low risk (no price volatility) -->
+                      <span v-if="!tariff.is_dynamic" class="badge badge-risk-low">
+                        <i class="fas fa-check-circle"></i>
+                        Niedriges Risiko
+                      </span>
                       <span v-if="tariff.app_available" class="badge badge-tech">
                         <i class="fas fa-mobile-alt"></i>
                         App
@@ -841,7 +858,7 @@
                       </div>
                       <div class="coincidence-info">
                         <div class="info-text">
-                          Sie verbrauchen {{ riskAnalysisData.coincidence_factor.consumption_during_expensive_hours }} kWh, das sind {{ riskAnalysisData.coincidence_factor.consumption_coincidence_pct.toFixed(0) }}% Ihres täglichen Verbrauchs, in den teuersten Stunden.
+                          {{ riskAnalysisData.coincidence_factor.consumption_coincidence_pct.toFixed(0) }}% Ihres Stromverbrauchs fällt in Stoßlastzeiten mit besonders hohen Preisen.
                         </div>
                         <div class="info-badge" :class="{
                           'badge-success': riskAnalysisData.coincidence_factor.coincidence_rating === 'low',
@@ -944,6 +961,10 @@ export default {
     const riskAnalysisLoading = ref(false)
     const riskAnalysisError = ref(null)
     
+    // Risk score data (simple low/moderate/high indicator)
+    const riskScore = ref(null)
+    const riskScoreLoading = ref(false)
+    
     // Modal functionality
     const showDetailsModal = ref(false)
     const selectedTariff = ref(null)
@@ -1018,6 +1039,11 @@ export default {
             // Fetch predictions and forecasts
             fetchSavingsPrediction()
             fetchPriceForecast()
+            
+            // Fetch risk score for dynamic tariffs
+            if (uploadedFile.value) {
+              fetchRiskScore()
+            }
             
             loading.value = false
             return
@@ -1120,6 +1146,28 @@ export default {
         console.log('Price forecast received:', response.data)
       } catch (error) {
         console.error('Error fetching price forecast:', error)
+      }
+    }
+    
+    // Fetch risk score from backend
+    const fetchRiskScore = async () => {
+      if (!uploadedFile.value) {
+        console.log('No file uploaded, skipping risk score calculation')
+        return
+      }
+      
+      riskScoreLoading.value = true
+      try {
+        console.log('Fetching risk score for uploaded file...')
+        const response = await apiService.getRiskScore(uploadedFile.value, 30)
+        
+        riskScore.value = response.data
+        console.log('Risk score received:', response.data)
+      } catch (error) {
+        console.error('Error fetching risk score:', error)
+        riskScore.value = null
+      } finally {
+        riskScoreLoading.value = false
       }
     }
     
@@ -1518,6 +1566,8 @@ export default {
       riskAnalysisData,
       riskAnalysisLoading,
       riskAnalysisError,
+      riskScore,
+      riskScoreLoading,
       showDetailsModal,
       selectedTariff,
       calculateTariffs,
@@ -1526,6 +1576,7 @@ export default {
       showTariffDetails,
       closeDetailsModal,
       fetchRiskAnalysis,
+      fetchRiskScore,
       handleFileSelect,
       handleFileDrop,
       removeFile,
@@ -3959,4 +4010,36 @@ export default {
     width: 100%;
   }
 }
+
+/* Risk Badge Styles (inline with other badges) */
+.badge-risk-low {
+  background: #d1fae5;
+  color: #065f46;
+  border: 1px solid #6ee7b7;
+}
+
+.badge-risk-low i {
+  color: #10b981;
+}
+
+.badge-risk-moderate {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fcd34d;
+}
+
+.badge-risk-moderate i {
+  color: #f59e0b;
+}
+
+.badge-risk-high {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fca5a5;
+}
+
+.badge-risk-high i {
+  color: #ef4444;
+}
 </style>
+
