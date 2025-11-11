@@ -531,3 +531,83 @@ def get_user_load_profile(consumption_data: pd.DataFrame, days: int = 30, app_da
             }
         }
     }
+    
+def get_aggregated_risk_score(historic_risk_analysis: dict, coincidence_factor: dict) -> dict:
+    """
+    Aggregate the risk analysis results into a simple risk assessment.
+    
+    This function combines the outputs from historic risk analysis and coincidence factor
+    calculations to provide an overall risk assessment for the user.
+    
+    Parameters:
+    historic_risk_analysis (dict): Output from create_historic_risk_analysis function
+    coincidence_factor (dict): Output from calculate_coincidence_factor function
+    
+    Returns:
+    dict: Contains:
+        - risk_level: 'low', 'moderate', or 'high'
+        - risk_score: numeric score (0-100, lower is better)
+        - risk_message: human-readable explanation
+        - risk_factors: breakdown of contributing factors
+    """
+    # Initialize score (lower is better/less risky)
+    score = 50  # Start at neutral
+    factors = []
+    
+    # Adjust score based on historic risk analysis
+    price_diff_pct = historic_risk_analysis.get('price_differential_pct', 0)
+    if price_diff_pct < -5:
+        score -= 15  # Favorable - user already benefits
+        factors.append({'factor': 'Historischer Verbrauch', 'impact': 'positive', 'detail': f'{abs(price_diff_pct):.1f}% unter Marktdurchschnitt'})
+    elif -5 <= price_diff_pct <= 5:
+        score -= 5  # Neutral
+        factors.append({'factor': 'Historischer Verbrauch', 'impact': 'neutral', 'detail': 'Im Marktdurchschnitt'})
+    else:
+        score += 15  # Unfavorable - user consumes at expensive times
+        factors.append({'factor': 'Historischer Verbrauch', 'impact': 'negative', 'detail': f'{price_diff_pct:.1f}% über Marktdurchschnitt'})
+    
+    # Adjust score based on coincidence factor
+    consumption_coincidence = coincidence_factor.get('consumption_coincidence_pct', 0)
+    expensive_hours_pct = coincidence_factor.get('expensive_hours_pct', 20.0)
+    
+    if consumption_coincidence < expensive_hours_pct - 5:
+        score -= 15  # Favorable - avoids expensive hours
+        factors.append({'factor': 'Verbrauchstiming', 'impact': 'positive', 'detail': 'Vermeidet teure Stunden'})
+    elif expensive_hours_pct - 5 <= consumption_coincidence <= expensive_hours_pct + 10:
+        score -= 5  # Neutral
+        factors.append({'factor': 'Verbrauchstiming', 'impact': 'neutral', 'detail': 'Typisches Verbrauchsmuster'})
+    else:
+        score += 15  # Unfavorable - high coincidence with expensive hours
+        factors.append({'factor': 'Verbrauchstiming', 'impact': 'negative', 'detail': 'Hoher Verbrauch zu teuren Zeiten'})
+    
+    # Check price volatility
+    volatility = historic_risk_analysis.get('price_volatility', 0)
+    if volatility > 0.05:  # High volatility (>5 ct/kWh std dev)
+        score += 10
+        factors.append({'factor': 'Preisvolatilität', 'impact': 'negative', 'detail': 'Hohe Preisschwankungen'})
+    elif volatility > 0.03:  # Medium volatility
+        score += 5
+        factors.append({'factor': 'Preisvolatilität', 'impact': 'neutral', 'detail': 'Moderate Preisschwankungen'})
+    else:
+        factors.append({'factor': 'Preisvolatilität', 'impact': 'positive', 'detail': 'Niedrige Preisschwankungen'})
+    
+    # Ensure score is within bounds (0-100, lower is better)
+    overall_risk_score = max(0, min(100, score))
+    
+    # Determine risk level
+    if overall_risk_score <= 40:
+        risk_level = 'low'
+        risk_message = 'Niedriges Risiko: Ihr Verbrauchsprofil eignet sich gut für dynamische Tarife'
+    elif overall_risk_score <= 60:
+        risk_level = 'moderate'
+        risk_message = 'Moderates Risiko: Dynamische Tarife können für Sie vorteilhaft sein, aber Optimierung empfohlen'
+    else:
+        risk_level = 'high'
+        risk_message = 'Höheres Risiko: Überprüfen Sie, ob Sie Ihren Verbrauch zu günstigeren Zeiten verschieben können'
+    
+    return {
+        'risk_level': risk_level,
+        'risk_score': int(overall_risk_score),
+        'risk_message': risk_message,
+        'risk_factors': factors
+    }
