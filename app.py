@@ -460,7 +460,7 @@ async def compare_tariffs_with_csv(
                 print(f"\n🔍 Scrape {provider.upper()} für PLZ {zip_code}...")
                 
                 if provider.lower() == "tibber":
-                    from src.Webscraping.scraper_tibber import TibberScraper
+                    from src.webscraping.scraper_tibber import TibberScraper
                     scraper = TibberScraper(debug_mode=False)
                     scraped_data = scraper.scrape_tariff(
                         zip_code=zip_code,
@@ -481,7 +481,7 @@ async def compare_tariffs_with_csv(
                     print(f"   ✓ Zusatz-Komponenten: {scraped_data['additional_price_ct']:.2f} ct/kWh")
                     
                 elif provider.lower() == "enbw":
-                    from src.Webscraping.scraper_enbw import EnbwScraper
+                    from src.webscraping.scraper_enbw import EnbwScraper
                     scraper = EnbwScraper(headless=True, debug=False, use_edge=False)
                     scraped_data = scraper.scrape_tariff(
                         zip_code=zip_code,
@@ -1482,7 +1482,7 @@ async def scrape_enbw_tariff(request: EnbwScraperRequest):
     """
     try:
         # Import EnBW scraper
-        from src.Webscraping.scraper_enbw import scrape_enbw_tariff as scrape_tariff
+        from src.webscraping.scraper_enbw import scrape_enbw_tariff as scrape_tariff
         
         logger.info(f"🔍 EnBW Scraper API Request: PLZ {request.zip_code}, {request.annual_consumption} kWh")
         
@@ -1589,7 +1589,7 @@ async def scrape_tado_tariff(request: TadoScraperRequest):
     """
     try:
         # Import Tado scraper
-        from src.Webscraping.scraper_tado import scrape_tado_tariff as scrape_tariff
+        from src.webscraping.scraper_tado import scrape_tado_tariff as scrape_tariff
         
         logger.info(f"🔍 Tado Energy API Request: PLZ {request.zip_code}, {request.annual_consumption} kWh")
         
@@ -1717,7 +1717,7 @@ async def scrape_tibber_tariff(request: TibberScraperRequest):
         logger.info(f"📞 Tibber-Scraper API-Request: PLZ {request.zip_code}, {request.annual_consumption} kWh/Jahr")
         
         # Import Scraper function
-        from src.Webscraping.scraper_tibber import scrape_tibber_price
+        from src.webscraping.scraper_tibber import scrape_tibber_price
         
         # Scrape prices (async)
         result = await scrape_tibber_price(
@@ -1794,7 +1794,7 @@ async def scrape_all_tariffs(request: ScraperTariffRequest):
     for provider in request.providers:
         try:
             if provider.lower() == "enbw":
-                from src.Webscraping.scraper_enbw import scrape_enbw_tariff
+                from src.webscraping.scraper_enbw import scrape_enbw_tariff
                 result = await scrape_enbw_tariff(
                     zip_code=request.zip_code,
                     annual_consumption=request.annual_consumption
@@ -1807,7 +1807,7 @@ async def scrape_all_tariffs(request: ScraperTariffRequest):
                     errors.append({"provider": "EnBW", "error": "No data returned"})
                     
             elif provider.lower() == "tado":
-                from src.Webscraping.scraper_tado import scrape_tado_tariff
+                from src.webscraping.scraper_tado import scrape_tado_tariff
                 result = await scrape_tado_tariff(
                     zip_code=request.zip_code,
                     annual_consumption=request.annual_consumption
@@ -1820,7 +1820,7 @@ async def scrape_all_tariffs(request: ScraperTariffRequest):
                     errors.append({"provider": "Tado", "error": "No data returned"})
                     
             elif provider.lower() == "tibber":
-                from src.Webscraping.scraper_tibber import scrape_tibber_price
+                from src.webscraping.scraper_tibber import scrape_tibber_price
                 result = await scrape_tibber_price(
                     postal_code=request.zip_code,
                     annual_consumption_kwh=request.annual_consumption
