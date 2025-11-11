@@ -14,6 +14,55 @@
     </div>
 
     <div class="container">
+      <!-- Price Basics -->
+      <section class="price-basics">
+        <h2 class="section-title">
+          <i class="fas fa-info-circle"></i>
+          Grundlagen der Energiepreise
+        </h2>
+        
+        <div class="basics-grid">
+          <div class="basic-card" :class="{ 'expanded': arbeitspreisExpanded }" @click="toggleArbeitspreis">
+            <div class="basic-header">
+              <h3>
+                <i class="fas fa-zap"></i>
+                Arbeitspreis (Energie)
+              </h3>
+              <i class="fas fa-chevron-down toggle-icon" :class="{ 'rotated': arbeitspreisExpanded }"></i>
+            </div>
+            <div class="basic-content" v-show="arbeitspreisExpanded">
+              <p class="basic-intro">Die wichtigste Größe für die Höhe der Strom- oder Gasrechnung ist in der Regel der sogenannte Arbeitspreis:</p>
+              <ul class="basic-points">
+                <li>Dieser wird in Cent pro Kilowattstunde (ct/kWh) angegeben.</li>
+                <li>Je mehr Kilowattstunden Sie verbrauchen, desto höher fällt Ihre Jahresrechnung aus.</li>
+                <li>Der Arbeitspreis multipliziert mit Ihrem Jahresverbrauch wird zum Grundpreis addiert und ergibt so Ihren Abrechnungsbetrag auf der Jahresrechnung.</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="basic-card" :class="{ 'expanded': grundpreisExpanded }" @click="toggleGrundpreis">
+            <div class="basic-header">
+              <h3>
+                <i class="fas fa-calendar-alt"></i>
+                Grundpreis (Energie)
+              </h3>
+              <i class="fas fa-chevron-down toggle-icon" :class="{ 'rotated': grundpreisExpanded }"></i>
+            </div>
+            <div class="basic-content" v-show="grundpreisExpanded">
+              <p class="basic-intro">Dieser Bestandteil des Energiepreises ist - im Gegensatz zum Arbeitspreis - vom Verbrauch unabhängig und wird in Euro pro Monat oder auch Euro pro Jahr angegeben. Er macht üblicherweise einen deutlich kleineren Anteil an der Gesamtrechnung aus.</p>
+              <div class="tip-box">
+                <h4>💡 Tipp für Energiesparer:</h4>
+                <p>Inzwischen gibt es Lieferanten, die keinen oder einen sehr geringen Grundpreis verlangen. Solche sogenannten linearen Tarife bieten Anreize zum Energiesparen und sind für Verbraucherinnen/Verbraucher vorteilhaft, weil jede eingesparte Kilowattstunde die Energiekosten direkt mindert.</p>
+              </div>
+              <div class="tip-box high-consumption">
+                <h4>⚡ Tipp für Vielverbraucher:</h4>
+                <p>Haben Sie allerdings einen hohen Strombedarf (z.B. wegen einer Wärmepumpe oder anderen verbrauchsintensiven Geräten), ist es für Sie oft günstiger, einen Tarif mit einem ggf. höheren Grundpreis und dafür einen niedrigeren Arbeitspreis zu wählen.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <!-- Price Components Overview -->
       <section class="price-overview">
         <h2 class="section-title">
@@ -28,7 +77,7 @@
             </div>
             <div class="component-content">
               <h3>Steuern & Abgaben</h3>
-              <div class="percentage">~52%</div>
+              <div class="percentage">~25%</div>
               <p>Stromsteuer, EEG-Umlage, Netzentgelte und weitere staatlich regulierte Kosten</p>
             </div>
           </div>
@@ -39,7 +88,7 @@
             </div>
             <div class="component-content">
               <h3>Netznutzung</h3>
-              <div class="percentage">~25%</div>
+              <div class="percentage">~32%</div>
               <p>Kosten für den Transport des Stroms über die Stromnetze zu Ihnen nach Hause</p>
             </div>
           </div>
@@ -50,7 +99,7 @@
             </div>
             <div class="component-content">
               <h3>Energiebeschaffung</h3>
-              <div class="percentage">~23%</div>
+              <div class="percentage">~43%</div>
               <p>Kosten für die Stromerzeugung und den Vertrieb - hier können Sie sparen!</p>
             </div>
           </div>
@@ -64,84 +113,12 @@
           Detaillierte Aufschlüsselung
         </h2>
 
-        <div class="breakdown-container">
-          <div class="breakdown-chart">
+        <div class="breakdown-container-centered">
+          <div class="breakdown-chart-centered">
             <PriceBreakdownChart />
           </div>
-
-          <div class="breakdown-details">
-            <div class="detail-category">
-              <h4 class="category-title taxes-color">
-                <i class="fas fa-university"></i>
-                Steuern & Abgaben (52%)
-              </h4>
-              <div class="detail-items">
-                <div class="detail-item">
-                  <span class="item-name">EEG-Umlage</span>
-                  <span class="item-value">6,5 ct/kWh</span>
-                </div>
-                <div class="detail-item">
-                  <span class="item-name">Stromsteuer</span>
-                  <span class="item-value">2,05 ct/kWh</span>
-                </div>
-                <div class="detail-item">
-                  <span class="item-name">Konzessionsabgabe</span>
-                  <span class="item-value">1,6 ct/kWh</span>
-                </div>
-                <div class="detail-item">
-                  <span class="item-name">§19-Umlage</span>
-                  <span class="item-value">0,4 ct/kWh</span>
-                </div>
-                <div class="detail-item">
-                  <span class="item-name">Mehrwertsteuer</span>
-                  <span class="item-value">19%</span>
-                </div>
-              </div>
-            </div>
-
-            <div class="detail-category">
-              <h4 class="category-title network-color">
-                <i class="fas fa-project-diagram"></i>
-                Netznutzung (25%)
-              </h4>
-              <div class="detail-items">
-                <div class="detail-item">
-                  <span class="item-name">Übertragungsnetz</span>
-                  <span class="item-value">2,1 ct/kWh</span>
-                </div>
-                <div class="detail-item">
-                  <span class="item-name">Verteilernetz</span>
-                  <span class="item-value">5,4 ct/kWh</span>
-                </div>
-                <div class="detail-item">
-                  <span class="item-name">Messung & Abrechnung</span>
-                  <span class="item-value">0,3 ct/kWh</span>
-                </div>
-              </div>
-            </div>
-
-            <div class="detail-category">
-              <h4 class="category-title energy-color">
-                <i class="fas fa-bolt"></i>
-                Energiebeschaffung (23%)
-              </h4>
-              <div class="detail-items">
-                <div class="detail-item">
-                  <span class="item-name">Stromerzeugung</span>
-                  <span class="item-value">4,2 ct/kWh</span>
-                </div>
-                <div class="detail-item">
-                  <span class="item-name">Vertrieb & Service</span>
-                  <span class="item-value">2,1 ct/kWh</span>
-                </div>
-                <div class="detail-item">
-                  <span class="item-name">Gewinnmarge</span>
-                  <span class="item-value">0,9 ct/kWh</span>
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
+
       </section>
 
       <!-- Why Compare Section -->
@@ -281,6 +258,20 @@ export default {
     PriceEvolutionChart,
     PriceBreakdownChart
   },
+  data() {
+    return {
+      arbeitspreisExpanded: false,
+      grundpreisExpanded: false
+    }
+  },
+  methods: {
+    toggleArbeitspreis() {
+      this.arbeitspreisExpanded = !this.arbeitspreisExpanded;
+    },
+    toggleGrundpreis() {
+      this.grundpreisExpanded = !this.grundpreisExpanded;
+    }
+  },
   mounted() {
     // Scroll to top when component is mounted
     window.scrollTo(0, 0);
@@ -346,6 +337,137 @@ section {
 
 .section-title i {
   color: #059669;
+}
+
+/* Price Basics */
+.basics-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+  margin-bottom: 3rem;
+  max-width: 800px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.basic-card {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  overflow: hidden;
+}
+
+.basic-card:hover {
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+.basic-card.expanded {
+  box-shadow: 0 8px 25px rgba(5, 150, 105, 0.15);
+  border: 1px solid #10b981;
+}
+
+.basic-header {
+  padding: 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.basic-card.expanded .basic-header {
+  border-bottom-color: #10b981;
+  background: linear-gradient(135deg, #ecfdf5 0%, #f0fdf4 100%);
+}
+
+.basic-header h3 {
+  font-size: 1.3rem;
+  color: #1f2937;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.basic-header i.fas {
+  color: #059669;
+}
+
+.toggle-icon {
+  color: #6b7280;
+  transition: transform 0.3s ease;
+  font-size: 1.2rem;
+}
+
+.toggle-icon.rotated {
+  transform: rotate(180deg);
+  color: #059669;
+}
+
+.basic-content {
+  padding: 2rem;
+  background: #fafafa;
+  border-top: 1px solid #e5e7eb;
+}
+
+.basic-intro {
+  font-size: 1.1rem;
+  color: #374151;
+  margin-bottom: 1.5rem;
+  font-weight: 500;
+  line-height: 1.6;
+}
+
+.basic-points {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.basic-points li {
+  position: relative;
+  padding-left: 1.5rem;
+  margin-bottom: 1rem;
+  color: #4b5563;
+  line-height: 1.6;
+}
+
+.basic-points li::before {
+  content: '•';
+  position: absolute;
+  left: 0;
+  color: #059669;
+  font-weight: bold;
+  font-size: 1.2rem;
+}
+
+.tip-box {
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin: 1.5rem 0;
+}
+
+.tip-box.high-consumption {
+  background: #fef3c7;
+  border-color: #fbbf24;
+}
+
+.tip-box h4 {
+  font-size: 1rem;
+  color: #1f2937;
+  margin: 0 0 0.75rem 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.tip-box p {
+  margin: 0;
+  color: #374151;
+  line-height: 1.6;
 }
 
 /* Components Grid */
@@ -423,6 +545,18 @@ section {
   border-radius: 12px;
   padding: 2rem;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.breakdown-container-centered {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  margin: 0;
+}
+
+.breakdown-chart-centered {
+  width: 100%;
 }
 
 .chart-placeholder {
@@ -683,6 +817,22 @@ section {
     font-size: 2rem;
     flex-direction: column;
     gap: 0.5rem;
+  }
+
+  .basics-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .basic-header {
+    padding: 1.5rem;
+  }
+
+  .basic-content {
+    padding: 1.5rem;
+  }
+
+  .basic-header h3 {
+    font-size: 1.1rem;
   }
 
   .components-grid {

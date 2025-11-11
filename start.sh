@@ -27,9 +27,9 @@ pip install -r requirements.txt
 
 # Install Node.js dependencies
 echo "📦 Installing Node.js dependencies..."
-cd frontend
+cd src/frontend
 npm install
-cd ..
+cd ../..
 
 # Start backend server in background
 echo "🔧 Starting FastAPI backend server..."
@@ -42,7 +42,7 @@ sleep 3
 
 # Start frontend development server
 echo "🎨 Starting Vue.js frontend..."
-cd frontend
+cd src/frontend
 npm run dev &
 FRONTEND_PID=$!
 

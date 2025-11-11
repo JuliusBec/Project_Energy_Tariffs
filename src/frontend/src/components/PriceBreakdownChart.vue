@@ -9,10 +9,12 @@
       <p>{{ error }}</p>
     </div>
     <div v-else class="chart-container">
-      <canvas ref="chartCanvas"></canvas>
-      <div class="chart-center-text">
-        <div class="center-price">{{ formattedCenterPrice }}</div>
-        <div class="center-label">Ø Preis/kWh</div>
+      <div class="chart-wrapper">
+        <canvas ref="chartCanvas"></canvas>
+        <div class="chart-center-text">
+          <div class="center-price">{{ formattedCenterPrice }}</div>
+          <div class="center-label">Ø Preis/kWh</div>
+        </div>
       </div>
       <div class="chart-disclaimer">
         <i class="fas fa-info-circle"></i>
@@ -87,12 +89,14 @@ export default {
             borderWidth: 2,
             borderColor: '#ffffff',
             hoverBorderWidth: 3,
-            hoverBorderColor: '#ffffff'
+            hoverBorderColor: '#ffffff',
+            circumference: 180, // Half circle
+            rotation: 270 // Start from top
           }]
         },
         options: {
           responsive: true,
-          maintainAspectRatio: true,
+          maintainAspectRatio: false,
           cutout: '70%', // Makes it a doughnut with space in center
           plugins: {
             legend: {
@@ -197,15 +201,27 @@ export default {
 }
 
 .chart-container {
+  width: 100%;
+  background: white;
+  border-radius: 16px;
+  padding: 3rem 2.5rem;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.chart-wrapper {
   position: relative;
   width: 100%;
-  max-width: 400px;
-  margin: 0 auto;
+  max-width: 600px;
+  height: 350px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 0 auto 2rem auto;
 }
 
 .chart-center-text {
   position: absolute;
-  top: 50%;
+  top: 65%;
   left: 50%;
   transform: translate(-50%, -50%);
   text-align: center;
@@ -229,17 +245,19 @@ export default {
 }
 
 .chart-disclaimer {
-  margin-top: 1.5rem;
-  padding: 0.75rem 1rem;
+  margin: 0 auto;
+  max-width: 600px;
+  padding: 1rem 1.25rem;
   background-color: #f1f5f9;
   border-left: 3px solid #059669;
-  border-radius: 0.375rem;
+  border-radius: 0.5rem;
   display: flex;
   align-items: flex-start;
-  gap: 0.75rem;
-  font-size: 0.75rem;
+  gap: 0.875rem;
+  font-size: 0.8rem;
   color: #475569;
-  line-height: 1.5;
+  line-height: 1.6;
+  text-align: left;
 }
 
 .chart-disclaimer i {
@@ -255,7 +273,13 @@ export default {
 
 @media (max-width: 768px) {
   .chart-container {
-    max-width: 320px;
+    padding: 2rem 1.5rem;
+  }
+
+  .chart-wrapper {
+    max-width: 350px;
+    height: 300px;
+    margin-bottom: 1.5rem;
   }
   
   .center-price {
@@ -267,8 +291,9 @@ export default {
   }
   
   .chart-disclaimer {
-    font-size: 0.7rem;
-    padding: 0.625rem 0.875rem;
+    font-size: 0.75rem;
+    padding: 0.875rem 1rem;
+    max-width: 350px;
   }
 }
 </style>
