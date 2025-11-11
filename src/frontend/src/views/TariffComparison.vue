@@ -307,6 +307,18 @@
                         <i class="fas fa-home"></i>
                         Smart Ready
                       </span>
+                      <span v-if="tariff.risk_level === 'low'" class="badge badge-success">
+                        <i class="fas fa-shield-alt"></i>
+                        Niedriges Risiko
+                      </span>
+                      <span v-if="tariff.risk_level === 'moderate'" class="badge badge-warning">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        Moderates Risiko
+                      </span>
+                      <span v-if="tariff.risk_level === 'high'" class="badge badge-danger">
+                        <i class="fas fa-exclamation-circle"></i>
+                        Höheres Risiko
+                      </span>
                       <span v-if="index === 0" class="badge badge-gold">
                         <i class="fas fa-star"></i>
                         Empfohlen
@@ -1009,11 +1021,35 @@ export default {
             if (csvData.annual_kwh) {
               annualConsumption = Math.round(csvData.annual_kwh)
               formData.value.annualKwh = annualConsumption
-              console.log(`📈 Updated annual consumption from CSV: ${annualConsumption} kWh`)
+              console.log(`Updated annual consumption from CSV: ${annualConsumption} kWh`)
             }
             
             // Store CSV analysis for later use
             csvAnalysis = csvData
+            
+            // Fetch risk analysis with CSV data BEFORE creating tariffs
+            console.log('Fetching risk analysis before tariff creation...')
+            try {
+              // Fetch full risk analysis (for charts/details)
+              const riskResponse = await apiService.getRiskAnalysis(uploadedFile.value, 30)
+              riskAnalysisData.value = riskResponse.data
+              
+              // ALSO fetch risk score (for badges)
+              const riskScoreResponse = await apiService.getRiskScore(uploadedFile.value, 30)
+              const riskScore = riskScoreResponse.data
+              
+              // Merge risk score into risk analysis data
+              riskAnalysisData.value.risk_level = riskScore.risk_level
+              riskAnalysisData.value.risk_score = riskScore.risk_score
+              riskAnalysisData.value.risk_message = riskScore.risk_message
+              
+              console.log('Risk analysis loaded:', riskAnalysisData.value)
+              console.log('Risk level:', riskAnalysisData.value.risk_level)
+              console.log('Risk score:', riskAnalysisData.value.risk_score)
+            } catch (riskError) {
+              console.error('⚠️ Risk analysis failed:', riskError)
+              riskAnalysisData.value = null
+            }
           } catch (csvError) {
             console.error('⚠️ CSV analysis failed:', csvError)
           }
@@ -1050,43 +1086,57 @@ export default {
           
           // Convert EnergyTariff format to frontend display format
           const scrapedTariffs = scraperData.tariffs.map(tariff => {
-            // Berechnung für dynamische Tarife:
             const monthlyConsumption = annualConsumption / 12
+            let monthlyCost, annualCost, totalKwhPrice
             
-            // Spezielle Berechnung für Tibber (mit additional_kwh_rate)
-            let monthlyCost, annualCost
-            
-            if (tariff.provider === "Tibber" && tariff.additional_kwh_rate) {
-              // Tibber: Grundpreis + (Verbrauch × Arbeitspreis) + (Verbrauch × Forecast)
-              // Formel: 15,89 + (monatl. kWh × 0,184€) + (monatl. kWh × Forecast-Preis)
+            // Check if this is a fixed or dynamic tariff
+            if (tariff.is_dynamic === false && tariff.kwh_rate) {
+              // FIXED TARIFF: Simple calculation with fixed kWh rate
+              const fixedKwhRate = tariff.kwh_rate
+              monthlyCost = tariff.base_price + (monthlyConsumption * fixedKwhRate)
+              annualCost = (tariff.base_price * 12) + (annualConsumption * fixedKwhRate)
+              totalKwhPrice = fixedKwhRate
+              
+              console.log(`💰 ${tariff.name} (FIXED) Berechnung:`)
+              console.log(`   Grundpreis: ${tariff.base_price}€/Monat`)
+              console.log(`   Fixpreis: ${fixedKwhRate}€/kWh = ${(fixedKwhRate * 100).toFixed(2)} ct/kWh`)
+              console.log(`   Monatlicher Verbrauch: ${monthlyConsumption.toFixed(2)} kWh`)
+              console.log(`   Monatspreis gesamt: ${monthlyCost.toFixed(2)}€`)
+              console.log(`   Jahrespreis gesamt: ${annualCost.toFixed(2)}€`)
+              
+            } else if (tariff.provider === "Tibber" && tariff.additional_kwh_rate) {
+              // DYNAMIC TARIFF - Tibber: Grundpreis + (Verbrauch × Arbeitspreis) + (Verbrauch × Forecast)
               const additionalCost = forecastAvgPrice * monthlyConsumption
               const taxesCost = tariff.additional_kwh_rate * monthlyConsumption
               monthlyCost = tariff.base_price + additionalCost + taxesCost
               annualCost = (tariff.base_price * 12) + (forecastAvgPrice * annualConsumption) + (tariff.additional_kwh_rate * annualConsumption)
+              totalKwhPrice = forecastAvgPrice + tariff.additional_kwh_rate
               
-              console.log(`💰 ${tariff.provider} Berechnung:`)
+              console.log(`💰 ${tariff.provider} (DYNAMIC) Berechnung:`)
               console.log(`   Grundpreis: ${tariff.base_price}€/Monat`)
               console.log(`   Arbeitspreis (Umlagen/Steuern): ${tariff.additional_kwh_rate}€/kWh = ${(tariff.additional_kwh_rate * 100).toFixed(2)} ct/kWh`)
               console.log(`   Börsenpreis (Forecast): ${forecastAvgPrice.toFixed(4)}€/kWh = ${(forecastAvgPrice * 100).toFixed(2)} ct/kWh`)
-              console.log(`   ➜ Gesamt-kWh-Preis: ${(forecastAvgPrice + tariff.additional_kwh_rate).toFixed(4)}€/kWh = ${((forecastAvgPrice + tariff.additional_kwh_rate) * 100).toFixed(2)} ct/kWh`)
+              console.log(`   ➜ Gesamt-kWh-Preis: ${totalKwhPrice.toFixed(4)}€/kWh = ${(totalKwhPrice * 100).toFixed(2)} ct/kWh`)
               console.log(`   Monatlicher Verbrauch: ${monthlyConsumption.toFixed(2)} kWh`)
               console.log(`   Umlagen/Steuern-Kosten/Monat: ${taxesCost.toFixed(2)}€`)
               console.log(`   Börsenstrom-Kosten/Monat: ${additionalCost.toFixed(2)}€`)
               console.log(`   Monatspreis gesamt: ${monthlyCost.toFixed(2)}€`)
               console.log(`   Jahrespreis gesamt: ${annualCost.toFixed(2)}€`)
+              
             } else {
-              // EnBW, Tado: Grundpreis + (Forecast × Verbrauch) + (Arbeitspreis × Verbrauch)
+              // DYNAMIC TARIFF - EnBW, Tado: Grundpreis + (Forecast × Verbrauch) + (Arbeitspreis × Verbrauch)
               const forecastCost = forecastAvgPrice * monthlyConsumption
               const arbeitspreisCtKwh = (tariff.additional_price_ct_kwh || 0) / 100  // ct/kWh → €/kWh
               const arbeitspreisCost = arbeitspreisCtKwh * monthlyConsumption
               monthlyCost = tariff.base_price + forecastCost + arbeitspreisCost
               annualCost = (tariff.base_price * 12) + (forecastAvgPrice * annualConsumption) + (arbeitspreisCtKwh * annualConsumption)
+              totalKwhPrice = forecastAvgPrice + arbeitspreisCtKwh
               
-              console.log(`💰 ${tariff.provider} Berechnung:`)
+              console.log(`💰 ${tariff.provider} (DYNAMIC) Berechnung:`)
               console.log(`   Grundpreis: ${tariff.base_price}€/Monat`)
               console.log(`   Arbeitspreis (vom Scraper): ${tariff.additional_price_ct_kwh || 0} ct/kWh = ${arbeitspreisCtKwh.toFixed(4)}€/kWh`)
               console.log(`   Börsenpreis (Forecast): ${forecastAvgPrice.toFixed(4)}€/kWh = ${(forecastAvgPrice * 100).toFixed(2)} ct/kWh`)
-              console.log(`   ➜ Gesamt-kWh-Preis: ${(forecastAvgPrice + arbeitspreisCtKwh).toFixed(4)}€/kWh = ${((forecastAvgPrice + arbeitspreisCtKwh) * 100).toFixed(2)} ct/kWh`)
+              console.log(`   ➜ Gesamt-kWh-Preis: ${totalKwhPrice.toFixed(4)}€/kWh = ${(totalKwhPrice * 100).toFixed(2)} ct/kWh`)
               console.log(`   Monatlicher Verbrauch: ${monthlyConsumption.toFixed(2)} kWh`)
               console.log(`   Arbeitspreis-Kosten/Monat: ${arbeitspreisCost.toFixed(2)}€`)
               console.log(`   Forecast-Kosten/Monat: ${forecastCost.toFixed(2)}€`)
@@ -1094,33 +1144,35 @@ export default {
               console.log(`   Jahrespreis gesamt: ${annualCost.toFixed(2)}€`)
             }
             
-            // Berechne Gesamt-kWh-Preis: Börsenpreis + Arbeitspreis
-            const totalKwhPrice = forecastAvgPrice + ((tariff.additional_kwh_rate || tariff.additional_price_ct_kwh || 0) / 100)
-            
             return {
-              id: `${tariff.provider.toLowerCase()}-dynamic`,
+              id: `${tariff.provider.toLowerCase()}-${tariff.is_dynamic ? 'dynamic' : 'fixed'}-${tariff.name.toLowerCase().replace(/\s+/g, '-')}`,
               name: tariff.name,
               provider: tariff.provider,
               monthly_cost: Math.round(monthlyCost),
               annual_cost: Math.round(annualCost),
               base_price: tariff.base_price,
-              network_fee: tariff.network_fee,
-              kwh_price: totalKwhPrice,  // Zeige GESAMT-Preis an (Börse + Arbeitspreis)
-              is_dynamic: tariff.is_dynamic,
-              smart_meter_required: true,
-              green_energy: true,
-              app_available: true,
-              price_forecast: true,
-              automation_ready: true,  // Smart Home Integration
+              network_fee: tariff.network_fee || 0,
+              kwh_price: totalKwhPrice,
+              is_dynamic: tariff.is_dynamic !== false,  // Default to true if not specified
+              smart_meter_required: tariff.is_dynamic !== false,
+              green_energy: tariff.features?.includes('green') || false,
+              app_available: tariff.is_dynamic !== false,  // Dynamic tariffs have apps
+              price_forecast: tariff.is_dynamic !== false,
+              automation_ready: tariff.is_dynamic !== false,
               special_features: tariff.features || [],
               // Add CSV-based metrics if available
               csv_based: csvAnalysis !== null,
-              actual_annual_consumption: csvAnalysis ? annualConsumption : null
+              actual_annual_consumption: csvAnalysis ? annualConsumption : null,
+              // Add risk assessment from risk analysis
+              risk_level: riskAnalysisData.value?.risk_level,
+              risk_score: riskAnalysisData.value?.risk_score,
+              risk_message: riskAnalysisData.value?.risk_message
             }
           })
           
           results.value = scrapedTariffs
           console.log('📊 Scraped tariffs with CSV data:', scrapedTariffs)
+          console.log('🛡️ Risk assessment applied:', riskAnalysisData.value?.risk_level)
           
           // Fetch predictions and forecasts
           fetchSavingsPrediction()

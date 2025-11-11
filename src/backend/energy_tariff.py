@@ -18,6 +18,14 @@ class EnergyTariff(ABC):
         Initialize the energy tariff.
         
         Args:
+            name: Name of the tariff
+            base_price: Monthly base price in €
+            is_dynamic: Whether this is a dynamic tariff
+            start_date: Start date for the tariff
+            kwh_rate: Fixed price per kWh in € (for fixed tariffs)
+            provider: Energy provider name
+            min_duration: Minimum contract duration in months
+            features: List of tariff features (e.g., ["green", "fixed"])
             postal_code: German postal code (Postleitzahl) for location-specific pricing or availability
         """
         self.name = name
@@ -91,6 +99,14 @@ class FixedTariff(EnergyTariff):
         Initialize the fixed tariff with base price and kWh rate.
         
         Args:
+            name: Name of the tariff
+            base_price: Monthly base price in €
+            kwh_rate: Fixed price per kWh in €
+            start_date: Start date for the tariff
+            provider: Energy provider name
+            min_duration: Minimum contract duration in months
+            is_dynamic: Whether this is a dynamic tariff (always False for this class)
+            features: List of tariff features (e.g., ["fixed", "green"])
             postal_code: German postal code (Postleitzahl) for location-specific pricing or availability
         """
         super().__init__(name=name, base_price=base_price, is_dynamic=False, start_date=start_date,
@@ -127,15 +143,16 @@ class FixedTariff(EnergyTariff):
     def calculate_cost(self, data) -> float:
         """
         Calculate the total cost for a given consumption in kWh.
+        
+        Args:
+            data: pandas DataFrame with 'datetime' and 'value' columns (hourly kWh consumption)
+                  or a numeric value representing annual consumption in kWh.
         """
         print(f"\n{'='*80}")
         print(f"FixedTariff.calculate_cost() called for tariff: {self.name}")
         print(f"Data type: {type(data)}")
         
         if isinstance(data, pd.DataFrame):
-            print(f"DataFrame shape: {data.shape}")
-            print(f"DataFrame columns: {list(data.columns)}")
-            print(f"DataFrame date range: {data['datetime'].min() if 'datetime' in data.columns else 'N/A'} to {data['datetime'].max() if 'datetime' in data.columns else 'N/A'}")
             if 'value' in data.columns:
                 print(f"Total consumption in uploaded data: {data['value'].sum():.2f} kWh")
         else:
@@ -321,6 +338,11 @@ class DynamicTariff(EnergyTariff):
     def calculate_cost_with_breakdown(self, data):
         """
         Calculate the total cost and return both cost and average kWh price.
+        
+        Args:
+            data: pandas DataFrame with 'datetime' and 'value' columns (hourly kWh consumption)
+                  or a numeric value representing annual consumption in kWh.
+                  
         Returns: dict with 'total_cost' and 'avg_kwh_price'
         """
         import os

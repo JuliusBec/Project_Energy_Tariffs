@@ -84,28 +84,15 @@ class BacktestDataResponse(BaseModel):
 
 # EnBW tariffs as EnergyTariff instances
 def create_enbw_tariffs():
-    """Create EnBW tariffs using EnergyTariff classes"""
+    """Create EnBW conventional (fixed) tariffs using EnergyTariff classes
+    
+    Note: Dynamic tariffs are now fetched via scrapers instead of being hardcoded.
+    This function only returns conventional fixed-rate tariffs for comparison.
+    """
     start_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
     
     return [
-        DynamicTariff(
-            name="EnBW mobility+ dynamic",
-            provider="EnBW",
-            base_price=14.90,
-            start_date=start_date,
-            is_dynamic=True,
-            network_fee=18.00,  # 18€ one-time network fee for premium dynamic tariff
-            features=["dynamic", "green"]
-        ),
-        DynamicTariff(
-            name="EnBW easy dynamic", 
-            provider="EnBW",
-            base_price=9.90,
-            start_date=start_date,
-            is_dynamic=True,
-            network_fee=22.00,  # 22€ one-time network fee for standard dynamic tariff
-            features=["dynamic", "green"]
-        ),
+        # Only conventional/fixed tariffs - dynamic tariffs come from scrapers
         FixedTariff(
             name="EnBW mobility+ Zuhause",
             provider="EnBW", 
@@ -151,57 +138,6 @@ def create_enbw_tariffs():
 # Create tariff instances
 ENBW_TARIFFS = create_enbw_tariffs()
 
-# Mock EnBW tariffs data for frontend compatibility
-ENBW_TARIFFS_MOCK = [
-    {
-        "name": "mobility+ dynamic",
-        "provider": "EnBW",
-        "baseFee": 14.90,
-        "workingPrice": 0.25,  # börsenpreis + 2ct/kWh
-        "features": ["Dynamischer Tarif", "E-Mobility Bonus", "100% Ökostrom"],
-        "isDynamic": True
-    },
-    {
-        "name": "easy dynamic",
-        "provider": "EnBW",
-        "baseFee": 9.90,
-        "workingPrice": 0.32,  # börsenpreis + 3.5ct/kWh
-        "features": ["Dynamischer Tarif", "Keine Mindestlaufzeit", "100% Ökostrom"],
-        "isDynamic": True
-    },
-    {
-        "name": "mobility+ Zuhause",
-        "provider": "EnBW",
-        "baseFee": 14.90,
-        "workingPrice": 0.3299,
-        "features": ["E-Mobility Bonus", "100% Ökostrom", "Wallbox-Rabatt"],
-        "isDynamic": False
-    },
-    {
-        "name": "easy+",
-        "provider": "EnBW",
-        "baseFee": 9.90,
-        "workingPrice": 0.3499,
-        "features": ["Keine Mindestlaufzeit", "100% Ökostrom", "Online-Bonus"],
-        "isDynamic": False
-    },
-    {
-        "name": "Basis",
-        "provider": "EnBW",
-        "baseFee": 12.90,
-        "workingPrice": 0.3699,
-        "features": ["Grundversorgung", "Lokaler Versorger", "Sicherheit"],
-        "isDynamic": False
-    },
-    {
-        "name": "Komfort",
-        "provider": "EnBW",
-        "baseFee": 15.90,
-        "workingPrice": 0.3599,
-        "features": ["Premium Service", "24h Hotline", "Persönlicher Berater"],
-        "isDynamic": False
-    }
-]
 
 @app.get("/")
 async def root():
@@ -239,22 +175,25 @@ async def get_tariffs():
         return frontend_tariffs
     
     except Exception as e:
-        # Fallback to mock data if real tariffs fail
-        print(f"Error loading real tariffs, using mock data: {str(e)}")
+        # Fallback to using ENBW_TARIFFS if primary method fails
+        print(f"Error loading real tariffs, using fallback: {str(e)}")
         frontend_tariffs = []
-        for i, tariff in enumerate(ENBW_TARIFFS_MOCK):
+        for i, tariff in enumerate(ENBW_TARIFFS):
+            # Get kwh_rate from tariff object
+            kwh_rate = getattr(tariff, 'kwh_rate', 0.30) if not tariff.is_dynamic else 0.25
+            
             frontend_tariff = {
-                "id": tariff["name"].lower().replace(" ", "_").replace("+", "plus"),
-                "name": tariff["name"],
-                "provider": tariff["provider"],
-                "base_price": tariff["baseFee"],
-                "kwh_price": tariff["workingPrice"],
-                "is_dynamic": tariff["isDynamic"],
-                "features": tariff["features"],
-                "contract_duration": 12 if tariff["name"] == "Basis" else 1,
-                "green_energy": True,
-                "description": f"{'Dynamischer' if tariff['isDynamic'] else 'Fester'} Stromtarif von {tariff['provider']}",
-                "type": "dynamic" if tariff["isDynamic"] else "fixed"
+                "id": tariff.name.lower().replace(" ", "_").replace("+", "plus"),
+                "name": tariff.name,
+                "provider": tariff.provider,
+                "base_price": tariff.base_price,
+                "kwh_price": kwh_rate,
+                "is_dynamic": tariff.is_dynamic,
+                "features": tariff.features if tariff.features else [],
+                "contract_duration": getattr(tariff, 'min_duration', 1),
+                "green_energy": "green" in (tariff.features or []),
+                "description": f"{'Dynamischer' if tariff.is_dynamic else 'Fester'} Stromtarif von {tariff.provider}",
+                "type": "dynamic" if tariff.is_dynamic else "fixed"
             }
             frontend_tariffs.append(frontend_tariff)
         
@@ -460,30 +399,28 @@ async def compare_tariffs_with_csv(
                 print(f"\n🔍 Scrape {provider.upper()} für PLZ {zip_code}...")
                 
                 if provider.lower() == "tibber":
-                    from src.webscraping.scraper_tibber import TibberScraper
-                    scraper = TibberScraper(debug_mode=False)
-                    scraped_data = scraper.scrape_tariff(
-                        zip_code=zip_code,
-                        annual_consumption=int(annual_kwh)
+                    from src.webscraping.scraper_tibber import scrape_tibber_price
+                    scraped_data = await scrape_tibber_price(
+                        postal_code=zip_code,
+                        annual_consumption_kwh=int(annual_kwh)
                     )
                     
                     tariff = DynamicTariff(
                         name="Tibber Dynamic",
                         provider="Tibber",
-                        base_price=scraped_data['total_base_monthly'],
+                        base_price=scraped_data['base_price_monthly'],
                         start_date=start_date,
                         network_fee=0,
                         postal_code=zip_code,
-                        additional_price_ct_kwh=scraped_data['additional_price_ct']
+                        additional_price_ct_kwh=scraped_data['additional_price_ct_kwh']
                     )
                     tariffs.append(('Tibber', tariff, scraped_data))
-                    print(f"   ✓ Grundpreis: {scraped_data['total_base_monthly']:.2f} €/Mon")
-                    print(f"   ✓ Zusatz-Komponenten: {scraped_data['additional_price_ct']:.2f} ct/kWh")
+                    print(f"   ✓ Grundpreis: {scraped_data['base_price_monthly']:.2f} €/Mon")
+                    print(f"   ✓ Zusatz-Komponenten: {scraped_data['additional_price_ct_kwh']:.2f} ct/kWh")
                     
                 elif provider.lower() == "enbw":
-                    from src.webscraping.scraper_enbw import EnbwScraper
-                    scraper = EnbwScraper(headless=True, debug=False, use_edge=False)
-                    scraped_data = scraper.scrape_tariff(
+                    from src.webscraping.scraper_enbw import scrape_enbw_tariff
+                    scraped_data = await scrape_enbw_tariff(
                         zip_code=zip_code,
                         annual_consumption=int(annual_kwh)
                     )
@@ -503,11 +440,14 @@ async def compare_tariffs_with_csv(
                 
             except Exception as e:
                 print(f"   ❌ Fehler beim Scrapen von {provider}: {e}")
+                import traceback
+                traceback.print_exc()
                 continue
         
         # 4. Kosten für jeden Tarif mit ECHTEN CSV-Daten berechnen
         results = []
         
+        # 4a. Berechne Kosten für gescrapte dynamische Tarife
         for provider_name, tariff, scraped_data in tariffs:
             try:
                 print(f"\n💰 Berechne Kosten für {provider_name} mit CSV-Daten...")
@@ -524,7 +464,8 @@ async def compare_tariffs_with_csv(
                     "monthly_cost": result['total_cost'],
                     "annual_cost": result['total_cost'] * 12,
                     "postal_code": zip_code,
-                    "data_source": "csv_uploaded"
+                    "data_source": "csv_uploaded",
+                    "tariff_type": "dynamic"
                 })
                 
                 print(f"   ✓ Durchschnitt: {result['avg_kwh_price']*100:.2f} ct/kWh")
@@ -532,6 +473,39 @@ async def compare_tariffs_with_csv(
                 
             except Exception as e:
                 print(f"   ❌ Fehler bei Berechnung für {provider_name}: {e}")
+                import traceback
+                traceback.print_exc()
+                continue
+        
+        # 4b. Füge konventionelle Fixpreis-Tarife hinzu
+        print(f"\n💰 Berechne Kosten für konventionelle Fixpreis-Tarife...")
+        conventional_tariffs = create_enbw_tariffs()
+        
+        for conv_tariff in conventional_tariffs:
+            try:
+                print(f"\n   Berechne {conv_tariff.name}...")
+                
+                # Berechne Kosten mit CSV-Daten
+                monthly_cost = conv_tariff.calculate_cost(df)
+                
+                results.append({
+                    "provider": conv_tariff.provider,
+                    "tariff_name": conv_tariff.name,
+                    "base_price_monthly": conv_tariff.base_price,
+                    "additional_price_ct_kwh": None,  # Fixpreis hat kein Markup
+                    "avg_kwh_price_ct": conv_tariff.kwh_rate * 100,
+                    "monthly_cost": monthly_cost,
+                    "annual_cost": monthly_cost * 12,
+                    "postal_code": zip_code,
+                    "data_source": "hardcoded_conventional",
+                    "tariff_type": "fixed"
+                })
+                
+                print(f"   ✓ Fixpreis: {conv_tariff.kwh_rate*100:.2f} ct/kWh")
+                print(f"   ✓ Monatliche Kosten: {monthly_cost:.2f} €")
+                
+            except Exception as e:
+                print(f"   ❌ Fehler bei Berechnung für {conv_tariff.name}: {e}")
                 import traceback
                 traceback.print_exc()
                 continue
@@ -894,7 +868,7 @@ async def calculate_tariffs(request: TariffRequest):
         return await calculate_tariffs_mock(request)
 
 async def calculate_tariffs_mock(request: TariffRequest):
-    """Fallback calculation using mock data"""
+    """Fallback calculation using ENBW_TARIFFS objects"""
     # Handle both frontend and direct API formats
     annual_consumption = request.annualConsumption or request.annual_kwh or 3500
     has_smart_meter = request.hasSmartMeter if request.hasSmartMeter is not None else request.has_smart_meter
@@ -902,30 +876,30 @@ async def calculate_tariffs_mock(request: TariffRequest):
     if request.tariff_id:
         # Frontend sends specific tariff calculation
         target_tariff = None
-        for tariff in ENBW_TARIFFS_MOCK:
-            tariff_id = tariff["name"].lower().replace(" ", "_").replace("+", "plus")
+        for tariff in ENBW_TARIFFS:
+            tariff_id = tariff.name.lower().replace(" ", "_").replace("+", "plus")
             if tariff_id == request.tariff_id:
                 target_tariff = tariff
                 break
         
         if not target_tariff:
-            target_tariff = ENBW_TARIFFS_MOCK[0]  # fallback
+            target_tariff = ENBW_TARIFFS[0]  # fallback
         
         # Mock spot price for dynamic tariffs
         spot_price = random.uniform(0.08, 0.15)  # €/kWh
         
         # Calculate working price
-        if target_tariff["isDynamic"]:
-            working_price = spot_price + (target_tariff["workingPrice"] - 0.08)  # Add markup
+        if target_tariff.is_dynamic:
+            working_price = spot_price + 0.02  # Add markup
         else:
-            working_price = target_tariff["workingPrice"]
+            working_price = target_tariff.kwh_rate
         
         # Calculate total cost
-        annual_cost = (target_tariff["baseFee"] * 12) + (annual_consumption * working_price)
+        annual_cost = (target_tariff.base_price * 12) + (annual_consumption * working_price)
         
         # Calculate savings potential for smart meter users
         savings_potential = 0
-        if has_smart_meter and target_tariff["isDynamic"]:
+        if has_smart_meter and target_tariff.is_dynamic:
             savings_potential = random.uniform(10, 25)  # 10-25% savings possible
         
         return {
@@ -933,7 +907,7 @@ async def calculate_tariffs_mock(request: TariffRequest):
             "monthly_cost": annual_cost / 12,
             "savings_potential": savings_potential,
             "cost_breakdown": {
-                "base_fee_annual": target_tariff["baseFee"] * 12,
+                "base_fee_annual": target_tariff.base_price * 12,
                 "energy_cost_annual": annual_consumption * working_price,
                 "working_price": working_price
             }
@@ -946,23 +920,23 @@ async def calculate_tariffs_mock(request: TariffRequest):
         # Mock spot price for dynamic tariffs
         spot_price = random.uniform(0.08, 0.15)  # €/kWh
         
-        for tariff in ENBW_TARIFFS_MOCK:
+        for tariff in ENBW_TARIFFS:
             # Calculate working price
-            if tariff["isDynamic"]:
-                working_price = spot_price + (tariff["workingPrice"] - 0.08)  # Add markup
+            if tariff.is_dynamic:
+                working_price = spot_price + 0.02  # Add markup
             else:
-                working_price = tariff["workingPrice"]
+                working_price = tariff.kwh_rate
             
             # Calculate total cost
-            annual_cost = (tariff["baseFee"] * 12) + (annual_consumption * working_price)
+            annual_cost = (tariff.base_price * 12) + (annual_consumption * working_price)
             
             results.append(TariffResult(
-                name=tariff["name"],
-                provider=tariff["provider"],
-                baseFee=tariff["baseFee"],
+                name=tariff.name,
+                provider=tariff.provider,
+                baseFee=tariff.base_price,
                 workingPrice=working_price,
                 totalCost=annual_cost,
-                features=tariff["features"]
+                features=tariff.features if tariff.features else []
             ))
         
         # Sort by total cost
@@ -1836,7 +1810,23 @@ async def scrape_all_tariffs(request: ScraperTariffRequest):
             logger.error(f"❌ Error scraping {provider}: {e}")
             errors.append({"provider": provider, "error": str(e)})
     
-    logger.info(f"✅ Scraped {len(tariffs)} tariffs successfully, {len(errors)} errors")
+    # Add conventional (fixed-rate) tariffs from ENBW_TARIFFS
+    logger.info(f"Adding {len(ENBW_TARIFFS)} conventional fixed-rate tariffs")
+    for conv_tariff in ENBW_TARIFFS:
+        tariff_data = {
+            "name": conv_tariff.name,
+            "provider": conv_tariff.provider,
+            "is_dynamic": conv_tariff.is_dynamic,
+            "start_date": conv_tariff.start_date.isoformat(),
+            "features": conv_tariff.features if conv_tariff.features else [],
+            "base_price": conv_tariff.base_price,
+            "kwh_rate": conv_tariff.kwh_rate,
+            "min_duration": getattr(conv_tariff, 'min_duration', None),
+            "postal_code": request.zip_code
+        }
+        tariffs.append(tariff_data)
+    
+    logger.info(f"Total: {len(tariffs)} tariffs ({len(tariffs) - len(ENBW_TARIFFS)} scraped + {len(ENBW_TARIFFS)} conventional), {len(errors)} errors")
     
     return {
         "success": len(tariffs) > 0,

@@ -716,16 +716,21 @@ def create_chart_data(historical_file=None,
         }
         
         # Create combined timeline for a complete view
+        # To connect historical and forecast smoothly, we duplicate the last historical value
+        # as the first forecast value
         combined_timestamps = historical_data['timestamps'] + forecast_data['timestamps']
         combined_historical = historical_data['prices'] + [None] * len(forecast_data['timestamps'])
-        combined_forecast = [None] * len(historical_data['timestamps']) + forecast_data['prices']
+        
+        # Start forecast with the last historical value to create a smooth connection
+        last_historical_price = historical_data['prices'][-1] if historical_data['prices'] else None
+        combined_forecast = [None] * (len(historical_data['timestamps']) - 1) + [last_historical_price] + forecast_data['prices']
         
         combined_data = {
             'timestamps': combined_timestamps,
             'historical_prices': combined_historical,
             'forecast_prices': combined_forecast,
-            'forecast_lower': [None] * len(historical_data['timestamps']) + forecast_data['lower_bound'],
-            'forecast_upper': [None] * len(historical_data['timestamps']) + forecast_data['upper_bound']
+            'forecast_lower': [None] * (len(historical_data['timestamps']) - 1) + [last_historical_price] + forecast_data['lower_bound'],
+            'forecast_upper': [None] * (len(historical_data['timestamps']) - 1) + [last_historical_price] + forecast_data['upper_bound']
         }
         
         logging.info(f"Chart data prepared successfully:")
