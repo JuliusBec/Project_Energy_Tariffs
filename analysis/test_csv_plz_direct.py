@@ -16,9 +16,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
-from src.Webscraping.scraper_tibber import TibberScraper
-from src.Webscraping.scraper_enbw import EnbwScraper
-from src.backend.EnergyTariff import DynamicTariff
+from src.webscraping.scraper_tibber import TibberScraper
+from src.webscraping.scraper_enbw import EnbwScraper
+from src.backend.energy_tariff import DynamicTariff
 
 ZIP_CODE = "68167"  # Mannheim
 START_DATE = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
@@ -62,9 +62,9 @@ print(f"✓ Zeitraum: {(df['datetime'].max() - df['datetime'].min()).days} Tage"
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
-from src.backend.EnergyTariff import DynamicTariff
-from src.Webscraping.scraper_tibber import TibberScraper
-from src.Webscraping.scraper_enbw import EnbwScraper
+from src.backend.energy_tariff import DynamicTariff
+from src.webscraping.scraper_tibber import TibberScraper
+from src.webscraping.scraper_enbw import EnbwScraper
 import os
 
 print("=" * 80)

@@ -5,8 +5,8 @@ PLZ 68167 (Mannheim)
 """
 
 from datetime import datetime
-from src.backend.EnergyTariff import DynamicTariff
-from src.Webscraping.scraper_enbw import EnbwScraper
+from src.backend.energy_tariff import DynamicTariff
+from src.webscraping.scraper_enbw import EnbwScraper
 
 print("=" * 80)
 print("🧪 VOLLSTÄNDIGE INTEGRATION: EnBW PLZ 68167")

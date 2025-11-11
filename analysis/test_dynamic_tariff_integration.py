@@ -5,8 +5,8 @@ Zeigt, wie die additional_price_ct_kwh von Tibber verwendet wird
 """
 
 from datetime import datetime
-from src.backend.EnergyTariff import DynamicTariff
-from src.Webscraping.scraper_tibber import TibberScraper
+from src.backend.energy_tariff import DynamicTariff
+from src.webscraping.scraper_tibber import TibberScraper
 
 print("=" * 80)
 print("🧪 TEST: DYNAMIC TARIFF MIT SCRAPER-INTEGRATION")

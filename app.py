@@ -10,8 +10,8 @@ import io
 import sys
 import os
 import logging
-from src.backend.EnergyTariff import FixedTariff, DynamicTariff
-from src.backend.forecasting.UsageForecast import create_backtest
+from src.backend.energy_tariff import FixedTariff, DynamicTariff
+from src.backend.forecasting.energy_usage_forecast import create_backtest
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -996,7 +996,7 @@ async def get_market_prices():
 async def get_price_chart_data():
     """Get historical and forecast price data for chart visualization"""
     try:
-        from src.backend.forecasting.EnergyPriceForecast import create_chart_data
+        from src.backend.forecasting.energy_price_forecast import create_chart_data
         
         # Generate chart data
         chart_data = create_chart_data()
@@ -1014,7 +1014,7 @@ async def get_price_chart_data():
 async def get_price_breakdown():
     """Get energy price component breakdown for doughnut chart visualization"""
     try:
-        from src.backend.forecasting.EnergyPriceForecast import get_price_breakdown
+        from src.backend.forecasting.energy_price_forecast import get_price_breakdown
         
         # Generate price breakdown data
         breakdown_data = get_price_breakdown()
@@ -1193,7 +1193,7 @@ async def get_risk_analysis(file: UploadFile = File(...), days: int = Form(30)):
     Returns historic risk analysis, coincidence factor, and load profile data.
     """
     import traceback
-    from src.backend.RiskAnalysis import (
+    from src.backend.risk_analysis import (
         create_historic_risk_analysis,
         calculate_coincidence_factor,
         get_user_load_profile
@@ -1257,7 +1257,7 @@ async def get_risk_score(file: UploadFile = File(...), days: int = Form(30)):
     Returns a simple low/moderate/high risk assessment.
     """
     import traceback
-    from src.backend.RiskAnalysis import (
+    from src.backend.risk_analysis import (
         create_historic_risk_analysis,
         calculate_coincidence_factor,
         get_aggregated_risk_score

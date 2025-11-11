@@ -5,9 +5,9 @@ Zeigt PLZ-spezifische Preise für verschiedene Regionen
 """
 
 from datetime import datetime
-from src.backend.EnergyTariff import DynamicTariff
-from src.Webscraping.scraper_tibber import TibberScraper
-from src.Webscraping.scraper_enbw import EnbwScraper
+from src.backend.energy_tariff import DynamicTariff
+from src.webscraping.scraper_tibber import TibberScraper
+from src.webscraping.scraper_enbw import EnbwScraper
 
 print("=" * 100)
 print("📊 TARIFVERGLEICH MIT ECHTEN SCRAPER-DATEN (PLZ-SPEZIFISCH)")
