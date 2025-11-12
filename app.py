@@ -1,6 +1,6 @@
 from fastapi import FastAPI, File, HTTPException, UploadFile, Form, Response
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List, Optional
 import uvicorn
 import random
@@ -9,8 +9,13 @@ import pandas as pd
 import io
 import sys
 import os
-from src.backend.EnergyTariff import FixedTariff, DynamicTariff
-from src.backend.forecasting.UsageForecast import create_backtest
+import logging
+from src.backend.energy_tariff import FixedTariff, DynamicTariff
+from src.backend.forecasting.energy_usage_forecast import create_backtest
+
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
@@ -79,28 +84,15 @@ class BacktestDataResponse(BaseModel):
 
 # EnBW tariffs as EnergyTariff instances
 def create_enbw_tariffs():
-    """Create EnBW tariffs using EnergyTariff classes"""
+    """Create EnBW conventional (fixed) tariffs using EnergyTariff classes
+    
+    Note: Dynamic tariffs are now fetched via scrapers instead of being hardcoded.
+    This function only returns conventional fixed-rate tariffs for comparison.
+    """
     start_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
     
     return [
-        DynamicTariff(
-            name="EnBW mobility+ dynamic",
-            provider="EnBW",
-            base_price=14.90,
-            start_date=start_date,
-            is_dynamic=True,
-            markup=0.18,  # 18ct/kWh markup for premium dynamic tariff
-            features=["dynamic", "green"]
-        ),
-        DynamicTariff(
-            name="EnBW easy dynamic", 
-            provider="EnBW",
-            base_price=9.90,
-            start_date=start_date,
-            is_dynamic=True,
-            markup=0.22,  # 22ct/kWh markup for standard dynamic tariff
-            features=["dynamic", "green"]
-        ),
+        # Only conventional/fixed tariffs - dynamic tariffs come from scrapers
         FixedTariff(
             name="EnBW mobility+ Zuhause",
             provider="EnBW", 
@@ -146,57 +138,6 @@ def create_enbw_tariffs():
 # Create tariff instances
 ENBW_TARIFFS = create_enbw_tariffs()
 
-# Mock EnBW tariffs data for frontend compatibility
-ENBW_TARIFFS_MOCK = [
-    {
-        "name": "mobility+ dynamic",
-        "provider": "EnBW",
-        "baseFee": 14.90,
-        "workingPrice": 0.25,  # börsenpreis + 2ct/kWh
-        "features": ["Dynamischer Tarif", "E-Mobility Bonus", "100% Ökostrom"],
-        "isDynamic": True
-    },
-    {
-        "name": "easy dynamic",
-        "provider": "EnBW",
-        "baseFee": 9.90,
-        "workingPrice": 0.32,  # börsenpreis + 3.5ct/kWh
-        "features": ["Dynamischer Tarif", "Keine Mindestlaufzeit", "100% Ökostrom"],
-        "isDynamic": True
-    },
-    {
-        "name": "mobility+ Zuhause",
-        "provider": "EnBW",
-        "baseFee": 14.90,
-        "workingPrice": 0.3299,
-        "features": ["E-Mobility Bonus", "100% Ökostrom", "Wallbox-Rabatt"],
-        "isDynamic": False
-    },
-    {
-        "name": "easy+",
-        "provider": "EnBW",
-        "baseFee": 9.90,
-        "workingPrice": 0.3499,
-        "features": ["Keine Mindestlaufzeit", "100% Ökostrom", "Online-Bonus"],
-        "isDynamic": False
-    },
-    {
-        "name": "Basis",
-        "provider": "EnBW",
-        "baseFee": 12.90,
-        "workingPrice": 0.3699,
-        "features": ["Grundversorgung", "Lokaler Versorger", "Sicherheit"],
-        "isDynamic": False
-    },
-    {
-        "name": "Komfort",
-        "provider": "EnBW",
-        "baseFee": 15.90,
-        "workingPrice": 0.3599,
-        "features": ["Premium Service", "24h Hotline", "Persönlicher Berater"],
-        "isDynamic": False
-    }
-]
 
 @app.get("/")
 async def root():
@@ -234,22 +175,25 @@ async def get_tariffs():
         return frontend_tariffs
     
     except Exception as e:
-        # Fallback to mock data if real tariffs fail
-        print(f"Error loading real tariffs, using mock data: {str(e)}")
+        # Fallback to using ENBW_TARIFFS if primary method fails
+        print(f"Error loading real tariffs, using fallback: {str(e)}")
         frontend_tariffs = []
-        for i, tariff in enumerate(ENBW_TARIFFS_MOCK):
+        for i, tariff in enumerate(ENBW_TARIFFS):
+            # Get kwh_rate from tariff object
+            kwh_rate = getattr(tariff, 'kwh_rate', 0.30) if not tariff.is_dynamic else 0.25
+            
             frontend_tariff = {
-                "id": tariff["name"].lower().replace(" ", "_").replace("+", "plus"),
-                "name": tariff["name"],
-                "provider": tariff["provider"],
-                "base_price": tariff["baseFee"],
-                "kwh_price": tariff["workingPrice"],
-                "is_dynamic": tariff["isDynamic"],
-                "features": tariff["features"],
-                "contract_duration": 12 if tariff["name"] == "Basis" else 1,
-                "green_energy": True,
-                "description": f"{'Dynamischer' if tariff['isDynamic'] else 'Fester'} Stromtarif von {tariff['provider']}",
-                "type": "dynamic" if tariff["isDynamic"] else "fixed"
+                "id": tariff.name.lower().replace(" ", "_").replace("+", "plus"),
+                "name": tariff.name,
+                "provider": tariff.provider,
+                "base_price": tariff.base_price,
+                "kwh_price": kwh_rate,
+                "is_dynamic": tariff.is_dynamic,
+                "features": tariff.features if tariff.features else [],
+                "contract_duration": getattr(tariff, 'min_duration', 1),
+                "green_energy": "green" in (tariff.features or []),
+                "description": f"{'Dynamischer' if tariff.is_dynamic else 'Fester'} Stromtarif von {tariff.provider}",
+                "type": "dynamic" if tariff.is_dynamic else "fixed"
             }
             frontend_tariffs.append(frontend_tariff)
         
@@ -323,6 +267,288 @@ async def calculate_yearly_usage(
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing file: {str(e)}")
+
+
+# =============================================================================
+# NEW: CSV + PLZ-specific Scraper Integration
+# =============================================================================
+
+class TariffComparisonRequest(BaseModel):
+    """Request for tariff comparison with CSV and PLZ"""
+    zip_code: str  # Postleitzahl (5-stellig)
+    providers: List[str] = ["tibber", "enbw"]  # Anbieter zum Vergleich
+
+@app.post("/api/compare-tariffs-with-csv")
+async def compare_tariffs_with_csv(
+    file: UploadFile = File(...),
+    zip_code: str = Form(...),
+    providers: str = Form("tibber,enbw")  # Comma-separated
+):
+    """
+    Tarifvergleich mit hochgeladenen Verbrauchsdaten (CSV) und PLZ-spezifischen Preisen
+    
+    **Dieser Endpunkt kombiniert:**
+    - Hochgeladene CSV-Verbrauchsdaten (echte Smart-Meter Daten)
+    - PLZ-spezifische Preise von verschiedenen Anbietern (gescrapt)
+    - Prophet-Forecast für zukünftige Börsenstrompreise
+    
+    **Parameter:**
+    - file: CSV-Datei mit Verbrauchsdaten (Spalten: datetime, value)
+    - zip_code: Deutsche Postleitzahl (5 Stellen, z.B. "68167")
+    - providers: Komma-separierte Liste von Anbietern (z.B. "tibber,enbw")
+    
+    **Rückgabe:**
+    - Tarifvergleich mit realistischen, PLZ-spezifischen Preisen
+    - Basierend auf ECHTEN Verbrauchsdaten aus CSV
+    """
+    try:
+        # 1. CSV-Datei validieren und einlesen
+        if not file.filename.endswith('.csv'):
+            raise HTTPException(status_code=400, detail="File must be a CSV")
+        
+        contents = await file.read()
+        df = pd.read_csv(io.StringIO(contents.decode('utf-8')))
+        
+        print(f"\n{'='*80}")
+        print(f"📊 CSV-DATEI ANALYSE")
+        print(f"{'='*80}")
+        print(f"Datei: {file.filename}")
+        print(f"Spalten: {list(df.columns)}")
+        print(f"Zeilen: {len(df)}")
+        print(f"Erste 3 Zeilen:")
+        print(df.head(3))
+        
+        # Flexible Spaltenerkennung
+        time_col = None
+        value_col = None
+        
+        # Suche Zeitstempel-Spalte
+        for col in df.columns:
+            col_lower = col.lower()
+            if any(keyword in col_lower for keyword in ['time', 'date', 'zeit', 'datum', 'timestamp']):
+                time_col = col
+                break
+        
+        # Suche Verbrauchs-Spalte
+        for col in df.columns:
+            col_lower = col.lower()
+            if any(keyword in col_lower for keyword in ['value', 'consumption', 'verbrauch', 'kwh', 'wh', 'leistung']):
+                value_col = col
+                break
+        
+        if not time_col or not value_col:
+            raise HTTPException(
+                status_code=400,
+                detail=f"CSV-Spalten nicht erkannt. Gefunden: {list(df.columns)}. Erwartet: Zeitstempel + Verbrauchswert"
+            )
+        
+        print(f"✓ Erkannte Zeitstempel-Spalte: '{time_col}'")
+        print(f"✓ Erkannte Verbrauchs-Spalte: '{value_col}'")
+        
+        # Normalisiere Spaltennamen
+        df['datetime'] = pd.to_datetime(df[time_col])
+        df['value'] = pd.to_numeric(df[value_col], errors='coerce')
+        
+        # Entferne NaN-Werte
+        original_len = len(df)
+        df = df.dropna(subset=['datetime', 'value'])
+        if len(df) < original_len:
+            print(f"⚠️  {original_len - len(df)} Zeilen mit ungültigen Werten entfernt")
+        
+        if len(df) == 0:
+            raise HTTPException(status_code=400, detail="Keine gültigen Daten in CSV gefunden")
+        
+        # 2. Jahresverbrauch aus CSV berechnen
+        # Erkenne automatisch das Intervall
+        if len(df) > 1:
+            time_diff_seconds = (df['datetime'].iloc[1] - df['datetime'].iloc[0]).total_seconds()
+            if time_diff_seconds <= 900:  # 15 Minuten
+                interval_factor = 4  # 4 x 15min = 1 Stunde
+            elif time_diff_seconds <= 3600:  # 1 Stunde
+                interval_factor = 1  # Werte sind bereits kWh
+            else:
+                interval_factor = 1  # Fallback
+        else:
+            interval_factor = 1
+        
+        total_consumption = df['value'].sum() / interval_factor
+        date_range_years = (df['datetime'].max() - df['datetime'].min()).total_seconds() / (365.25 * 24 * 3600)
+        
+        if 0 < date_range_years < 1:
+            annual_kwh = total_consumption / date_range_years
+        else:
+            annual_kwh = total_consumption
+        
+        print(f"\n{'='*80}")
+        print(f"📊 CSV-VERBRAUCHSDATEN ANALYSE")
+        print(f"{'='*80}")
+        print(f"Datei: {file.filename}")
+        print(f"PLZ: {zip_code}")
+        print(f"Zeitraum: {df['datetime'].min()} bis {df['datetime'].max()}")
+        print(f"Daten: {len(df)} Einträge ({date_range_years:.2f} Jahre)")
+        print(f"Jahresverbrauch: {annual_kwh:.2f} kWh")
+        print(f"{'='*80}\n")
+        
+        # 3. Anbieter scrapen und Tarife erstellen
+        provider_list = [p.strip() for p in providers.split(",")]
+        tariffs = []
+        start_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        
+        for provider in provider_list:
+            try:
+                print(f"\n🔍 Scrape {provider.upper()} für PLZ {zip_code}...")
+                
+                if provider.lower() == "tibber":
+                    from src.webscraping.scraper_tibber import scrape_tibber_price
+                    scraped_data = await scrape_tibber_price(
+                        postal_code=zip_code,
+                        annual_consumption_kwh=int(annual_kwh)
+                    )
+                    
+                    tariff = DynamicTariff(
+                        name="Tibber Dynamic",
+                        provider="Tibber",
+                        base_price=scraped_data['base_price_monthly'],
+                        start_date=start_date,
+                        network_fee=0,
+                        postal_code=zip_code,
+                        additional_price_ct_kwh=scraped_data['additional_price_ct_kwh']
+                    )
+                    tariffs.append(('Tibber', tariff, scraped_data))
+                    print(f"   ✓ Grundpreis: {scraped_data['base_price_monthly']:.2f} €/Mon")
+                    print(f"   ✓ Zusatz-Komponenten: {scraped_data['additional_price_ct_kwh']:.2f} ct/kWh")
+                    
+                elif provider.lower() == "enbw":
+                    from src.webscraping.scraper_enbw import scrape_enbw_tariff
+                    scraped_data = await scrape_enbw_tariff(
+                        zip_code=zip_code,
+                        annual_consumption=int(annual_kwh)
+                    )
+                    
+                    tariff = DynamicTariff(
+                        name="EnBW Dynamisch",
+                        provider="EnBW",
+                        base_price=scraped_data['base_price_monthly'],
+                        start_date=start_date,
+                        network_fee=0,
+                        postal_code=zip_code,
+                        additional_price_ct_kwh=scraped_data['markup_ct_kwh']
+                    )
+                    tariffs.append(('EnBW', tariff, scraped_data))
+                    print(f"   ✓ Grundpreis: {scraped_data['base_price_monthly']:.2f} €/Mon")
+                    print(f"   ✓ Zusatz-Komponenten: {scraped_data['markup_ct_kwh']:.2f} ct/kWh")
+                
+            except Exception as e:
+                print(f"   ❌ Fehler beim Scrapen von {provider}: {e}")
+                import traceback
+                traceback.print_exc()
+                continue
+        
+        # 4. Kosten für jeden Tarif mit ECHTEN CSV-Daten berechnen
+        results = []
+        
+        # 4a. Berechne Kosten für gescrapte dynamische Tarife
+        for provider_name, tariff, scraped_data in tariffs:
+            try:
+                print(f"\n💰 Berechne Kosten für {provider_name} mit CSV-Daten...")
+                
+                # Verwende die ECHTEN Verbrauchsdaten aus der CSV!
+                result = tariff.calculate_cost_with_breakdown(df)
+                
+                results.append({
+                    "provider": provider_name,
+                    "tariff_name": tariff.name,
+                    "base_price_monthly": tariff.base_price,
+                    "additional_price_ct_kwh": tariff.additional_price_ct_kwh,
+                    "avg_kwh_price_ct": result['avg_kwh_price'] * 100,
+                    "monthly_cost": result['total_cost'],
+                    "annual_cost": result['total_cost'] * 12,
+                    "postal_code": zip_code,
+                    "data_source": "csv_uploaded",
+                    "tariff_type": "dynamic"
+                })
+                
+                print(f"   ✓ Durchschnitt: {result['avg_kwh_price']*100:.2f} ct/kWh")
+                print(f"   ✓ Monatliche Kosten: {result['total_cost']:.2f} €")
+                
+            except Exception as e:
+                print(f"   ❌ Fehler bei Berechnung für {provider_name}: {e}")
+                import traceback
+                traceback.print_exc()
+                continue
+        
+        # 4b. Füge konventionelle Fixpreis-Tarife hinzu
+        print(f"\n💰 Berechne Kosten für konventionelle Fixpreis-Tarife...")
+        conventional_tariffs = create_enbw_tariffs()
+        
+        for conv_tariff in conventional_tariffs:
+            try:
+                print(f"\n   Berechne {conv_tariff.name}...")
+                
+                # Berechne Kosten mit CSV-Daten
+                monthly_cost = conv_tariff.calculate_cost(df)
+                
+                results.append({
+                    "provider": conv_tariff.provider,
+                    "tariff_name": conv_tariff.name,
+                    "base_price_monthly": conv_tariff.base_price,
+                    "additional_price_ct_kwh": None,  # Fixpreis hat kein Markup
+                    "avg_kwh_price_ct": conv_tariff.kwh_rate * 100,
+                    "monthly_cost": monthly_cost,
+                    "annual_cost": monthly_cost * 12,
+                    "postal_code": zip_code,
+                    "data_source": "hardcoded_conventional",
+                    "tariff_type": "fixed"
+                })
+                
+                print(f"   ✓ Fixpreis: {conv_tariff.kwh_rate*100:.2f} ct/kWh")
+                print(f"   ✓ Monatliche Kosten: {monthly_cost:.2f} €")
+                
+            except Exception as e:
+                print(f"   ❌ Fehler bei Berechnung für {conv_tariff.name}: {e}")
+                import traceback
+                traceback.print_exc()
+                continue
+        
+        # 5. Sortiere nach Kosten
+        results.sort(key=lambda x: x['monthly_cost'])
+        
+        # 6. Berechne Ersparnis
+        if len(results) > 1:
+            cheapest = results[0]['monthly_cost']
+            for r in results[1:]:
+                r['savings_monthly'] = r['monthly_cost'] - cheapest
+                r['savings_annual'] = r['savings_monthly'] * 12
+        
+        print(f"\n{'='*80}")
+        print(f"✅ VERGLEICH ABGESCHLOSSEN")
+        print(f"{'='*80}\n")
+        
+        return {
+            "success": True,
+            "zip_code": zip_code,
+            "annual_consumption_kwh": round(annual_kwh, 2),
+            "data_source": "uploaded_csv",
+            "csv_filename": file.filename,
+            "csv_date_range": {
+                "start": df['datetime'].min().isoformat(),
+                "end": df['datetime'].max().isoformat(),
+                "days": (df['datetime'].max() - df['datetime'].min()).days
+            },
+            "tariffs": results,
+            "cheapest_provider": results[0]['provider'] if results else None
+        }
+        
+    except Exception as e:
+        print(f"❌ Fehler: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
+
+
+# =============================================================================
+# Original CSV endpoint (ohne Scraper-Integration)
+# =============================================================================
 
 @app.post("/api/calculate-with-csv")
 async def calculate_with_csv(
@@ -642,7 +868,7 @@ async def calculate_tariffs(request: TariffRequest):
         return await calculate_tariffs_mock(request)
 
 async def calculate_tariffs_mock(request: TariffRequest):
-    """Fallback calculation using mock data"""
+    """Fallback calculation using ENBW_TARIFFS objects"""
     # Handle both frontend and direct API formats
     annual_consumption = request.annualConsumption or request.annual_kwh or 3500
     has_smart_meter = request.hasSmartMeter if request.hasSmartMeter is not None else request.has_smart_meter
@@ -650,30 +876,30 @@ async def calculate_tariffs_mock(request: TariffRequest):
     if request.tariff_id:
         # Frontend sends specific tariff calculation
         target_tariff = None
-        for tariff in ENBW_TARIFFS_MOCK:
-            tariff_id = tariff["name"].lower().replace(" ", "_").replace("+", "plus")
+        for tariff in ENBW_TARIFFS:
+            tariff_id = tariff.name.lower().replace(" ", "_").replace("+", "plus")
             if tariff_id == request.tariff_id:
                 target_tariff = tariff
                 break
         
         if not target_tariff:
-            target_tariff = ENBW_TARIFFS_MOCK[0]  # fallback
+            target_tariff = ENBW_TARIFFS[0]  # fallback
         
         # Mock spot price for dynamic tariffs
         spot_price = random.uniform(0.08, 0.15)  # €/kWh
         
         # Calculate working price
-        if target_tariff["isDynamic"]:
-            working_price = spot_price + (target_tariff["workingPrice"] - 0.08)  # Add markup
+        if target_tariff.is_dynamic:
+            working_price = spot_price + 0.02  # Add markup
         else:
-            working_price = target_tariff["workingPrice"]
+            working_price = target_tariff.kwh_rate
         
         # Calculate total cost
-        annual_cost = (target_tariff["baseFee"] * 12) + (annual_consumption * working_price)
+        annual_cost = (target_tariff.base_price * 12) + (annual_consumption * working_price)
         
         # Calculate savings potential for smart meter users
         savings_potential = 0
-        if has_smart_meter and target_tariff["isDynamic"]:
+        if has_smart_meter and target_tariff.is_dynamic:
             savings_potential = random.uniform(10, 25)  # 10-25% savings possible
         
         return {
@@ -681,7 +907,7 @@ async def calculate_tariffs_mock(request: TariffRequest):
             "monthly_cost": annual_cost / 12,
             "savings_potential": savings_potential,
             "cost_breakdown": {
-                "base_fee_annual": target_tariff["baseFee"] * 12,
+                "base_fee_annual": target_tariff.base_price * 12,
                 "energy_cost_annual": annual_consumption * working_price,
                 "working_price": working_price
             }
@@ -694,23 +920,23 @@ async def calculate_tariffs_mock(request: TariffRequest):
         # Mock spot price for dynamic tariffs
         spot_price = random.uniform(0.08, 0.15)  # €/kWh
         
-        for tariff in ENBW_TARIFFS_MOCK:
+        for tariff in ENBW_TARIFFS:
             # Calculate working price
-            if tariff["isDynamic"]:
-                working_price = spot_price + (tariff["workingPrice"] - 0.08)  # Add markup
+            if tariff.is_dynamic:
+                working_price = spot_price + 0.02  # Add markup
             else:
-                working_price = tariff["workingPrice"]
+                working_price = tariff.kwh_rate
             
             # Calculate total cost
-            annual_cost = (tariff["baseFee"] * 12) + (annual_consumption * working_price)
+            annual_cost = (tariff.base_price * 12) + (annual_consumption * working_price)
             
             results.append(TariffResult(
-                name=tariff["name"],
-                provider=tariff["provider"],
-                baseFee=tariff["baseFee"],
+                name=tariff.name,
+                provider=tariff.provider,
+                baseFee=tariff.base_price,
                 workingPrice=working_price,
                 totalCost=annual_cost,
-                features=tariff["features"]
+                features=tariff.features if tariff.features else []
             ))
         
         # Sort by total cost
@@ -744,7 +970,7 @@ async def get_market_prices():
 async def get_price_chart_data():
     """Get historical and forecast price data for chart visualization"""
     try:
-        from src.backend.forecasting.EnergyPriceForecast import create_chart_data
+        from src.backend.forecasting.energy_price_forecast import create_chart_data
         
         # Generate chart data
         chart_data = create_chart_data()
@@ -762,7 +988,7 @@ async def get_price_chart_data():
 async def get_price_breakdown():
     """Get energy price component breakdown for doughnut chart visualization"""
     try:
-        from src.backend.forecasting.EnergyPriceForecast import get_price_breakdown
+        from src.backend.forecasting.energy_price_forecast import get_price_breakdown
         
         # Generate price breakdown data
         breakdown_data = get_price_breakdown()
@@ -778,51 +1004,109 @@ async def get_price_breakdown():
 
 @app.get("/api/forecast")
 async def get_price_forecast():
-    """Get price forecast for the next 7 days"""
-    import random
-    from datetime import datetime, timedelta
+    """Get price forecast for the next 7 days from Prophet model"""
+    import os
+    import pandas as pd
+    from datetime import datetime
     
-    forecast_data = []
-    base_date = datetime.now()
-    
-    for day in range(7):
-        current_date = base_date + timedelta(days=day)
-        daily_prices = []
+    try:
+        # Load the actual Prophet forecast data
+        project_root = os.path.dirname(os.path.abspath(__file__))
+        app_data_path = os.path.join(project_root, "app_data")
         
-        # Simulate realistic hourly price patterns
-        for hour in range(24):
-            # Lower prices at night (23-6h), higher during peak times (17-20h)
-            if 23 <= hour or hour <= 6:  # Night hours
-                base_price = random.uniform(0.05, 0.12)
-            elif 17 <= hour <= 20:  # Peak hours
-                base_price = random.uniform(0.20, 0.35)
-            else:  # Regular hours
-                base_price = random.uniform(0.12, 0.22)
+        # Find the most recent price forecast file
+        forecast_files = [f for f in os.listdir(app_data_path) if f.startswith('germany_price_forecast_') and f.endswith('.csv')]
+        if not forecast_files:
+            raise FileNotFoundError("No price forecast files found")
+        
+        latest_forecast_file = sorted(forecast_files)[-1]
+        forecast_path = os.path.join(app_data_path, latest_forecast_file)
+        
+        # Read forecast data
+        df = pd.read_csv(forecast_path)
+        df['ds'] = pd.to_datetime(df['ds'])
+        
+        # Use only next 7 days (168 hours)
+        df = df.head(168)
+        
+        # Convert yhat_energy from EUR/MWh to EUR/kWh
+        df['price_eur_kwh'] = df['yhat_energy'] / 10 / 100  # EUR/MWh -> ct/kWh -> EUR/kWh
+        
+        # Group by day
+        forecast_data = []
+        for date in df['ds'].dt.date.unique()[:7]:
+            day_data = df[df['ds'].dt.date == date]
             
-            # Add some volatility
-            price = base_price + random.uniform(-0.03, 0.03)
-            price = max(0.02, price)  # Minimum price
+            hourly_prices = []
+            for _, row in day_data.iterrows():
+                hourly_prices.append({
+                    "hour": row['ds'].hour,
+                    "price": round(row['price_eur_kwh'], 4),
+                    "datetime": row['ds'].isoformat()
+                })
             
-            daily_prices.append({
-                "hour": hour,
-                "price": round(price, 4),
-                "datetime": current_date.replace(hour=hour).isoformat()
+            forecast_data.append({
+                "date": str(date),
+                "day_name": pd.Timestamp(date).strftime("%A"),
+                "hourly_prices": hourly_prices,
+                "avg_price": round(day_data['price_eur_kwh'].mean(), 4),
+                "min_price": round(day_data['price_eur_kwh'].min(), 4),
+                "max_price": round(day_data['price_eur_kwh'].max(), 4)
             })
         
-        forecast_data.append({
-            "date": current_date.strftime("%Y-%m-%d"),
-            "day_name": current_date.strftime("%A"),
-            "hourly_prices": daily_prices,
-            "avg_price": round(sum(p["price"] for p in daily_prices) / 24, 4),
-            "min_price": round(min(p["price"] for p in daily_prices), 4),
-            "max_price": round(max(p["price"] for p in daily_prices), 4)
-        })
+        return {
+            "forecast": forecast_data,
+            "generated_at": datetime.now().isoformat(),
+            "currency": "EUR/kWh",
+            "source": "prophet_model"
+        }
+        
+    except Exception as e:
+        # Fallback to mock data if Prophet data not available
+        import random
+        from datetime import datetime, timedelta
+        print(f"⚠️ Could not load Prophet forecast: {e}, using mock data")
+        forecast_data = []
+        base_date = datetime.now()
     
-    return {
-        "forecast": forecast_data,
-        "generated_at": datetime.now().isoformat(),
-        "currency": "EUR/kWh"
-    }
+        for day in range(7):
+            current_date = base_date + timedelta(days=day)
+            daily_prices = []
+            
+            # Simulate realistic hourly price patterns
+            for hour in range(24):
+                # Lower prices at night (23-6h), higher during peak times (17-20h)
+                if 23 <= hour or hour <= 6:  # Night hours
+                    base_price = random.uniform(0.05, 0.12)
+                elif 17 <= hour <= 20:  # Peak hours
+                    base_price = random.uniform(0.20, 0.35)
+                else:  # Regular hours
+                    base_price = random.uniform(0.12, 0.22)
+                
+                # Add some volatility
+                price = base_price + random.uniform(-0.03, 0.03)
+                price = max(0.02, price)  # Minimum price
+                
+                daily_prices.append({
+                    "hour": hour,
+                    "price": round(price, 4),
+                    "datetime": current_date.replace(hour=hour).isoformat()
+                })
+            
+            forecast_data.append({
+                "date": current_date.strftime("%Y-%m-%d"),
+                "day_name": current_date.strftime("%A"),
+                "hourly_prices": daily_prices,
+                "avg_price": round(sum(p["price"] for p in daily_prices) / 24, 4),
+                "min_price": round(min(p["price"] for p in daily_prices), 4),
+                "max_price": round(max(p["price"] for p in daily_prices), 4)
+            })
+        
+        return {
+            "forecast": forecast_data,
+            "generated_at": datetime.now().isoformat(),
+            "currency": "EUR/kWh"
+        }
 
 @app.post("/api/predict-savings")
 async def predict_savings(usage_data: dict):
@@ -883,7 +1167,7 @@ async def get_risk_analysis(file: UploadFile = File(...), days: int = Form(30)):
     Returns historic risk analysis, coincidence factor, and load profile data.
     """
     import traceback
-    from src.backend.RiskAnalysis import (
+    from src.backend.risk_analysis import (
         create_historic_risk_analysis,
         calculate_coincidence_factor,
         get_user_load_profile
@@ -947,7 +1231,7 @@ async def get_risk_score(file: UploadFile = File(...), days: int = Form(30)):
     Returns a simple low/moderate/high risk assessment.
     """
     import traceback
-    from src.backend.RiskAnalysis import (
+    from src.backend.risk_analysis import (
         create_historic_risk_analysis,
         calculate_coincidence_factor,
         get_aggregated_risk_score
@@ -979,8 +1263,19 @@ async def get_risk_score(file: UploadFile = File(...), days: int = Form(30)):
         historic_risk = create_historic_risk_analysis(df, days=days, app_data_dir=app_data_dir)
         coincidence = calculate_coincidence_factor(df, days=days, expensive_hours_pct=20.0, app_data_dir=app_data_dir)
         
+        # Prepare parameters for risk score calculation
+        forecast_price_volatility = {}  # Empty dict for now, can be enhanced later
+        usage_forecast_quality = {}  # Empty dict for now, can be enhanced later
+        is_dynamic = True  # Assuming dynamic tariff evaluation by default
+        
         # Get aggregated risk score
-        risk_assessment = get_aggregated_risk_score(historic_risk, coincidence)
+        risk_assessment = get_aggregated_risk_score(
+            historic_risk, 
+            coincidence, 
+            forecast_price_volatility,
+            is_dynamic,
+            usage_forecast_quality
+        )
         
         return risk_assessment
         
@@ -1002,5 +1297,750 @@ async def get_risk_score(file: UploadFile = File(...), days: int = Form(30)):
         print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=error_msg)
 
+
+@app.post("/api/risk-score-per-tariff")
+async def get_risk_score_per_tariff(
+    file: UploadFile = File(...), 
+    days: int = Form(30),
+    is_dynamic: bool = Form(True)
+):
+    """
+    Get aggregated risk score for a specific tariff type (dynamic or fixed).
+    Returns a simple low/moderate/high risk assessment customized for the tariff type.
+    
+    Parameters:
+    - file: CSV file with consumption data (datetime, value columns)
+    - days: Number of days to analyze (default: 30)
+    - is_dynamic: Whether to calculate risk for a dynamic (True) or fixed (False) tariff
+    """
+    import traceback
+    from src.backend.risk_analysis import (
+        create_historic_risk_analysis,
+        calculate_coincidence_factor,
+        get_aggregated_risk_score
+    )
+    
+    # Validate file type
+    if not file.filename.endswith('.csv'):
+        raise HTTPException(status_code=400, detail="File must be a CSV")
+    
+    try:
+        # Read the uploaded CSV
+        contents = await file.read()
+        df = pd.read_csv(io.StringIO(contents.decode('utf-8')))
+        
+        # Validate CSV has required columns
+        if 'datetime' not in df.columns or 'value' not in df.columns:
+            raise HTTPException(
+                status_code=400, 
+                detail="CSV must have 'datetime' and 'value' columns"
+            )
+        
+        # Convert datetime column
+        df['datetime'] = pd.to_datetime(df['datetime'])
+        
+        # Determine app_data directory
+        app_data_dir = os.path.join(os.path.dirname(__file__), "app_data")
+        
+        # Calculate risk metrics
+        historic_risk = create_historic_risk_analysis(df, days=days, app_data_dir=app_data_dir)
+        coincidence = calculate_coincidence_factor(df, days=days, expensive_hours_pct=20.0, app_data_dir=app_data_dir)
+        
+        # Prepare parameters for risk score calculation
+        forecast_price_volatility = {}  # Empty dict for now, can be enhanced later
+        usage_forecast_quality = {}  # Empty dict for now, can be enhanced later
+        
+        # Get aggregated risk score with tariff-specific is_dynamic parameter
+        risk_assessment = get_aggregated_risk_score(
+            historic_risk, 
+            coincidence, 
+            forecast_price_volatility,
+            is_dynamic,  # This will affect the risk calculation
+            usage_forecast_quality
+        )
+        
+        # Add tariff type to response
+        risk_assessment['tariff_type'] = 'dynamic' if is_dynamic else 'fixed'
+        
+        return risk_assessment
+        
+    except FileNotFoundError as e:
+        error_msg = str(e)
+        print(f"FileNotFoundError in risk score per tariff: {error_msg}")
+        traceback.print_exc()
+        raise HTTPException(status_code=404, detail=error_msg)
+    except ValueError as e:
+        error_msg = str(e)
+        print(f"ValueError in risk score per tariff: {error_msg}")
+        traceback.print_exc()
+        raise HTTPException(status_code=400, detail=error_msg)
+    except HTTPException:
+        raise
+    except Exception as e:
+        error_msg = f"Error calculating risk score per tariff: {str(e)}"
+        print(f"Unexpected error in risk score per tariff: {error_msg}")
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=error_msg)
+
+
+# =============================================================================
+# SCRAPER ENDPOINTS - EnBW, Tado, Tibber
+# =============================================================================
+
+# Helper function to create DynamicTariff objects from scraper data
+def create_dynamic_tariff_from_scraper(scraper_data: dict, provider: str) -> DynamicTariff:
+    """
+    Create a DynamicTariff object from scraper response data.
+    
+    Args:
+        scraper_data: Raw scraper response dictionary
+        provider: Provider name (e.g., "EnBW", "Tado", "Tibber")
+    
+    Returns:
+        DynamicTariff: Configured tariff object with scraped pricing data
+    """
+    from datetime import datetime
+    
+    # Extract common fields
+    base_price = scraper_data.get("total_base_monthly", scraper_data.get("base_price_monthly", 0))
+    start_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    
+    # Extract provider-specific additional_price_ct_kwh
+    additional_price_ct_kwh = None
+    network_fee = 0
+    
+    if provider.lower() == "tibber":
+        # Tibber: additional_price_ct enthält Netzentgelte, Steuern, Umlagen (~18.4 ct/kWh)
+        additional_price_ct_kwh = scraper_data.get("additional_price_ct", 18.4)
+        network_fee = 0  # Bei Tibber in base_price enthalten
+        
+    elif provider.lower() == "enbw":
+        # EnBW: markup_ct_kwh enthält die festen Komponenten (Netzentgelte + Steuern + Umlagen)
+        # Diese werden direkt als ct/kWh berechnet, NICHT als einmalige network_fee!
+        additional_price_ct_kwh = scraper_data.get("markup_ct_kwh", 18.4)
+        network_fee = 0  # EnBW hat keine einmalige Netzgebühr, alles ist im markup_ct_kwh
+        
+    elif provider.lower() == "tado":
+        # Tado: Monatliche Netzgebühr umrechnen in ct/kWh
+        annual_consumption = scraper_data.get("annual_consumption", 2500)
+        network_fee_monthly = scraper_data.get("network_fee_monthly", 51.85)
+        # (51.85€/Monat * 12) / annual_consumption * 100 = ct/kWh
+        additional_price_ct_kwh = (network_fee_monthly * 12 / annual_consumption * 100) if annual_consumption > 0 else 18.4
+        network_fee = 0  # Bei Tado monatlich, nicht einmalig
+    
+    # Fallback auf default, falls nicht gesetzt
+    if additional_price_ct_kwh is None:
+        additional_price_ct_kwh = 18.4
+    
+    # Create DynamicTariff object
+    tariff = DynamicTariff(
+        name=scraper_data.get("tariff_name", f"{provider} Dynamic"),
+        provider=provider,
+        base_price=base_price,
+        start_date=start_date,
+        is_dynamic=True,
+        network_fee=network_fee,
+        features=["dynamic", "real-time-pricing", "smart-meter-required"],
+        postal_code=scraper_data.get("zip_code"),
+        additional_price_ct_kwh=additional_price_ct_kwh  # ← NEUE PARAMETER!
+    )
+    
+    return tariff
+
+
+# Helper function to convert scraper data to EnergyTariff-compatible dict (legacy)
+def scraper_to_tariff(scraper_data: dict, provider: str, tariff_type: str = "dynamic") -> dict:
+    """
+    Convert scraper response data to EnergyTariff-compatible format.
+    
+    Args:
+        scraper_data: Raw scraper response dictionary
+        provider: Provider name (e.g., "EnBW", "Tado", "Tibber")
+        tariff_type: Type of tariff ("dynamic" or "fixed")
+    
+    Returns:
+        dict: EnergyTariff-compatible data structure
+    """
+    from datetime import datetime
+    
+    # Base tariff data
+    tariff_dict = {
+        "name": scraper_data.get("tariff_name", f"{provider} Dynamic"),
+        "provider": provider,
+        "is_dynamic": tariff_type == "dynamic",
+        "start_date": datetime.now().isoformat(),
+        "features": ["dynamic", "real-time-pricing", "smart-meter-required"]
+    }
+    
+    # Provider-specific data mapping
+    if provider == "EnBW":
+        # EnBW: markup_ct_kwh enthält Netznutzung, Steuern, Umlagen
+        tariff_dict.update({
+            "base_price": scraper_data.get("base_price_monthly", 0),
+            "kwh_rate": scraper_data.get("exchange_price_ct_kwh", 0) / 100 if scraper_data.get("exchange_price_ct_kwh") else 0,  # Börsenpreis
+            "network_fee": 0,  # Bei EnBW nicht separat
+            "additional_price_ct_kwh": scraper_data.get("markup_ct_kwh", 15.36),  # Netzentgelte, Steuern, Umlagen in ct/kWh
+            "min_duration": None
+        })
+    elif provider == "Tado":
+        # Tado: markup_ct_kwh enthält nur Netzentgelte/Steuern (ohne aktuellen Börsenpreis)
+        # Der Scraper berechnet: kwh_price_ct (gesamt) - tatsächlicher Börsenpreis = markup_ct_kwh
+        tariff_dict.update({
+            "base_price": scraper_data.get("base_price_monthly", 0),
+            "kwh_rate": 0,  # Forecast-Preis wird später verwendet
+            "network_fee": 0,  # Bei Tado im markup_ct_kwh enthalten
+            "additional_price_ct_kwh": scraper_data.get("markup_ct_kwh", 18.0),  # Nur Markup (Netz + Steuern, ohne Börse)
+            "min_duration": None
+        })
+    elif provider == "Tibber":
+        # Tibber: additional_price_ct_kwh enthält alle Zusatzkosten (18,25 ct/kWh)
+        tariff_dict.update({
+            "base_price": scraper_data.get("base_price_monthly", 0),  # Grundpreis
+            "kwh_rate": 0,  # Forecast-Preis wird später verwendet
+            "network_fee": 0,  # Bei Tibber in additional_price_ct_kwh enthalten
+            "additional_price_ct_kwh": scraper_data.get("additional_price_ct_kwh", 18.25),  # Netzentgelte + Steuern + Umlagen
+            "min_duration": None
+        })
+    
+    return tariff_dict
+
+
+# ============================================================
+# EnBW Dynamic Tariff Scraper Endpoint (NEW)
+# ============================================================
+
+class EnbwScraperRequest(BaseModel):
+    """Request model for EnBW scraper"""
+    zip_code: str  # Postleitzahl (5-stellig)
+    annual_consumption: float  # Jahresverbrauch in kWh
+    headless: bool = True  # Browser im Headless-Modus
+    debug_mode: bool = False  # Debug-Ausgaben und Screenshots
+
+class EnbwScraperResponse(BaseModel):
+    """Response model for EnBW scraper"""
+    success: bool
+    provider: str
+    tariff_name: str
+    base_price_monthly: Optional[float] = None
+    markup_ct_kwh: Optional[float] = None
+    exchange_price_ct_kwh: Optional[float] = None
+    total_kwh_price_ct: Optional[float] = None
+    monthly_cost_example: Optional[float] = None
+    zip_code: str
+    annual_consumption: float
+    timestamp: str
+    source_url: str
+    error: Optional[str] = None
+
+@app.post("/api/scrape/enbw")
+async def scrape_enbw_tariff(request: EnbwScraperRequest):
+    """
+    Scrape real-time pricing from EnBW dynamic tariff page using Playwright
+    
+    This endpoint uses Playwright to scrape actual prices from the EnBW website
+    for the given zip code and annual consumption.
+    
+    - **zip_code**: German postal code (5 digits, e.g., "71065")
+    - **annual_consumption**: Annual consumption in kWh (e.g., 2250)
+    
+    Returns real-time pricing data including:
+    - Base price (monthly, €)
+    - Markup price (ct/kWh)
+    - Average exchange price (ct/kWh, variable)
+    - Total kWh price (ct/kWh)
+    - Example monthly cost (€)
+    """
+    try:
+        # Import EnBW scraper
+        from src.webscraping.scraper_enbw import scrape_enbw_tariff as scrape_tariff
+        
+        logger.info(f"🔍 EnBW Scraper API Request: PLZ {request.zip_code}, {request.annual_consumption} kWh")
+        
+        # Scrape data using async function
+        result = await scrape_tariff(
+            zip_code=request.zip_code,
+            annual_consumption=request.annual_consumption
+        )
+        
+        if result and 'provider' in result:
+            # Success
+            response = EnbwScraperResponse(
+                success=True,
+                provider=result.get('provider', 'EnBW'),
+                tariff_name=result.get('tariff_name', 'Dynamischer Stromtarif'),
+                base_price_monthly=result.get('base_price_monthly'),
+                markup_ct_kwh=result.get('markup_ct_kwh'),
+                exchange_price_ct_kwh=result.get('exchange_price_ct_kwh'),
+                total_kwh_price_ct=result.get('total_kwh_price_ct'),
+                monthly_cost_example=result.get('monthly_cost_example'),
+                zip_code=result.get('zip_code', request.zip_code),
+                annual_consumption=result.get('annual_consumption', request.annual_consumption),
+                timestamp=result.get('scraped_at', datetime.now().isoformat()),
+                source_url=result.get('url', 'https://www.enbw.com/strom/dynamischer-stromtarif')
+            )
+            
+            logger.info(f"✅ EnBW Scraping erfolgreich: {response.base_price_monthly} €/Mon, {response.markup_ct_kwh} ct/kWh (Quelle: {result.get('data_source')})")
+            
+            return response
+        else:
+            # Scraping failed
+            raise HTTPException(
+                status_code=500,
+                detail="Scraping fehlgeschlagen - keine Daten erhalten"
+            )
+            
+    except ImportError as e:
+        print(f"❌ Import Error: {e}")
+        raise HTTPException(
+            status_code=503,
+            detail=f"EnBW Scraper nicht verfügbar: {str(e)}"
+        )
+    except Exception as e:
+        print(f"❌ Scraping Error: {e}")
+        import traceback
+        traceback.print_exc()
+        
+        # Return error response
+        return EnbwScraperResponse(
+            success=False,
+            provider="EnBW",
+            tariff_name="Dynamischer Stromtarif",
+            zip_code=request.zip_code,
+            annual_consumption=request.annual_consumption,
+            timestamp=datetime.now().isoformat(),
+            source_url="https://www.enbw.com/strom/dynamischer-stromtarif",
+            error=str(e)
+        )
+
+
+# ============================================================
+# Tado Energy Tariff Scraper Endpoint (NEW)
+# ============================================================
+
+class TadoScraperRequest(BaseModel):
+    """Request model for Tado scraper"""
+    zip_code: str
+    annual_consumption: float
+    headless: bool = True
+    debug_mode: bool = False
+
+class TadoScraperResponse(BaseModel):
+    """Response model for Tado scraper"""
+    success: bool
+    provider: str
+    tariff_name: str
+    base_price_monthly: Optional[float] = None
+    kwh_price_ct: Optional[float] = None
+    monthly_cost: Optional[float] = None
+    annual_cost: Optional[float] = None
+    zip_code: str
+    annual_consumption: float
+    timestamp: str
+    source_url: str
+    note: Optional[str] = None
+    error: Optional[str] = None
+
+@app.post("/api/scrape/tado")
+async def scrape_tado_tariff(request: TadoScraperRequest):
+    """
+    Scrape real-time pricing from Tado Energy using Playwright
+    
+    This endpoint uses Playwright to scrape actual prices from the Tado Energy website
+    for the given zip code and annual consumption.
+    
+    - **zip_code**: German postal code (5 digits, e.g., "71065")
+    - **annual_consumption**: Annual consumption in kWh (e.g., 2500)
+    
+    Returns pricing data including:
+    - Base price (monthly, €)
+    - kWh price (ct/kWh, dynamic/variable)
+    - Monthly cost (€)
+    - Annual cost (€)
+    """
+    try:
+        # Import Tado scraper
+        from src.webscraping.scraper_tado import scrape_tado_tariff as scrape_tariff
+        
+        logger.info(f"🔍 Tado Energy API Request: PLZ {request.zip_code}, {request.annual_consumption} kWh")
+        
+        # Scrape data using async function
+        result = await scrape_tariff(
+            zip_code=request.zip_code,
+            annual_consumption=request.annual_consumption
+        )
+        
+        if result and 'provider' in result:
+            # Success
+            response = TadoScraperResponse(
+                success=True,
+                provider=result.get('provider', 'Tado Energy'),
+                tariff_name=result.get('tariff_name', 'Tado Hourly'),
+                base_price_monthly=result.get('base_price_monthly'),
+                kwh_price_ct=result.get('kwh_price_ct'),
+                monthly_cost=result.get('monthly_cost_estimated'),
+                annual_cost=result.get('annual_cost_estimated'),
+                zip_code=result.get('zip_code', request.zip_code),
+                annual_consumption=result.get('annual_consumption_kwh', request.annual_consumption),
+                timestamp=result.get('scraped_at', datetime.now().isoformat()),
+                source_url=result.get('url', 'https://energy.tado.com'),
+                note=f"Quelle: {result.get('data_source')}"
+            )
+            
+            logger.info(f"✅ Tado scraping erfolgreich: {response.base_price_monthly} €/Mon, {response.kwh_price_ct} ct/kWh (Quelle: {result.get('data_source')})")
+            
+            return response
+        else:
+            # Failed
+            raise HTTPException(
+                status_code=500,
+                detail="Scraping fehlgeschlagen - keine Daten erhalten"
+            )
+            
+    except ImportError as e:
+        print(f"❌ Import Error: {e}")
+        raise HTTPException(
+            status_code=503,
+            detail=f"Tado Scraper nicht verfügbar: {str(e)}"
+        )
+    except Exception as e:
+        print(f"❌ Error: {e}")
+        import traceback
+        traceback.print_exc()
+        
+        # Return error response
+        return TadoScraperResponse(
+            success=False,
+            provider="Tado Energy",
+            tariff_name="Tado Dynamic",
+            zip_code=request.zip_code,
+            annual_consumption=request.annual_consumption,
+            timestamp=datetime.now().isoformat(),
+            source_url="https://energy.tado.com",
+            error=str(e)
+        )
+
+
+# =============================================================================
+# TIBBER SCRAPER ENDPOINT
+# =============================================================================
+
+class TibberScraperRequest(BaseModel):
+    """Request-Modell für Tibber Scraper"""
+    zip_code: str = Field(..., description="Deutsche Postleitzahl")
+    annual_consumption: int = Field(..., description="Jahresverbrauch in kWh", gt=0)
+    headless: bool = Field(default=True, description="Browser im Headless-Modus")
+    debug_mode: bool = Field(default=False, description="Debug-Ausgaben aktivieren")
+
+
+class TibberScraperResponse(BaseModel):
+    """Response-Modell für Tibber Scraper"""
+    success: bool
+    kwh_price_ct: float = Field(..., description="Arbeitspreis in ct/kWh")
+    exchange_price_ct: float = Field(..., description="Börsenstrompreis in ct/kWh")
+    additional_price_ct: float = Field(..., description="Weitere Preisbestandteile (Steuern, Abgaben) in ct/kWh")
+    average_price_12m_ct: float = Field(..., description="Durchschnittspreis letzte 12 Monate in ct/kWh")
+    network_fees_monthly: float = Field(..., description="Netznutzungs- und Messstellengebühren pro Monat in €")
+    tibber_fee_monthly: float = Field(..., description="Tibber-Gebühr pro Monat in €")
+    total_base_monthly: float = Field(..., description="Summe Grundpreis pro Monat in €")
+    monthly_cost_example: float = Field(..., description="Beispiel-Monatskosten von Webseite in €")
+    calculated_monthly_cost: float = Field(..., description="Berechnete Monatskosten in €")
+    calculated_annual_cost: float = Field(..., description="Berechnete Jahreskosten in €")
+    timestamp: str
+    note: Optional[str] = Field(default=None, description="Hinweis bei Fallback-Daten")
+
+
+@app.post(
+    "/api/scrape/tibber",
+    response_model=TibberScraperResponse,
+    tags=["scraper"],
+    summary="Tibber Energiepreise scrapen",
+    description="Extrahiert aktuelle Preisdaten von Tibber für eine PLZ und Jahresverbrauch"
+)
+async def scrape_tibber_tariff(request: TibberScraperRequest):
+    """
+    Scraped Tibber Energiepreise
+    
+    **Parameter:**
+    - zip_code: Deutsche Postleitzahl (5 Stellen)
+    - annual_consumption: Jahresverbrauch in kWh
+    - headless: Browser ohne GUI (Standard: True)
+    - debug_mode: Erweiterte Logs (Standard: False)
+    
+    **Rückgabe:**
+    - Preisdaten inkl. Arbeitspreis, Börsenstrompreis, Grundpreise
+    - Berechnete Monats- und Jahreskosten
+    - Bei Scraping-Fehler: Realistische Fallback-Beispieldaten
+    
+    **Beispiel:**
+    ```
+    curl -X POST "http://localhost:8000/api/scrape/tibber" \\
+         -H "Content-Type: application/json" \\
+         -d '{
+               "zip_code": "71065",
+               "annual_consumption": 2500,
+               "headless": true,
+               "debug_mode": false
+             }'
+    ```
+    """
+    try:
+        logger.info(f"📞 Tibber-Scraper API-Request: PLZ {request.zip_code}, {request.annual_consumption} kWh/Jahr")
+        
+        # Import Scraper function
+        from src.webscraping.scraper_tibber import scrape_tibber_price
+        
+        # Scrape prices (async)
+        result = await scrape_tibber_price(
+            postal_code=request.zip_code,
+            annual_consumption_kwh=request.annual_consumption
+        )
+        
+        # Calculate costs
+        monthly_consumption_kwh = request.annual_consumption / 12
+        base_price_monthly = result['base_price_monthly']
+        additional_price_ct_kwh = result['additional_price_ct_kwh']
+        
+        # Get current exchange price (estimate from source)
+        exchange_price_ct = 9.15  # From Prophet forecast
+        total_kwh_price_ct = exchange_price_ct + additional_price_ct_kwh
+        
+        monthly_cost = base_price_monthly + (monthly_consumption_kwh * total_kwh_price_ct / 100)
+        annual_cost = monthly_cost * 12
+        
+        # Response formatieren
+        response = TibberScraperResponse(
+            success=True,
+            kwh_price_ct=total_kwh_price_ct,
+            exchange_price_ct=exchange_price_ct,
+            additional_price_ct=additional_price_ct_kwh,
+            average_price_12m_ct=total_kwh_price_ct,  # Simplified
+            network_fees_monthly=base_price_monthly * 0.65,  # Rough estimate
+            tibber_fee_monthly=5.99,  # Tibber's fixed fee
+            total_base_monthly=base_price_monthly,
+            monthly_cost_example=monthly_cost,
+            calculated_monthly_cost=monthly_cost,
+            calculated_annual_cost=annual_cost,
+            timestamp=datetime.now().isoformat(),
+            note=f"Datenquelle: {result['source']}"
+        )
+        
+        logger.info(f"✅ Tibber-Scraper erfolgreich: {response.calculated_monthly_cost:.2f} €/Monat")
+        return response
+        
+    except Exception as e:
+        logger.error(f"❌ Fehler beim Tibber-Scraping: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Tibber-Scraping fehlgeschlagen: {str(e)}"
+        )
+
+
+# =============================================================================
+# COMBINED SCRAPER ENDPOINT - Returns EnergyTariff-compatible format
+# =============================================================================
+
+class ScraperTariffRequest(BaseModel):
+    """Request for getting scraped tariffs in EnergyTariff format"""
+    zip_code: str
+    annual_consumption: float
+    providers: List[str] = ["enbw", "tado", "tibber"]
+    headless: bool = True
+    debug_mode: bool = False
+    days: int = 30  # Days for risk analysis
+
+
+@app.post("/api/scrape/tariffs")
+async def scrape_all_tariffs(
+    zip_code: str = Form(...),
+    annual_consumption: float = Form(...),
+    providers: str = Form('["enbw", "tado", "tibber"]'),  # JSON string
+    headless: bool = Form(True),
+    debug_mode: bool = Form(False),
+    days: int = Form(30),
+    file: Optional[UploadFile] = File(None)  # Optional CSV file for risk analysis
+):
+    """
+    Scrape multiple providers and return data in EnergyTariff-compatible format.
+    Optionally calculates risk scores per tariff if CSV consumption data is provided.
+    
+    Returns tariff objects with fields matching EnergyTariff class structure:
+    - name, provider, base_price, kwh_rate, is_dynamic, start_date, features
+    - risk_level, risk_score, risk_message (if CSV file is provided)
+    """
+    import json
+    import traceback
+    
+    tariffs = []
+    errors = []
+    
+    # Parse providers from JSON string
+    try:
+        providers_list = json.loads(providers)
+    except:
+        providers_list = ["enbw", "tado", "tibber"]  # Default
+    
+    logger.info(f"🔍 Scraping tariffs for providers: {providers_list}, PLZ: {zip_code}, {annual_consumption} kWh")
+    
+    # Parse CSV file if provided for risk analysis
+    consumption_df = None
+    if file and file.filename:
+        try:
+            logger.info(f"📊 Processing CSV file for risk analysis: {file.filename}")
+            contents = await file.read()
+            consumption_df = pd.read_csv(io.StringIO(contents.decode('utf-8')))
+            
+            # Validate CSV has required columns
+            if 'datetime' not in consumption_df.columns or 'value' not in consumption_df.columns:
+                logger.warning("CSV missing required columns (datetime, value), skipping risk analysis")
+                consumption_df = None
+            else:
+                consumption_df['datetime'] = pd.to_datetime(consumption_df['datetime'])
+                logger.info(f"✅ CSV loaded: {len(consumption_df)} rows")
+        except Exception as e:
+            logger.error(f"❌ Error parsing CSV: {e}")
+            consumption_df = None
+    
+    for provider in providers_list:
+        try:
+            if provider.lower() == "enbw":
+                from src.webscraping.scraper_enbw import scrape_enbw_tariff
+                result = await scrape_enbw_tariff(
+                    zip_code=zip_code,
+                    annual_consumption=annual_consumption
+                )
+                if result and result.get('base_price_monthly') is not None:
+                    tariff_data = scraper_to_tariff(result, "EnBW", "dynamic")
+                    tariffs.append(tariff_data)
+                    logger.info(f"✅ EnBW: {result.get('base_price_monthly')} €/Mon, {result.get('markup_ct_kwh')} ct/kWh")
+                else:
+                    errors.append({"provider": "EnBW", "error": "No data returned"})
+                    
+            elif provider.lower() == "tado":
+                from src.webscraping.scraper_tado import scrape_tado_tariff
+                result = await scrape_tado_tariff(
+                    zip_code=zip_code,
+                    annual_consumption=annual_consumption
+                )
+                if result and result.get('base_price_monthly') is not None:
+                    tariff_data = scraper_to_tariff(result, "Tado", "dynamic")
+                    tariffs.append(tariff_data)
+                    logger.info(f"✅ Tado: {result.get('base_price_monthly')} €/Mon, {result.get('markup_ct_kwh')} ct/kWh markup (gesamt: {result.get('kwh_price_ct')} ct/kWh)")
+                else:
+                    errors.append({"provider": "Tado", "error": "No data returned"})
+                    
+            elif provider.lower() == "tibber":
+                from src.webscraping.scraper_tibber import scrape_tibber_price
+                result = await scrape_tibber_price(
+                    postal_code=zip_code,
+                    annual_consumption_kwh=annual_consumption
+                )
+                if result and result.get('base_price_monthly') is not None:
+                    tariff_data = scraper_to_tariff(result, "Tibber", "dynamic")
+                    tariffs.append(tariff_data)
+                    logger.info(f"✅ Tibber: {result.get('base_price_monthly')} €/Mon, {result.get('additional_price_ct_kwh')} ct/kWh")
+                else:
+                    errors.append({"provider": "Tibber", "error": "No data returned"})
+                    
+        except Exception as e:
+            logger.error(f"❌ Error scraping {provider}: {e}")
+            errors.append({"provider": provider, "error": str(e)})
+    
+    # Add conventional (fixed-rate) tariffs from ENBW_TARIFFS
+    logger.info(f"Adding {len(ENBW_TARIFFS)} conventional fixed-rate tariffs")
+    for conv_tariff in ENBW_TARIFFS:
+        tariff_data = {
+            "name": conv_tariff.name,
+            "provider": conv_tariff.provider,
+            "is_dynamic": conv_tariff.is_dynamic,
+            "start_date": conv_tariff.start_date.isoformat(),
+            "features": conv_tariff.features if conv_tariff.features else [],
+            "base_price": conv_tariff.base_price,
+            "kwh_rate": conv_tariff.kwh_rate,
+            "min_duration": getattr(conv_tariff, 'min_duration', None),
+            "postal_code": zip_code
+        }
+        tariffs.append(tariff_data)
+    
+    # Calculate risk scores per tariff if CSV data is available
+    if consumption_df is not None:
+        logger.info(f"🛡️ Calculating risk scores for {len(tariffs)} tariffs...")
+        try:
+            from src.backend.risk_analysis import (
+                create_historic_risk_analysis,
+                calculate_coincidence_factor,
+                get_aggregated_risk_score
+            )
+            
+            # Determine app_data directory
+            app_data_dir = os.path.join(os.path.dirname(__file__), "app_data")
+            
+            # Calculate base risk metrics (same for all tariffs)
+            historic_risk = create_historic_risk_analysis(
+                consumption_df, 
+                days=days, 
+                app_data_dir=app_data_dir
+            )
+            coincidence = calculate_coincidence_factor(
+                consumption_df, 
+                days=days, 
+                expensive_hours_pct=20.0, 
+                app_data_dir=app_data_dir
+            )
+            
+            # Prepare common parameters
+            forecast_price_volatility = {}
+            usage_forecast_quality = {}
+            
+            # Calculate risk score for each tariff based on its is_dynamic attribute
+            for tariff in tariffs:
+                try:
+                    is_dynamic = tariff.get('is_dynamic', True)
+                    risk_assessment = get_aggregated_risk_score(
+                        historic_risk,
+                        coincidence,
+                        forecast_price_volatility,
+                        is_dynamic,
+                        usage_forecast_quality
+                    )
+                    
+                    # Add risk data to tariff
+                    tariff['risk_level'] = risk_assessment['risk_level']
+                    tariff['risk_score'] = risk_assessment['risk_score']
+                    tariff['risk_message'] = risk_assessment['risk_message']
+                    tariff['risk_factors'] = risk_assessment.get('risk_factors', [])
+                    
+                    logger.info(f"  ✅ {tariff['name']}: {risk_assessment['risk_level']} (score: {risk_assessment['risk_score']})")
+                    
+                except Exception as e:
+                    logger.error(f"  ❌ Error calculating risk for {tariff.get('name', 'unknown')}: {e}")
+                    # Set default risk values on error
+                    tariff['risk_level'] = 'moderate'
+                    tariff['risk_score'] = 50
+                    tariff['risk_message'] = 'Risikobewertung nicht verfügbar'
+                    
+        except Exception as e:
+            logger.error(f"❌ Error in risk analysis: {e}")
+            traceback.print_exc()
+    else:
+        logger.info("ℹ️ No CSV data provided, skipping risk analysis")
+    
+    logger.info(f"Total: {len(tariffs)} tariffs ({len(tariffs) - len(ENBW_TARIFFS)} scraped + {len(ENBW_TARIFFS)} conventional), {len(errors)} errors")
+    
+    return {
+        "success": len(tariffs) > 0,
+        "tariffs": tariffs,
+        "errors": errors if errors else None,
+        "timestamp": datetime.now().isoformat(),
+        "risk_analysis_performed": consumption_df is not None
+    }
+
+
+# RUN SERVER
+# =============================================================================
+
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
+
+
+# =============================================================================

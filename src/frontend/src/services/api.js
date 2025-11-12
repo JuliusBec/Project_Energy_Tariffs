@@ -3,7 +3,7 @@ import axios from 'axios'
 // Create axios instance with base configuration
 const api = axios.create({
   baseURL: '/api',
-  timeout: 10000,
+  timeout: 120000,  // 120 seconds for CSV processing and scraping
   headers: {
     'Content-Type': 'application/json'
   }
@@ -51,6 +51,19 @@ export const apiService = {
     const formData = new FormData()
     formData.append('file', file)
     return api.post('/calculate-with-csv', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    })
+  },
+
+  // New integrated endpoint: CSV + PLZ + Scraper
+  compareTariffsWithCsv: (file, zipCode, providers = ['tibber', 'enbw']) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('zip_code', zipCode)
+    formData.append('providers', providers.join(','))
+    return api.post('/compare-tariffs-with-csv', formData, {
       headers: {
         'Content-Type': 'multipart/form-data'
       }
@@ -117,6 +130,73 @@ export const apiService = {
   
   getPriceBreakdown: () => {
     return api.get('/price-breakdown')
+  },
+  
+  // Scraper endpoints for real-time tariff data
+  scrapeEnbwTariff: (zipCode, annualConsumption, options = {}) => {
+    return api.post('/scrape/enbw', {
+      zip_code: zipCode,
+      annual_consumption: annualConsumption,
+      headless: options.headless !== false,
+      debug_mode: options.debug_mode || false
+    }, {
+      timeout: 90000  // 90 seconds for scraping
+    })
+  },
+  
+  scrapeTadoTariff: (zipCode, annualConsumption, options = {}) => {
+    return api.post('/scrape/tado', {
+      zip_code: zipCode,
+      annual_consumption: annualConsumption,
+      headless: options.headless !== false,
+      debug_mode: options.debug_mode || false
+    }, {
+      timeout: 120000  // 120 seconds
+    })
+  },
+  
+  scrapeTibberTariff: (zipCode, annualConsumption, options = {}) => {
+    return api.post('/scrape/tibber', {
+      zip_code: zipCode,
+      annual_consumption: annualConsumption,
+      headless: options.headless !== undefined ? options.headless : true,
+      debug_mode: options.debugMode || false
+    }, {
+      timeout: 120000  // 120 seconds
+    })
+  },
+  
+  // Combined scraper endpoint - returns all tariffs in EnergyTariff format
+  scrapeAllTariffs: (zipCode, annualConsumption, providers = ['enbw', 'tado', 'tibber'], options = {}) => {
+    // If a CSV file is provided, send as multipart/form-data
+    if (options.csvFile) {
+      const formData = new FormData()
+      formData.append('zip_code', zipCode)
+      formData.append('annual_consumption', annualConsumption)
+      formData.append('providers', JSON.stringify(providers))
+      formData.append('headless', options.headless !== false)
+      formData.append('debug_mode', options.debug_mode || false)
+      formData.append('days', options.days || 30)
+      formData.append('file', options.csvFile)
+      
+      return api.post('/scrape/tariffs', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        },
+        timeout: 180000  // 180 seconds for all scrapers
+      })
+    }
+    
+    // Otherwise, send as JSON (backward compatible)
+    return api.post('/scrape/tariffs', {
+      zip_code: zipCode,
+      annual_consumption: annualConsumption,
+      providers: providers,
+      headless: options.headless !== false,
+      debug_mode: options.debug_mode || false
+    }, {
+      timeout: 180000  // 180 seconds for all scrapers
+    })
   },
   
   // Generic request method

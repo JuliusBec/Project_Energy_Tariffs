@@ -56,6 +56,22 @@
               <div v-if="formData.hasSmartMeter === true" class="smart-meter-section">
                
                 <div class="form-group">
+                  <label class="form-label">Postleitzahl *</label>
+                  <input 
+                    type="text" 
+                    v-model="formData.zipCode" 
+                    class="form-input"
+                    placeholder="z.B. 70173"
+                    pattern="[0-9]{5}"
+                    maxlength="5"
+                    required
+                  >
+                  <div class="form-help">
+                    Für Tarifverfügbarkeit in Ihrer Region
+                  </div>
+                </div>
+               
+                <div class="form-group">
                   <label class="form-label">Verbrauchsdaten hochladen *</label>
                   <div class="upload-section">
                     <div class="upload-area" :class="{ 'dragover': isDragOver, 'has-file': uploadedFile }" 
@@ -283,23 +299,6 @@
                         <i class="fas fa-leaf"></i>
                         Ökostrom
                       </span>
-                      <!-- Risk indicator badge (inline with other badges) -->
-                      <!-- For dynamic tariffs: show calculated risk from uploaded data -->
-                      <span v-if="tariff.is_dynamic && riskScore" class="badge" :class="'badge-risk-' + riskScore.risk_level">
-                        <i class="fas" :class="{
-                          'fa-check-circle': riskScore.risk_level === 'low',
-                          'fa-exclamation-circle': riskScore.risk_level === 'moderate',
-                          'fa-times-circle': riskScore.risk_level === 'high'
-                        }"></i>
-                        {{ riskScore.risk_level === 'low' ? 'Niedriges Risiko' : 
-                           riskScore.risk_level === 'moderate' ? 'Moderates Risiko' : 
-                           'Höheres Risiko' }}
-                      </span>
-                      <!-- For fixed tariffs: always show low risk (no price volatility) -->
-                      <span v-if="!tariff.is_dynamic" class="badge badge-risk-low">
-                        <i class="fas fa-check-circle"></i>
-                        Niedriges Risiko
-                      </span>
                       <span v-if="tariff.app_available" class="badge badge-tech">
                         <i class="fas fa-mobile-alt"></i>
                         App
@@ -307,6 +306,18 @@
                       <span v-if="tariff.automation_ready" class="badge badge-smart">
                         <i class="fas fa-home"></i>
                         Smart Ready
+                      </span>
+                      <span v-if="tariff.risk_level === 'low'" class="badge badge-success">
+                        <i class="fas fa-shield-alt"></i>
+                        Niedriges Risiko
+                      </span>
+                      <span v-if="tariff.risk_level === 'moderate'" class="badge badge-warning">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        Moderates Risiko
+                      </span>
+                      <span v-if="tariff.risk_level === 'high'" class="badge badge-danger">
+                        <i class="fas fa-exclamation-circle"></i>
+                        Höheres Risiko
                       </span>
                       <span v-if="index === 0" class="badge badge-gold">
                         <i class="fas fa-star"></i>
@@ -316,8 +327,8 @@
                   </div>
 
                   <div class="tariff-price">
-                    <div class="monthly-cost-main">{{ Math.round(tariff.monthly_cost) }}€/Monat</div>
-                    <div class="annual-cost-small">{{ Math.round(tariff.annual_cost) }}€/Jahr</div>
+                    <div class="monthly-cost-main">{{ tariff.monthly_cost.toFixed(2) }}€/Monat</div>
+                    <div class="annual-cost-small">{{ tariff.annual_cost.toFixed(2) }}€/Jahr</div>
                   </div>
                 </div>
 
@@ -330,15 +341,15 @@
                   <div class="detail-grid">
                     <div class="detail-item">
                       <i class="fas fa-euro-sign"></i>
-                      <span>Grundpreis: {{ tariff.base_price }}€/Monat</span>
+                      <span>Grundpreis: {{ tariff.base_price.toFixed(2) }}€/Monat</span>
                     </div>
                     <div class="detail-item">
                       <i class="fas fa-bolt"></i>
-                      <span>Aufschlag: {{ tariff.kwh_price }}€/kWh</span>
+                      <span>Gesamt-kWh-Preis: {{ tariff.kwh_price.toFixed(4) }}€/kWh</span>
                     </div>
                     <div class="detail-item">
                       <i class="fas fa-calendar"></i>
-                      <span>Laufzeit: {{ tariff.contract_duration }} Monate</span>
+                      <span>Laufzeit: 1 Monat</span>
                     </div>
                     <div class="detail-item" v-if="tariff.volatility">
                       <i class="fas fa-wave-square"></i>
@@ -360,20 +371,20 @@
                     <div class="breakdown-grid">
                       <div class="breakdown-item">
                         <span class="breakdown-label">Grundgebühr/Jahr:</span>
-                        <span class="breakdown-value">{{ Math.round(tariff.base_price * 12) }}€</span>
+                        <span class="breakdown-value">{{ (tariff.base_price * 12).toFixed(2) }}€</span>
                       </div>
                       <div class="breakdown-item">
                         <span class="breakdown-label">Verbrauchskosten/Jahr:</span>
-                        <span class="breakdown-value">{{ Math.round(tariff.annual_cost - (tariff.base_price * 12)) }}€</span>
+                        <span class="breakdown-value">{{ (tariff.annual_cost - (tariff.base_price * 12)).toFixed(2) }}€</span>
                       </div>
                       <div class="breakdown-item">
                         <span class="breakdown-label">Kosten pro kWh (Ø):</span>
-                        <span class="breakdown-value">{{ (tariff.annual_cost / formData.annualKwh).toFixed(3) }}€</span>
+                        <span class="breakdown-value">{{ (tariff.annual_cost / formData.annualKwh).toFixed(4) }}€</span>
                       </div>
                       <div v-if="tariff.is_dynamic" class="breakdown-item highlight">
                         <span class="breakdown-label">Einsparungspotenzial:</span>
                         <span class="breakdown-value savings">
-                          bis zu {{ Math.round(tariff.annual_cost * 0.15) }}€/Jahr
+                          bis zu {{ (tariff.annual_cost * 0.15).toFixed(2) }}€/Jahr
                         </span>
                       </div>
                     </div>
@@ -437,7 +448,7 @@
                     </div>
                     <div class="optimization-item">
                       <i class="fas fa-piggy-bank"></i>
-                      <span>Zusätzliche Ersparnis: {{ Math.round(tariff.annual_cost * (0.10 + Math.random() * 0.15)) }}€/Jahr</span>
+                      <span>Zusätzliche Ersparnis: {{ (tariff.annual_cost * (0.10 + Math.random() * 0.15)).toFixed(2) }}€/Jahr</span>
                     </div>
                   </div>
                 </div>
@@ -449,13 +460,13 @@
                     <span>Ihre Ersparnis gegenüber aktuellem Tarif</span>
                   </div>
                   <div class="savings-amount-large">
-                    {{ Math.round(formData.currentCost - tariff.annual_cost) }}€ pro Jahr
+                    {{ (formData.currentCost - tariff.annual_cost).toFixed(2) }}€ pro Jahr
                   </div>
                   <div class="savings-breakdown-small">
-                    <span>Das sind {{ Math.round((formData.currentCost - tariff.annual_cost) / 12) }}€ pro Monat weniger</span>
+                    <span>Das sind {{ ((formData.currentCost - tariff.annual_cost) / 12).toFixed(2) }}€ pro Monat weniger</span>
                   </div>
                   <div class="savings-percentage">
-                    {{ Math.round(((formData.currentCost - tariff.annual_cost) / formData.currentCost) * 100) }}% Ersparnis
+                    {{ (((formData.currentCost - tariff.annual_cost) / formData.currentCost) * 100).toFixed(1) }}% Ersparnis
                   </div>
                 </div>
 
@@ -724,7 +735,7 @@
                 <i class="fas fa-calendar-alt"></i>
                 <div class="contract-content">
                   <div class="contract-title">Mindestlaufzeit</div>
-                  <div class="contract-value">{{ selectedTariff.contract_duration }} {{ selectedTariff.contract_duration === 1 ? 'Monat' : 'Monate' }}</div>
+                  <div class="contract-value">1 Monat</div>
                 </div>
               </div>
               <div class="contract-item">
@@ -858,7 +869,7 @@
                       </div>
                       <div class="coincidence-info">
                         <div class="info-text">
-                          {{ riskAnalysisData.coincidence_factor.consumption_coincidence_pct.toFixed(0) }}% Ihres Stromverbrauchs fällt in Stoßlastzeiten mit besonders hohen Preisen.
+                          Sie verbrauchen {{ riskAnalysisData.coincidence_factor.consumption_during_expensive_hours }} kWh, das sind {{ riskAnalysisData.coincidence_factor.consumption_coincidence_pct.toFixed(0) }}% Ihres täglichen Verbrauchs, in den teuersten Stunden.
                         </div>
                         <div class="info-badge" :class="{
                           'badge-success': riskAnalysisData.coincidence_factor.coincidence_rating === 'low',
@@ -961,10 +972,6 @@ export default {
     const riskAnalysisLoading = ref(false)
     const riskAnalysisError = ref(null)
     
-    // Risk score data (simple low/moderate/high indicator)
-    const riskScore = ref(null)
-    const riskScoreLoading = ref(false)
-    
     // Modal functionality
     const showDetailsModal = ref(false)
     const selectedTariff = ref(null)
@@ -997,124 +1004,219 @@ export default {
       searchPerformed.value = true
       
       try {
-        // Fetch tariffs from backend API
-        console.log('Fetching tariffs from backend...')
-        const response = await apiService.getTariffs()
-        const backendTariffs = response.data
-        console.log('Backend tariffs received:', backendTariffs)
+        const zipCode = formData.value.zipCode
+        let annualConsumption = formData.value.annualKwh
+        let csvAnalysis = null
         
-        // Check if user uploaded a CSV file
+        // Check if user uploaded a CSV file - analyze it FIRST
         if (formData.value.hasSmartMeter && uploadedFile.value) {
-          console.log('Using uploaded CSV file for calculations:', uploadedFile.value.name)
+          console.log('📊 Analyzing uploaded CSV file:', uploadedFile.value.name)
           
-          // Use the /api/calculate-with-csv endpoint
           try {
             const csvResponse = await apiService.calculateWithCsv(uploadedFile.value)
+            const csvData = csvResponse.data
+            console.log('✅ CSV analysis complete:', csvData)
             
-            const csvResults = csvResponse.data
-            console.log('CSV calculation results:', csvResults)
-            
-            // Update formData with the calculated annual kWh from CSV
-            if (csvResults.annual_kwh) {
-              formData.value.annualKwh = Math.round(csvResults.annual_kwh)
-              console.log('Updated annualKwh from CSV:', formData.value.annualKwh)
+            // Extract annual consumption from CSV
+            if (csvData.annual_kwh) {
+              annualConsumption = Math.round(csvData.annual_kwh)
+              formData.value.annualKwh = annualConsumption
+              console.log(`Updated annual consumption from CSV: ${annualConsumption} kWh`)
             }
             
-            // Map the results to the tariffs
-            const calculatedTariffs = csvResults.results.map(result => {
-              const tariff = backendTariffs.find(t => t.name === result.tariff_name)
-              return {
-                ...tariff,
-                annual_cost: Math.round(result.annual_cost),
-                monthly_cost: Math.round(result.monthly_cost),
-                savings_potential: 0,
-                avg_kwh_price: result.avg_kwh_price,
-                tariff_type: result.tariff_type
+            // Store CSV analysis for later use
+            csvAnalysis = csvData
+            
+            // Fetch risk analysis with CSV data BEFORE creating tariffs
+            console.log('Fetching risk analysis before tariff creation...')
+            try {
+              // Fetch full risk analysis (for charts/details)
+              const riskResponse = await apiService.getRiskAnalysis(uploadedFile.value, 30)
+              riskAnalysisData.value = riskResponse.data
+              
+              // ALSO fetch risk score (for badges)
+              const riskScoreResponse = await apiService.getRiskScore(uploadedFile.value, 30)
+              const riskScore = riskScoreResponse.data
+              
+              // Merge risk score into risk analysis data
+              riskAnalysisData.value.risk_level = riskScore.risk_level
+              riskAnalysisData.value.risk_score = riskScore.risk_score
+              riskAnalysisData.value.risk_message = riskScore.risk_message
+              
+              console.log('Risk analysis loaded:', riskAnalysisData.value)
+              console.log('Risk level:', riskAnalysisData.value.risk_level)
+              console.log('Risk score:', riskAnalysisData.value.risk_score)
+            } catch (riskError) {
+              console.error('⚠️ Risk analysis failed:', riskError)
+              riskAnalysisData.value = null
+            }
+          } catch (csvError) {
+            console.error('⚠️ CSV analysis failed:', csvError)
+          }
+        }
+        
+        console.log(`🔍 Scraping tariffs for PLZ: ${zipCode}, Consumption: ${annualConsumption} kWh`)
+        
+        // Call combined scraper endpoint with actual consumption data
+        // Pass CSV file if available for per-tariff risk analysis
+        const scraperOptions = {}
+        if (uploadedFile.value) {
+          scraperOptions.csvFile = uploadedFile.value
+          scraperOptions.days = 30
+          console.log('📊 Sending CSV file to scraper for per-tariff risk analysis')
+        }
+        
+        const scraperResponse = await apiService.scrapeAllTariffs(
+          zipCode, 
+          annualConsumption, 
+          ['enbw', 'tado', 'tibber'],
+          scraperOptions
+        )
+        const scraperData = scraperResponse.data
+        
+        console.log('✅ Scraper response:', scraperData)
+        
+        if (scraperData.success && scraperData.tariffs && scraperData.tariffs.length > 0) {
+          // Lade Forecast-Daten für dynamische Preisberechnung
+          let forecastAvgPrice = 0.25  // Default fallback in €/kWh
+          try {
+            const forecastResponse = await apiService.getForecast()
+            if (forecastResponse && forecastResponse.data && forecastResponse.data.forecast) {
+              const forecastData = forecastResponse.data.forecast
+              // Calculate average from all hourly prices across all days
+              let allPrices = []
+              forecastData.forEach(day => {
+                day.hourly_prices.forEach(hour => {
+                  allPrices.push(hour.price)
+                })
+              })
+              forecastAvgPrice = allPrices.reduce((a, b) => a + b, 0) / allPrices.length
+              console.log(`📈 Forecast average price: ${forecastAvgPrice.toFixed(4)} €/kWh (${(forecastAvgPrice * 100).toFixed(2)} ct/kWh)`)
+            }
+          } catch (forecastError) {
+            console.warn('⚠️ Could not fetch forecast data, using fallback price:', forecastError)
+          }
+          
+          // Convert EnergyTariff format to frontend display format
+          const scrapedTariffs = scraperData.tariffs.map(tariff => {
+            const monthlyConsumption = annualConsumption / 12
+            let monthlyCost, annualCost, totalKwhPrice
+            
+            // Check if this is a fixed or dynamic tariff
+            if (tariff.is_dynamic === false && tariff.kwh_rate) {
+              // FIXED TARIFF: Simple calculation with fixed kWh rate
+              const fixedKwhRate = tariff.kwh_rate
+              monthlyCost = tariff.base_price + (monthlyConsumption * fixedKwhRate)
+              annualCost = (tariff.base_price * 12) + (annualConsumption * fixedKwhRate)
+              totalKwhPrice = fixedKwhRate
+              
+              console.log(`💰 ${tariff.name} (FIXED) Berechnung:`)
+              console.log(`   Grundpreis: ${tariff.base_price}€/Monat`)
+              console.log(`   Fixpreis: ${fixedKwhRate}€/kWh = ${(fixedKwhRate * 100).toFixed(2)} ct/kWh`)
+              console.log(`   Monatlicher Verbrauch: ${monthlyConsumption.toFixed(2)} kWh`)
+              console.log(`   Monatspreis gesamt: ${monthlyCost.toFixed(2)}€`)
+              console.log(`   Jahrespreis gesamt: ${annualCost.toFixed(2)}€`)
+              
+            } else if (tariff.provider === "Tibber" && tariff.additional_kwh_rate) {
+              // DYNAMIC TARIFF - Tibber: Grundpreis + (Verbrauch × Arbeitspreis) + (Verbrauch × Forecast)
+              const additionalCost = forecastAvgPrice * monthlyConsumption
+              const taxesCost = tariff.additional_kwh_rate * monthlyConsumption
+              monthlyCost = tariff.base_price + additionalCost + taxesCost
+              annualCost = (tariff.base_price * 12) + (forecastAvgPrice * annualConsumption) + (tariff.additional_kwh_rate * annualConsumption)
+              totalKwhPrice = forecastAvgPrice + tariff.additional_kwh_rate
+              
+              console.log(`💰 ${tariff.provider} (DYNAMIC) Berechnung:`)
+              console.log(`   Grundpreis: ${tariff.base_price}€/Monat`)
+              console.log(`   Arbeitspreis (Umlagen/Steuern): ${tariff.additional_kwh_rate}€/kWh = ${(tariff.additional_kwh_rate * 100).toFixed(2)} ct/kWh`)
+              console.log(`   Börsenpreis (Forecast): ${forecastAvgPrice.toFixed(4)}€/kWh = ${(forecastAvgPrice * 100).toFixed(2)} ct/kWh`)
+              console.log(`   ➜ Gesamt-kWh-Preis: ${totalKwhPrice.toFixed(4)}€/kWh = ${(totalKwhPrice * 100).toFixed(2)} ct/kWh`)
+              console.log(`   Monatlicher Verbrauch: ${monthlyConsumption.toFixed(2)} kWh`)
+              console.log(`   Umlagen/Steuern-Kosten/Monat: ${taxesCost.toFixed(2)}€`)
+              console.log(`   Börsenstrom-Kosten/Monat: ${additionalCost.toFixed(2)}€`)
+              console.log(`   Monatspreis gesamt: ${monthlyCost.toFixed(2)}€`)
+              console.log(`   Jahrespreis gesamt: ${annualCost.toFixed(2)}€`)
+              
+            } else {
+              // DYNAMIC TARIFF - EnBW, Tado: Grundpreis + (Forecast × Verbrauch) + (Arbeitspreis × Verbrauch)
+              const forecastCost = forecastAvgPrice * monthlyConsumption
+              const arbeitspreisCtKwh = (tariff.additional_price_ct_kwh || 0) / 100  // ct/kWh → €/kWh
+              const arbeitspreisCost = arbeitspreisCtKwh * monthlyConsumption
+              monthlyCost = tariff.base_price + forecastCost + arbeitspreisCost
+              annualCost = (tariff.base_price * 12) + (forecastAvgPrice * annualConsumption) + (arbeitspreisCtKwh * annualConsumption)
+              totalKwhPrice = forecastAvgPrice + arbeitspreisCtKwh
+              
+              console.log(`💰 ${tariff.provider} (DYNAMIC) Berechnung:`)
+              console.log(`   Grundpreis: ${tariff.base_price}€/Monat`)
+              console.log(`   Arbeitspreis (vom Scraper): ${tariff.additional_price_ct_kwh || 0} ct/kWh = ${arbeitspreisCtKwh.toFixed(4)}€/kWh`)
+              console.log(`   Börsenpreis (Forecast): ${forecastAvgPrice.toFixed(4)}€/kWh = ${(forecastAvgPrice * 100).toFixed(2)} ct/kWh`)
+              console.log(`   ➜ Gesamt-kWh-Preis: ${totalKwhPrice.toFixed(4)}€/kWh = ${(totalKwhPrice * 100).toFixed(2)} ct/kWh`)
+              console.log(`   Monatlicher Verbrauch: ${monthlyConsumption.toFixed(2)} kWh`)
+              console.log(`   Arbeitspreis-Kosten/Monat: ${arbeitspreisCost.toFixed(2)}€`)
+              console.log(`   Forecast-Kosten/Monat: ${forecastCost.toFixed(2)}€`)
+              console.log(`   Monatspreis gesamt: ${monthlyCost.toFixed(2)}€`)
+              console.log(`   Jahrespreis gesamt: ${annualCost.toFixed(2)}€`)
+            }
+            
+            return {
+              id: `${tariff.provider.toLowerCase()}-${tariff.is_dynamic ? 'dynamic' : 'fixed'}-${tariff.name.toLowerCase().replace(/\s+/g, '-')}`,
+              name: tariff.name,
+              provider: tariff.provider,
+              monthly_cost: Math.round(monthlyCost),
+              annual_cost: Math.round(annualCost),
+              base_price: tariff.base_price,
+              network_fee: tariff.network_fee || 0,
+              kwh_price: totalKwhPrice,
+              is_dynamic: tariff.is_dynamic !== false,  // Default to true if not specified
+              smart_meter_required: tariff.is_dynamic !== false,
+              green_energy: tariff.features?.includes('green') || false,
+              app_available: tariff.is_dynamic !== false,  // Dynamic tariffs have apps
+              price_forecast: tariff.is_dynamic !== false,
+              automation_ready: tariff.is_dynamic !== false,
+              special_features: tariff.features || [],
+              // Add CSV-based metrics if available
+              csv_based: csvAnalysis !== null,
+              actual_annual_consumption: csvAnalysis ? annualConsumption : null,
+              // Use per-tariff risk assessment from backend (if available)
+              risk_level: tariff.risk_level || riskAnalysisData.value?.risk_level,
+              risk_score: tariff.risk_score || riskAnalysisData.value?.risk_score,
+              risk_message: tariff.risk_message || riskAnalysisData.value?.risk_message,
+              risk_factors: tariff.risk_factors || []
+            }
+          })
+          
+          results.value = scrapedTariffs
+          console.log('📊 Scraped tariffs with CSV data:', scrapedTariffs)
+          
+          // Log risk assessment status
+          const tariffsWithRisk = scrapedTariffs.filter(t => t.risk_level).length
+          if (tariffsWithRisk > 0) {
+            console.log(`🛡️ Per-tariff risk assessment: ${tariffsWithRisk}/${scrapedTariffs.length} tariffs`)
+            scrapedTariffs.forEach(t => {
+              if (t.risk_level) {
+                console.log(`   ${t.name}: ${t.risk_level} (${t.risk_score})`)
               }
             })
-            
-            results.value = calculatedTariffs
-            console.log('Final calculated tariffs from CSV:', calculatedTariffs)
-            
-            // Fetch predictions and forecasts
-            fetchSavingsPrediction()
-            fetchPriceForecast()
-            
-            // Fetch risk score for dynamic tariffs
-            if (uploadedFile.value) {
-              fetchRiskScore()
-            }
-            
-            loading.value = false
-            return
-          } catch (csvError) {
-            console.error('Error with CSV calculation, falling back to manual calculation:', csvError)
+          } else if (riskAnalysisData.value?.risk_level) {
+            console.log('🛡️ Using global risk assessment:', riskAnalysisData.value.risk_level)
           }
+          
+          // Fetch predictions and forecasts
+          fetchSavingsPrediction()
+          fetchPriceForecast()
+          
+          loading.value = false
+          return
+        } else {
+          // Keine gescrapten Tarife verfügbar
+          console.error('❌ Keine Tarife von Scrapern verfügbar')
+          results.value = []
+          loading.value = false
+          return
         }
-        
-        // Fallback: Manual calculation (no CSV file or CSV failed)
-        console.log('Using manual calculation without CSV')
-        const calculatedTariffs = []
-        
-        for (const tariff of backendTariffs) {
-          try {
-            const calculationData = {
-              tariff_id: tariff.id,
-              annual_kwh: formData.value.annualKwh,
-              has_smart_meter: formData.value.hasSmartMeter,
-              usage_pattern: 'manual'
-            }
-            
-            console.log('Calculating costs for tariff:', tariff.name, calculationData)
-            
-            try {
-              const calcResponse = await apiService.calculateTariffs(calculationData)
-              const calculation = calcResponse.data
-              console.log('Calculation result:', calculation)
-              
-              calculatedTariffs.push({
-                ...tariff,
-                annual_cost: Math.round(calculation.annual_cost),
-                monthly_cost: Math.round(calculation.annual_cost / 12),
-                savings_potential: calculation.savings_potential || 0,
-                cost_breakdown: calculation.cost_breakdown || {}
-              })
-            } catch (apiError) {
-              console.error('API calculation failed, using fallback:', apiError)
-              // Fallback to basic calculation if API call fails
-              const basicCost = (tariff.base_price * 12) + (formData.value.annualKwh * (tariff.kwh_price || 0.30))
-              calculatedTariffs.push({
-                ...tariff,
-                annual_cost: Math.round(basicCost),
-                monthly_cost: Math.round(basicCost / 12),
-                savings_potential: 0
-              })
-            }
-          } catch (calcError) {
-            console.error('Error calculating tariff:', tariff.name, calcError)
-            // Fallback calculation
-            const basicCost = (tariff.base_price * 12) + (formData.value.annualKwh * (tariff.kwh_price || 0.30))
-            calculatedTariffs.push({
-              ...tariff,
-              annual_cost: Math.round(basicCost),
-              monthly_cost: Math.round(basicCost / 12),
-              savings_potential: 0
-            })
-          }
-        }
-        
-        results.value = calculatedTariffs
-        console.log('Final calculated tariffs:', calculatedTariffs)
-        
-        // Fetch predictions and forecasts after tariffs are loaded
-        fetchSavingsPrediction()
-        fetchPriceForecast()
         
       } catch (error) {
-        console.error('Error fetching tariffs from backend:', error)
-        console.log('Falling back to mock data...')
-        // Fallback to mock data if backend is not available
-        generateMockTariffs()
+        console.error('❌ Fehler beim Laden der Tarife:', error)
+        results.value = []
       } finally {
         loading.value = false
       }
@@ -1146,28 +1248,6 @@ export default {
         console.log('Price forecast received:', response.data)
       } catch (error) {
         console.error('Error fetching price forecast:', error)
-      }
-    }
-    
-    // Fetch risk score from backend
-    const fetchRiskScore = async () => {
-      if (!uploadedFile.value) {
-        console.log('No file uploaded, skipping risk score calculation')
-        return
-      }
-      
-      riskScoreLoading.value = true
-      try {
-        console.log('Fetching risk score for uploaded file...')
-        const response = await apiService.getRiskScore(uploadedFile.value, 30)
-        
-        riskScore.value = response.data
-        console.log('Risk score received:', response.data)
-      } catch (error) {
-        console.error('Error fetching risk score:', error)
-        riskScore.value = null
-      } finally {
-        riskScoreLoading.value = false
       }
     }
     
@@ -1566,8 +1646,6 @@ export default {
       riskAnalysisData,
       riskAnalysisLoading,
       riskAnalysisError,
-      riskScore,
-      riskScoreLoading,
       showDetailsModal,
       selectedTariff,
       calculateTariffs,
@@ -1576,7 +1654,6 @@ export default {
       showTariffDetails,
       closeDetailsModal,
       fetchRiskAnalysis,
-      fetchRiskScore,
       handleFileSelect,
       handleFileDrop,
       removeFile,
@@ -4010,36 +4087,4 @@ export default {
     width: 100%;
   }
 }
-
-/* Risk Badge Styles (inline with other badges) */
-.badge-risk-low {
-  background: #d1fae5;
-  color: #065f46;
-  border: 1px solid #6ee7b7;
-}
-
-.badge-risk-low i {
-  color: #10b981;
-}
-
-.badge-risk-moderate {
-  background: #fef3c7;
-  color: #92400e;
-  border: 1px solid #fcd34d;
-}
-
-.badge-risk-moderate i {
-  color: #f59e0b;
-}
-
-.badge-risk-high {
-  background: #fee2e2;
-  color: #991b1b;
-  border: 1px solid #fca5a5;
-}
-
-.badge-risk-high i {
-  color: #ef4444;
-}
 </style>
-
