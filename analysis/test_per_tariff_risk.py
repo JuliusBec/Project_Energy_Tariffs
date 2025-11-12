@@ -22,7 +22,7 @@ def test_per_tariff_risk():
     print("="*80)
     
     # Load example consumption data
-    test_file = os.path.join(os.path.dirname(__file__), "..", "app_data", "example_smart_meter.csv")
+    test_file = os.path.join(os.path.dirname(__file__), "..", "data", "household_data/demo_userdata.csv")
     
     if not os.path.exists(test_file):
         print(f"❌ Test file not found: {test_file}")
