@@ -748,8 +748,8 @@ async def get_backtest_data(file: UploadFile = File(...)):
         # Convert datetime column
         df['datetime'] = pd.to_datetime(df['datetime'])
         
-        # Generate backtest data
-        backtest_data = create_backtest(df, return_data=True)
+        # Generate backtest data (now always returns data for API)
+        backtest_data = create_backtest(df)
         
         if backtest_data is None:
             raise HTTPException(status_code=500, detail="Failed to generate backtest data")
@@ -1227,8 +1227,16 @@ async def get_risk_analysis(file: UploadFile = File(...), days: int = Form(30)):
 @app.post("/api/risk-score")
 async def get_risk_score(file: UploadFile = File(...), days: int = Form(30)):
     """
-    Get aggregated risk score for dynamic tariff suitability.
-    Returns a simple low/moderate/high risk assessment.
+    Get aggregated risk scores for both dynamic and fixed tariffs.
+    Returns risk assessments for both tariff types to enable comparison.
+    
+    Parameters:
+    - file: CSV file with consumption data (datetime, value columns)
+    - days: Number of days to analyze (default: 30)
+    
+    Returns:
+    - risk_dynamic: Risk assessment for dynamic tariffs
+    - risk_fixed: Risk assessment for fixed tariffs
     """
     import traceback
     from src.backend.risk_analysis import (
@@ -1259,25 +1267,50 @@ async def get_risk_score(file: UploadFile = File(...), days: int = Form(30)):
         # Determine app_data directory
         app_data_dir = os.path.join(os.path.dirname(__file__), "app_data")
         
-        # Calculate risk metrics
+        # Calculate risk metrics (shared for both tariff types)
         historic_risk = create_historic_risk_analysis(df, days=days, app_data_dir=app_data_dir)
         coincidence = calculate_coincidence_factor(df, days=days, expensive_hours_pct=20.0, app_data_dir=app_data_dir)
         
-        # Prepare parameters for risk score calculation
-        forecast_price_volatility = {}  # Empty dict for now, can be enhanced later
-        usage_forecast_quality = {}  # Empty dict for now, can be enhanced later
-        is_dynamic = True  # Assuming dynamic tariff evaluation by default
+        # Calculate backtest metrics for forecast quality assessment
+        usage_forecast_quality = None
+        try:
+            backtest_data = create_backtest(df)
+            usage_forecast_quality = backtest_data.get('metrics', {})
+        except Exception as e:
+            # If backtest fails (e.g., not enough data), continue without forecast quality
+            print(f"Warning: Could not calculate backtest metrics: {str(e)}")
         
-        # Get aggregated risk score
-        risk_assessment = get_aggregated_risk_score(
+        # Calculate price forecast volatility
+        from src.backend.risk_analysis import get_price_forecast_volatility
+        forecast_price_volatility = {}
+        try:
+            forecast_price_volatility = get_price_forecast_volatility(app_data_dir=app_data_dir)
+        except Exception as e:
+            print(f"Warning: Could not calculate price forecast volatility: {str(e)}")
+        
+        # Get aggregated risk scores for BOTH tariff types
+        risk_dynamic = get_aggregated_risk_score(
             historic_risk, 
             coincidence, 
             forecast_price_volatility,
-            is_dynamic,
-            usage_forecast_quality
+            is_dynamic=True,
+            usage_forecast_quality=usage_forecast_quality
         )
+        risk_dynamic['tariff_type'] = 'dynamic'
         
-        return risk_assessment
+        risk_fixed = get_aggregated_risk_score(
+            historic_risk, 
+            coincidence, 
+            forecast_price_volatility,
+            is_dynamic=False,
+            usage_forecast_quality=usage_forecast_quality
+        )
+        risk_fixed['tariff_type'] = 'fixed'
+        
+        return {
+            'risk_dynamic': risk_dynamic,
+            'risk_fixed': risk_fixed
+        }
         
     except FileNotFoundError as e:
         error_msg = str(e)
@@ -1296,6 +1329,7 @@ async def get_risk_score(file: UploadFile = File(...), days: int = Form(30)):
         print(f"Unexpected error in risk score: {error_msg}")
         print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=error_msg)
+
 
 
 @app.post("/api/risk-score-per-tariff")
@@ -1346,9 +1380,22 @@ async def get_risk_score_per_tariff(
         historic_risk = create_historic_risk_analysis(df, days=days, app_data_dir=app_data_dir)
         coincidence = calculate_coincidence_factor(df, days=days, expensive_hours_pct=20.0, app_data_dir=app_data_dir)
         
-        # Prepare parameters for risk score calculation
-        forecast_price_volatility = {}  # Empty dict for now, can be enhanced later
-        usage_forecast_quality = {}  # Empty dict for now, can be enhanced later
+        # Calculate backtest metrics for forecast quality assessment
+        usage_forecast_quality = None
+        try:
+            backtest_data = create_backtest(df)
+            usage_forecast_quality = backtest_data.get('metrics', {})
+        except Exception as e:
+            # If backtest fails (e.g., not enough data), continue without forecast quality
+            print(f"Warning: Could not calculate backtest metrics: {str(e)}")
+        
+        # Calculate price forecast volatility
+        from src.backend.risk_analysis import get_price_forecast_volatility
+        forecast_price_volatility = {}
+        try:
+            forecast_price_volatility = get_price_forecast_volatility(app_data_dir=app_data_dir)
+        except Exception as e:
+            print(f"Warning: Could not calculate price forecast volatility: {str(e)}")
         
         # Get aggregated risk score with tariff-specific is_dynamic parameter
         risk_assessment = get_aggregated_risk_score(
@@ -1378,7 +1425,6 @@ async def get_risk_score_per_tariff(
         raise
     except Exception as e:
         error_msg = f"Error calculating risk score per tariff: {str(e)}"
-        print(f"Unexpected error in risk score per tariff: {error_msg}")
         print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=error_msg)
 
@@ -1974,7 +2020,7 @@ async def scrape_all_tariffs(
             # Determine app_data directory
             app_data_dir = os.path.join(os.path.dirname(__file__), "app_data")
             
-            # Calculate base risk metrics (same for all tariffs)
+            # Calculate base risk metrics ONCE (same for all tariffs)
             historic_risk = create_historic_risk_analysis(
                 consumption_df, 
                 days=days, 
@@ -1987,21 +2033,50 @@ async def scrape_all_tariffs(
                 app_data_dir=app_data_dir
             )
             
-            # Prepare common parameters
-            forecast_price_volatility = {}
-            usage_forecast_quality = {}
+            # Calculate backtest metrics for forecast quality assessment
+            usage_forecast_quality = None
+            try:
+                backtest_data = create_backtest(consumption_df)
+                usage_forecast_quality = backtest_data.get('metrics', {})
+                logger.info(f"✅ Backtest metrics calculated: CI width={usage_forecast_quality.get('relative_confidence_interval_width', 'N/A')}%")
+            except Exception as e:
+                # If backtest fails (e.g., not enough data), continue without forecast quality
+                logger.warning(f"⚠️  Could not calculate backtest metrics: {str(e)}")
             
-            # Calculate risk score for each tariff based on its is_dynamic attribute
+            # Calculate price forecast volatility
+            from src.backend.risk_analysis import get_price_forecast_volatility
+            forecast_price_volatility = {}
+            try:
+                forecast_price_volatility = get_price_forecast_volatility(app_data_dir=app_data_dir)
+                logger.info(f"✅ Price forecast volatility calculated: σ={forecast_price_volatility.get('forecast_std_dev', 'N/A')} €/kWh")
+            except Exception as e:
+                logger.warning(f"⚠️  Could not calculate price forecast volatility: {str(e)}")
+            
+            # Calculate risk score TWICE: once for dynamic tariffs, once for fixed tariffs
+            # This avoids redundant calculations since metrics are the same for all dynamic/fixed tariffs
+            risk_assessment_dynamic = get_aggregated_risk_score(
+                historic_risk,
+                coincidence,
+                forecast_price_volatility,
+                is_dynamic=True,
+                usage_forecast_quality=usage_forecast_quality
+            )
+            logger.info(f"  📊 Dynamic tariff risk: {risk_assessment_dynamic['risk_level']} (score: {risk_assessment_dynamic['risk_score']})")
+            
+            risk_assessment_fixed = get_aggregated_risk_score(
+                historic_risk,
+                coincidence,
+                forecast_price_volatility,
+                is_dynamic=False,
+                usage_forecast_quality=usage_forecast_quality
+            )
+            logger.info(f"  📊 Fixed tariff risk: {risk_assessment_fixed['risk_level']} (score: {risk_assessment_fixed['risk_score']})")
+            
+            # Apply the appropriate risk assessment to each tariff based on its type
             for tariff in tariffs:
                 try:
                     is_dynamic = tariff.get('is_dynamic', True)
-                    risk_assessment = get_aggregated_risk_score(
-                        historic_risk,
-                        coincidence,
-                        forecast_price_volatility,
-                        is_dynamic,
-                        usage_forecast_quality
-                    )
+                    risk_assessment = risk_assessment_dynamic if is_dynamic else risk_assessment_fixed
                     
                     # Add risk data to tariff
                     tariff['risk_level'] = risk_assessment['risk_level']
@@ -2012,7 +2087,7 @@ async def scrape_all_tariffs(
                     logger.info(f"  ✅ {tariff['name']}: {risk_assessment['risk_level']} (score: {risk_assessment['risk_score']})")
                     
                 except Exception as e:
-                    logger.error(f"  ❌ Error calculating risk for {tariff.get('name', 'unknown')}: {e}")
+                    logger.error(f"  ❌ Error applying risk data for {tariff.get('name', 'unknown')}: {e}")
                     # Set default risk values on error
                     tariff['risk_level'] = 'moderate'
                     tariff['risk_score'] = 50

@@ -531,21 +531,113 @@ def get_user_load_profile(consumption_data: pd.DataFrame, days: int = 30, app_da
             }
         }
     }
+
+def get_price_forecast_volatility(app_data_dir: str = None) -> dict:
+    """
+    Analyze price forecast volatility by reading the most recent forecast data.
+    
+    This function loads the most recent price forecast file from the app_data directory
+    and calculates two key volatility metrics.
+    
+    Parameters:
+    app_data_dir (str): Path to app_data directory. If None, uses default path
+    
+    Returns:
+    dict: Contains:
+        - forecast_std_dev: Standard deviation of forecasted prices (€/kWh)
+        - avg_confidence_interval_width: Average width of confidence intervals if available (€/kWh), None otherwise
+    
+    Raises:
+    FileNotFoundError: If no forecast files are found
+    """
+    # Determine app_data directory
+    if app_data_dir is None:
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        app_data_dir = os.path.join(project_root, "app_data")
+    
+    # Find the most recent forecast file
+    try:
+        forecast_file = _get_most_recent_price_file(app_data_dir)
+    except FileNotFoundError as e:
+        raise FileNotFoundError(f"Cannot analyze price forecast volatility: {str(e)}")
+    
+    # Load the forecast data
+    df = pd.read_csv(forecast_file)
+    
+    # Check for required columns
+    if 'ds' not in df.columns:
+        raise ValueError(f"Forecast file must have 'ds' (datetime) column. Found columns: {df.columns.tolist()}")
+    
+    # Convert datetime
+    df['ds'] = pd.to_datetime(df['ds'])
+    
+    # Determine price column (could be different names)
+    price_col = None
+    for col in ['price_eur_per_mwh', 'yhat', 'forecast', 'price']:
+        if col in df.columns:
+            price_col = col
+            break
+    
+    if price_col is None:
+        raise ValueError(f"No price column found in forecast file. Available columns: {df.columns.tolist()}")
+    
+    # Convert price to €/kWh if it's in €/MWh
+    if 'mwh' in price_col.lower():
+        df['price_eur_per_kwh'] = df[price_col] / 1000
+    else:
+        df['price_eur_per_kwh'] = df[price_col]
+    
+    # Calculate standard deviation
+    forecast_std = df['price_eur_per_kwh'].std()
+    
+    # Check for confidence interval columns
+    avg_ci_width = None
+    lower_col = None
+    upper_col = None
+    
+    for col in df.columns:
+        col_lower = col.lower()
+        if 'lower' in col_lower or 'yhat_lower' in col_lower:
+            lower_col = col
+        if 'upper' in col_lower or 'yhat_upper' in col_lower:
+            upper_col = col
+    
+    if lower_col and upper_col:
+        # Convert to €/kWh if needed
+        if 'mwh' in lower_col.lower():
+            df['lower_kwh'] = df[lower_col] / 1000
+            df['upper_kwh'] = df[upper_col] / 1000
+        else:
+            df['lower_kwh'] = df[lower_col]
+            df['upper_kwh'] = df[upper_col]
+        
+        # Calculate average confidence interval width
+        df['ci_width'] = df['upper_kwh'] - df['lower_kwh']
+        avg_ci_width = df['ci_width'].mean()
+    
+    return {
+        'forecast_std_dev': round(float(forecast_std), 4),
+        'avg_confidence_interval_width': round(float(avg_ci_width), 4) if avg_ci_width is not None else None
+    }
+
+    
+    
     
 def get_aggregated_risk_score(historic_risk_analysis: dict, coincidence_factor: dict, forecast_price_volatility: dict,
-                              is_dynamic: bool, usage_forecast_quality: dict) -> dict:
+                              is_dynamic: bool, usage_forecast_quality: dict = None) -> dict:
     """
     Aggregate the risk analysis results into a simple risk assessment.
     
-    This function combines the outputs from historic risk analysis and coincidence factor
-    calculations to provide an overall risk assessment for the user.
+    This function combines the outputs from historic risk analysis, coincidence factor
+    calculations, and forecast quality metrics to provide an overall risk assessment for the user.
     
     Parameters:
     historic_risk_analysis (dict): Output from create_historic_risk_analysis function
     coincidence_factor (dict): Output from calculate_coincidence_factor function
-    price_volatility (dict): Output from price volatility analysis
+    forecast_price_volatility (dict): Output from price volatility analysis
     is_dynamic (bool): Whether the tariff is dynamic
-    usage_forecast_quality (dict): Quality metrics of the usage forecast
+    usage_forecast_quality (dict): Optional. Quality metrics from backtest (includes avg_confidence_interval_width, 
+                                    relative_confidence_interval_width, mae, forecast_error_percentage)
     
     Returns:
     dict: Contains:
@@ -553,6 +645,7 @@ def get_aggregated_risk_score(historic_risk_analysis: dict, coincidence_factor: 
         - risk_score: numeric score (0-100, lower is better)
         - risk_message: human-readable explanation
         - risk_factors: breakdown of contributing factors
+        - forecast_quality_included: boolean indicating if forecast quality was factored in
     """
     # Initialize score (lower is better/less risky)
     score = 50  # Start at neutral
@@ -594,6 +687,129 @@ def get_aggregated_risk_score(historic_risk_analysis: dict, coincidence_factor: 
         factors.append({'factor': 'Preisvolatilität', 'impact': 'neutral', 'detail': 'Moderate Preisschwankungen'})
     else:
         factors.append({'factor': 'Preisvolatilität', 'impact': 'positive', 'detail': 'Niedrige Preisschwankungen'})
+    
+    # Adjust score based on forecast quality (if provided)
+    forecast_quality_included = False
+    if usage_forecast_quality:
+        forecast_quality_included = True
+        
+        # Use relative confidence interval width as primary metric
+        relative_ci_width = usage_forecast_quality.get('relative_confidence_interval_width', None)
+        forecast_error_pct = usage_forecast_quality.get('forecast_error_percentage', None)
+        
+        if relative_ci_width is not None:
+            # Confidence interval width analysis
+            # Lower CI width = more confident predictions = lower risk
+            # Typical ranges: <30% excellent, 30-50% good, 50-70% fair, >70% poor
+            
+            if relative_ci_width < 30:
+                # Excellent forecast quality - reduces risk for dynamic tariffs
+                score -= 10
+                factors.append({
+                    'factor': 'Prognosequalität', 
+                    'impact': 'positive', 
+                    'detail': f'Hohe Vorhersagegenauigkeit (CI: {relative_ci_width:.1f}%)'
+                })
+            elif relative_ci_width < 50:
+                # Good forecast quality - slight risk reduction
+                score -= 5
+                factors.append({
+                    'factor': 'Prognosequalität', 
+                    'impact': 'positive', 
+                    'detail': f'Gute Vorhersagegenauigkeit (CI: {relative_ci_width:.1f}%)'
+                })
+            elif relative_ci_width < 70:
+                # Fair forecast quality - neutral to slight risk increase
+                score += 5
+                factors.append({
+                    'factor': 'Prognosequalität', 
+                    'impact': 'neutral', 
+                    'detail': f'Moderate Vorhersageunsicherheit (CI: {relative_ci_width:.1f}%)'
+                })
+            else:
+                # Poor forecast quality - increases risk significantly
+                score += 15
+                factors.append({
+                    'factor': 'Prognosequalität', 
+                    'impact': 'negative', 
+                    'detail': f'Hohe Vorhersageunsicherheit (CI: {relative_ci_width:.1f}%)'
+                })
+        
+        elif forecast_error_pct is not None:
+            # Fallback to forecast error percentage if CI width not available
+            if forecast_error_pct < 10:
+                score -= 10
+                factors.append({
+                    'factor': 'Prognosequalität', 
+                    'impact': 'positive', 
+                    'detail': f'Hohe Vorhersagegenauigkeit (Fehler: {forecast_error_pct:.1f}%)'
+                })
+            elif forecast_error_pct < 20:
+                score -= 5
+                factors.append({
+                    'factor': 'Prognosequalität', 
+                    'impact': 'positive', 
+                    'detail': f'Gute Vorhersagegenauigkeit (Fehler: {forecast_error_pct:.1f}%)'
+                })
+            elif forecast_error_pct < 30:
+                score += 5
+                factors.append({
+                    'factor': 'Prognosequalität', 
+                    'impact': 'neutral', 
+                    'detail': f'Moderate Vorhersageunsicherheit (Fehler: {forecast_error_pct:.1f}%)'
+                })
+            else:
+                score += 15
+                factors.append({
+                    'factor': 'Prognosequalität', 
+                    'impact': 'negative', 
+                    'detail': f'Hohe Vorhersageunsicherheit (Fehler: {forecast_error_pct:.1f}%)'
+                })
+    
+    # Adjust score based on price forecast volatility (ONLY for dynamic tariffs)
+    # Price volatility doesn't matter for fixed tariffs since they have fixed rates
+    if is_dynamic and forecast_price_volatility:
+        price_std_dev = forecast_price_volatility.get('forecast_std_dev', None)
+        price_ci_width = forecast_price_volatility.get('avg_confidence_interval_width', None)
+        
+        if price_std_dev is not None:
+            # Standard deviation thresholds (in €/kWh)
+            # Low: <0.02, Medium: 0.02-0.04, High: >0.04
+            
+            if price_std_dev > 0.04:
+                # High price volatility increases risk
+                score += 10
+                factors.append({
+                    'factor': 'Preisvolatilität (Prognose)', 
+                    'impact': 'negative', 
+                    'detail': f'Hohe erwartete Preisschwankungen (σ: {price_std_dev:.4f} €/kWh)'
+                })
+            elif price_std_dev > 0.02:
+                # Medium price volatility
+                score += 5
+                factors.append({
+                    'factor': 'Preisvolatilität (Prognose)', 
+                    'impact': 'neutral', 
+                    'detail': f'Moderate erwartete Preisschwankungen (σ: {price_std_dev:.4f} €/kWh)'
+                })
+            else:
+                # Low price volatility reduces risk
+                score -= 5
+                factors.append({
+                    'factor': 'Preisvolatilität (Prognose)', 
+                    'impact': 'positive', 
+                    'detail': f'Niedrige erwartete Preisschwankungen (σ: {price_std_dev:.4f} €/kWh)'
+                })
+        
+        # Additional check for confidence interval width if available
+        if price_ci_width is not None and price_ci_width > 0.08:
+            # Very wide confidence intervals indicate high uncertainty in price forecasts
+            score += 5
+            factors.append({
+                'factor': 'Preisprognose-Unsicherheit', 
+                'impact': 'negative', 
+                'detail': f'Hohe Unsicherheit in Preisprognose (CI: {price_ci_width:.4f} €/kWh)'
+            })
             
     # Adjust score for fixed tariffs
     if not is_dynamic:
@@ -603,20 +819,30 @@ def get_aggregated_risk_score(historic_risk_analysis: dict, coincidence_factor: 
     # Ensure score is within bounds (0-100, lower is better)
     overall_risk_score = max(0, min(100, score))
     
-    # Determine risk level
+    # Determine risk level and message
     if overall_risk_score <= 40:
         risk_level = 'low'
-        risk_message = 'Niedriges Risiko: Ihr Verbrauchsprofil eignet sich gut für dynamische Tarife'
+        if forecast_quality_included:
+            risk_message = 'Niedriges Risiko: Ihr Verbrauchsprofil und zuverlässige Prognosen eignen sich gut für dynamische Tarife'
+        else:
+            risk_message = 'Niedriges Risiko: Ihr Verbrauchsprofil eignet sich gut für dynamische Tarife'
     elif overall_risk_score <= 60:
         risk_level = 'moderate'
-        risk_message = 'Moderates Risiko: Dynamische Tarife können für Sie vorteilhaft sein, aber Optimierung empfohlen'
+        if forecast_quality_included:
+            risk_message = 'Moderates Risiko: Dynamische Tarife können vorteilhaft sein. Berücksichtigen Sie die Prognosequalität'
+        else:
+            risk_message = 'Moderates Risiko: Dynamische Tarife können für Sie vorteilhaft sein, aber Optimierung empfohlen'
     else:
         risk_level = 'high'
-        risk_message = 'Höheres Risiko: Überprüfen Sie, ob Sie Ihren Verbrauch zu günstigeren Zeiten verschieben können'
+        if forecast_quality_included:
+            risk_message = 'Höheres Risiko: Unsichere Prognosen und ungünstiges Verbrauchsmuster erhöhen das Risiko'
+        else:
+            risk_message = 'Höheres Risiko: Überprüfen Sie, ob Sie Ihren Verbrauch zu günstigeren Zeiten verschieben können'
     
     return {
         'risk_level': risk_level,
         'risk_score': int(overall_risk_score),
         'risk_message': risk_message,
-        'risk_factors': factors
+        'risk_factors': factors,
+        'forecast_quality_included': forecast_quality_included
     }
