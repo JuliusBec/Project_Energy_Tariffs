@@ -412,7 +412,8 @@ async def compare_tariffs_with_csv(
                         start_date=start_date,
                         network_fee=0,
                         postal_code=zip_code,
-                        additional_price_ct_kwh=scraped_data['additional_price_ct_kwh']
+                        additional_price_ct_kwh=scraped_data['additional_price_ct_kwh'],
+                        features=["dynamic", "green", "app", "real-time-pricing", "smart-meter-required"]
                     )
                     tariffs.append(('Tibber', tariff, scraped_data))
                     print(f"   ✓ Grundpreis: {scraped_data['base_price_monthly']:.2f} €/Mon")
@@ -432,7 +433,8 @@ async def compare_tariffs_with_csv(
                         start_date=start_date,
                         network_fee=0,
                         postal_code=zip_code,
-                        additional_price_ct_kwh=scraped_data['markup_ct_kwh']
+                        additional_price_ct_kwh=scraped_data['markup_ct_kwh'],
+                        features=["dynamic", "green", "app", "real-time-pricing", "smart-meter-required"]
                     )
                     tariffs.append(('EnBW', tariff, scraped_data))
                     print(f"   ✓ Grundpreis: {scraped_data['base_price_monthly']:.2f} €/Mon")
@@ -1461,6 +1463,11 @@ def create_dynamic_tariff_from_scraper(scraper_data: dict, provider: str) -> Dyn
     if additional_price_ct_kwh is None:
         additional_price_ct_kwh = 18.4
     
+    # Build features list - all three providers offer green energy and have apps
+    features = ["dynamic", "real-time-pricing", "smart-meter-required"]
+    if provider.lower() in ["tado", "tibber", "enbw"]:
+        features.extend(["green", "app"])
+    
     # Create DynamicTariff object
     tariff = DynamicTariff(
         name=scraper_data.get("tariff_name", f"{provider} Dynamic"),
@@ -1469,7 +1476,7 @@ def create_dynamic_tariff_from_scraper(scraper_data: dict, provider: str) -> Dyn
         start_date=start_date,
         is_dynamic=True,
         network_fee=network_fee,
-        features=["dynamic", "real-time-pricing", "smart-meter-required"],
+        features=features,
         postal_code=scraper_data.get("zip_code"),
         additional_price_ct_kwh=additional_price_ct_kwh  # ← NEUE PARAMETER!
     )
@@ -1492,13 +1499,24 @@ def scraper_to_tariff(scraper_data: dict, provider: str, tariff_type: str = "dyn
     """
     from datetime import datetime
     
+    # Build features list based on provider
+    features = []
+    if tariff_type == "dynamic":
+        features.extend(["dynamic", "real-time-pricing", "smart-meter-required"])
+    
+    # All three providers (Tado, Tibber, EnBW) offer green energy and have apps with price notifications
+    provider_lower = provider.lower()
+    if provider_lower in ["tado", "tibber", "enbw"]:
+        features.append("green")
+        features.append("app")
+    
     # Base tariff data
     tariff_dict = {
         "name": scraper_data.get("tariff_name", f"{provider} Dynamic"),
         "provider": provider,
         "is_dynamic": tariff_type == "dynamic",
         "start_date": datetime.now().isoformat(),
-        "features": ["dynamic", "real-time-pricing", "smart-meter-required"]
+        "features": features
     }
     
     # Provider-specific data mapping

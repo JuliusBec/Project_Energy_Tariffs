@@ -1222,6 +1222,9 @@ export default {
           
           // Convert EnergyTariff format to frontend display format
           const scrapedTariffs = scraperData.tariffs.map(tariff => {
+            // Debug: Log features from backend
+            console.log(`📦 ${tariff.name} features from backend:`, tariff.features)
+            
             const monthlyConsumption = annualConsumption / 12
             let monthlyCost, annualCost, totalKwhPrice
             
@@ -1292,9 +1295,10 @@ export default {
               is_dynamic: tariff.is_dynamic !== false,  // Default to true if not specified
               smart_meter_required: tariff.is_dynamic !== false,
               green_energy: tariff.features?.includes('green') || false,
-              app_available: tariff.is_dynamic !== false,  // Dynamic tariffs have apps
+              app_available: tariff.features?.includes('app') || tariff.is_dynamic !== false,  // Check features first, then dynamic
               price_forecast: tariff.is_dynamic !== false,
               automation_ready: tariff.is_dynamic !== false,
+              features: tariff.features || [],  // ← IMPORTANT: Pass through the features array!
               special_features: tariff.features || [],
               // Add CSV-based metrics if available
               csv_based: csvAnalysis !== null,
