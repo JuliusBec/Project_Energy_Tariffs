@@ -748,8 +748,8 @@ async def get_backtest_data(file: UploadFile = File(...)):
         # Convert datetime column
         df['datetime'] = pd.to_datetime(df['datetime'])
         
-        # Generate backtest data
-        backtest_data = create_backtest(df, return_data=True)
+        # Generate backtest data (now always returns data for API)
+        backtest_data = create_backtest(df)
         
         if backtest_data is None:
             raise HTTPException(status_code=500, detail="Failed to generate backtest data")
@@ -1227,8 +1227,125 @@ async def get_risk_analysis(file: UploadFile = File(...), days: int = Form(30)):
 @app.post("/api/risk-score")
 async def get_risk_score(file: UploadFile = File(...), days: int = Form(30)):
     """
-    Get aggregated risk score for dynamic tariff suitability.
-    Returns a simple low/moderate/high risk assessment.
+    Get aggregated risk scores for both dynamic and fixed tariffs.
+    Returns risk assessments for both tariff types to enable comparison.
+    
+    Parameters:
+    - file: CSV file with consumption data (datetime, value columns)
+    - days: Number of days to analyze (default: 30)
+    
+    Returns:
+    - risk_dynamic: Risk assessment for dynamic tariffs
+    - risk_fixed: Risk assessment for fixed tariffs
+    """
+    import traceback
+    from src.backend.risk_analysis import (
+        create_historic_risk_analysis,
+        calculate_coincidence_factor,
+        get_aggregated_risk_score
+    )
+    
+    # Validate file type
+    if not file.filename.endswith('.csv'):
+        raise HTTPException(status_code=400, detail="File must be a CSV")
+    
+    try:
+        # Read the uploaded CSV
+        contents = await file.read()
+        df = pd.read_csv(io.StringIO(contents.decode('utf-8')))
+        
+        # Validate CSV has required columns
+        if 'datetime' not in df.columns or 'value' not in df.columns:
+            raise HTTPException(
+                status_code=400, 
+                detail="CSV must have 'datetime' and 'value' columns"
+            )
+        
+        # Convert datetime column
+        df['datetime'] = pd.to_datetime(df['datetime'])
+        
+        # Determine app_data directory
+        app_data_dir = os.path.join(os.path.dirname(__file__), "app_data")
+        
+        # Calculate risk metrics (shared for both tariff types)
+        historic_risk = create_historic_risk_analysis(df, days=days, app_data_dir=app_data_dir)
+        coincidence = calculate_coincidence_factor(df, days=days, expensive_hours_pct=20.0, app_data_dir=app_data_dir)
+        
+        # Calculate backtest metrics for forecast quality assessment
+        usage_forecast_quality = None
+        try:
+            backtest_data = create_backtest(df)
+            usage_forecast_quality = backtest_data.get('metrics', {})
+        except Exception as e:
+            # If backtest fails (e.g., not enough data), continue without forecast quality
+            print(f"Warning: Could not calculate backtest metrics: {str(e)}")
+        
+        # Calculate price forecast volatility
+        from src.backend.risk_analysis import get_price_forecast_volatility
+        forecast_price_volatility = {}
+        try:
+            forecast_price_volatility = get_price_forecast_volatility(app_data_dir=app_data_dir)
+        except Exception as e:
+            print(f"Warning: Could not calculate price forecast volatility: {str(e)}")
+        
+        # Get aggregated risk scores for BOTH tariff types
+        risk_dynamic = get_aggregated_risk_score(
+            historic_risk, 
+            coincidence, 
+            forecast_price_volatility,
+            is_dynamic=True,
+            usage_forecast_quality=usage_forecast_quality
+        )
+        risk_dynamic['tariff_type'] = 'dynamic'
+        
+        risk_fixed = get_aggregated_risk_score(
+            historic_risk, 
+            coincidence, 
+            forecast_price_volatility,
+            is_dynamic=False,
+            usage_forecast_quality=usage_forecast_quality
+        )
+        risk_fixed['tariff_type'] = 'fixed'
+        
+        return {
+            'risk_dynamic': risk_dynamic,
+            'risk_fixed': risk_fixed
+        }
+        
+    except FileNotFoundError as e:
+        error_msg = str(e)
+        print(f"FileNotFoundError in risk score: {error_msg}")
+        traceback.print_exc()
+        raise HTTPException(status_code=404, detail=error_msg)
+    except ValueError as e:
+        error_msg = str(e)
+        print(f"ValueError in risk score: {error_msg}")
+        traceback.print_exc()
+        raise HTTPException(status_code=400, detail=error_msg)
+    except HTTPException:
+        raise
+    except Exception as e:
+        error_msg = f"Error calculating risk score: {str(e)}"
+        print(f"Unexpected error in risk score: {error_msg}")
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=error_msg)
+
+
+
+@app.post("/api/risk-score-per-tariff")
+async def get_risk_score_per_tariff(
+    file: UploadFile = File(...), 
+    days: int = Form(30),
+    is_dynamic: bool = Form(True)
+):
+    """
+    Get aggregated risk score for a specific tariff type (dynamic or fixed).
+    Returns a simple low/moderate/high risk assessment customized for the tariff type.
+    
+    Parameters:
+    - file: CSV file with consumption data (datetime, value columns)
+    - days: Number of days to analyze (default: 30)
+    - is_dynamic: Whether to calculate risk for a dynamic (True) or fixed (False) tariff
     """
     import traceback
     from src.backend.risk_analysis import (
@@ -1263,26 +1380,51 @@ async def get_risk_score(file: UploadFile = File(...), days: int = Form(30)):
         historic_risk = create_historic_risk_analysis(df, days=days, app_data_dir=app_data_dir)
         coincidence = calculate_coincidence_factor(df, days=days, expensive_hours_pct=20.0, app_data_dir=app_data_dir)
         
-        # Get aggregated risk score
-        risk_assessment = get_aggregated_risk_score(historic_risk, coincidence)
+        # Calculate backtest metrics for forecast quality assessment
+        usage_forecast_quality = None
+        try:
+            backtest_data = create_backtest(df)
+            usage_forecast_quality = backtest_data.get('metrics', {})
+        except Exception as e:
+            # If backtest fails (e.g., not enough data), continue without forecast quality
+            print(f"Warning: Could not calculate backtest metrics: {str(e)}")
+        
+        # Calculate price forecast volatility
+        from src.backend.risk_analysis import get_price_forecast_volatility
+        forecast_price_volatility = {}
+        try:
+            forecast_price_volatility = get_price_forecast_volatility(app_data_dir=app_data_dir)
+        except Exception as e:
+            print(f"Warning: Could not calculate price forecast volatility: {str(e)}")
+        
+        # Get aggregated risk score with tariff-specific is_dynamic parameter
+        risk_assessment = get_aggregated_risk_score(
+            historic_risk, 
+            coincidence, 
+            forecast_price_volatility,
+            is_dynamic,  # This will affect the risk calculation
+            usage_forecast_quality
+        )
+        
+        # Add tariff type to response
+        risk_assessment['tariff_type'] = 'dynamic' if is_dynamic else 'fixed'
         
         return risk_assessment
         
     except FileNotFoundError as e:
         error_msg = str(e)
-        print(f"FileNotFoundError in risk score: {error_msg}")
+        print(f"FileNotFoundError in risk score per tariff: {error_msg}")
         traceback.print_exc()
         raise HTTPException(status_code=404, detail=error_msg)
     except ValueError as e:
         error_msg = str(e)
-        print(f"ValueError in risk score: {error_msg}")
+        print(f"ValueError in risk score per tariff: {error_msg}")
         traceback.print_exc()
         raise HTTPException(status_code=400, detail=error_msg)
     except HTTPException:
         raise
     except Exception as e:
-        error_msg = f"Error calculating risk score: {str(e)}"
-        print(f"Unexpected error in risk score: {error_msg}")
+        error_msg = f"Error calculating risk score per tariff: {str(e)}"
         print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=error_msg)
 
@@ -1750,28 +1892,67 @@ class ScraperTariffRequest(BaseModel):
     providers: List[str] = ["enbw", "tado", "tibber"]
     headless: bool = True
     debug_mode: bool = False
+    days: int = 30  # Days for risk analysis
 
 
 @app.post("/api/scrape/tariffs")
-async def scrape_all_tariffs(request: ScraperTariffRequest):
+async def scrape_all_tariffs(
+    zip_code: str = Form(...),
+    annual_consumption: float = Form(...),
+    providers: str = Form('["enbw", "tado", "tibber"]'),  # JSON string
+    headless: bool = Form(True),
+    debug_mode: bool = Form(False),
+    days: int = Form(30),
+    file: Optional[UploadFile] = File(None)  # Optional CSV file for risk analysis
+):
     """
     Scrape multiple providers and return data in EnergyTariff-compatible format.
+    Optionally calculates risk scores per tariff if CSV consumption data is provided.
     
     Returns tariff objects with fields matching EnergyTariff class structure:
     - name, provider, base_price, kwh_rate, is_dynamic, start_date, features
+    - risk_level, risk_score, risk_message (if CSV file is provided)
     """
+    import json
+    import traceback
+    
     tariffs = []
     errors = []
     
-    logger.info(f"🔍 Scraping tariffs for providers: {request.providers}, PLZ: {request.zip_code}, {request.annual_consumption} kWh")
+    # Parse providers from JSON string
+    try:
+        providers_list = json.loads(providers)
+    except:
+        providers_list = ["enbw", "tado", "tibber"]  # Default
     
-    for provider in request.providers:
+    logger.info(f"🔍 Scraping tariffs for providers: {providers_list}, PLZ: {zip_code}, {annual_consumption} kWh")
+    
+    # Parse CSV file if provided for risk analysis
+    consumption_df = None
+    if file and file.filename:
+        try:
+            logger.info(f"📊 Processing CSV file for risk analysis: {file.filename}")
+            contents = await file.read()
+            consumption_df = pd.read_csv(io.StringIO(contents.decode('utf-8')))
+            
+            # Validate CSV has required columns
+            if 'datetime' not in consumption_df.columns or 'value' not in consumption_df.columns:
+                logger.warning("CSV missing required columns (datetime, value), skipping risk analysis")
+                consumption_df = None
+            else:
+                consumption_df['datetime'] = pd.to_datetime(consumption_df['datetime'])
+                logger.info(f"✅ CSV loaded: {len(consumption_df)} rows")
+        except Exception as e:
+            logger.error(f"❌ Error parsing CSV: {e}")
+            consumption_df = None
+    
+    for provider in providers_list:
         try:
             if provider.lower() == "enbw":
                 from src.webscraping.scraper_enbw import scrape_enbw_tariff
                 result = await scrape_enbw_tariff(
-                    zip_code=request.zip_code,
-                    annual_consumption=request.annual_consumption
+                    zip_code=zip_code,
+                    annual_consumption=annual_consumption
                 )
                 if result and result.get('base_price_monthly') is not None:
                     tariff_data = scraper_to_tariff(result, "EnBW", "dynamic")
@@ -1783,8 +1964,8 @@ async def scrape_all_tariffs(request: ScraperTariffRequest):
             elif provider.lower() == "tado":
                 from src.webscraping.scraper_tado import scrape_tado_tariff
                 result = await scrape_tado_tariff(
-                    zip_code=request.zip_code,
-                    annual_consumption=request.annual_consumption
+                    zip_code=zip_code,
+                    annual_consumption=annual_consumption
                 )
                 if result and result.get('base_price_monthly') is not None:
                     tariff_data = scraper_to_tariff(result, "Tado", "dynamic")
@@ -1796,8 +1977,8 @@ async def scrape_all_tariffs(request: ScraperTariffRequest):
             elif provider.lower() == "tibber":
                 from src.webscraping.scraper_tibber import scrape_tibber_price
                 result = await scrape_tibber_price(
-                    postal_code=request.zip_code,
-                    annual_consumption_kwh=request.annual_consumption
+                    postal_code=zip_code,
+                    annual_consumption_kwh=annual_consumption
                 )
                 if result and result.get('base_price_monthly') is not None:
                     tariff_data = scraper_to_tariff(result, "Tibber", "dynamic")
@@ -1822,9 +2003,101 @@ async def scrape_all_tariffs(request: ScraperTariffRequest):
             "base_price": conv_tariff.base_price,
             "kwh_rate": conv_tariff.kwh_rate,
             "min_duration": getattr(conv_tariff, 'min_duration', None),
-            "postal_code": request.zip_code
+            "postal_code": zip_code
         }
         tariffs.append(tariff_data)
+    
+    # Calculate risk scores per tariff if CSV data is available
+    if consumption_df is not None:
+        logger.info(f"🛡️ Calculating risk scores for {len(tariffs)} tariffs...")
+        try:
+            from src.backend.risk_analysis import (
+                create_historic_risk_analysis,
+                calculate_coincidence_factor,
+                get_aggregated_risk_score
+            )
+            
+            # Determine app_data directory
+            app_data_dir = os.path.join(os.path.dirname(__file__), "app_data")
+            
+            # Calculate base risk metrics ONCE (same for all tariffs)
+            historic_risk = create_historic_risk_analysis(
+                consumption_df, 
+                days=days, 
+                app_data_dir=app_data_dir
+            )
+            coincidence = calculate_coincidence_factor(
+                consumption_df, 
+                days=days, 
+                expensive_hours_pct=20.0, 
+                app_data_dir=app_data_dir
+            )
+            
+            # Calculate backtest metrics for forecast quality assessment
+            usage_forecast_quality = None
+            try:
+                backtest_data = create_backtest(consumption_df)
+                usage_forecast_quality = backtest_data.get('metrics', {})
+                logger.info(f"✅ Backtest metrics calculated: CI width={usage_forecast_quality.get('relative_confidence_interval_width', 'N/A')}%")
+            except Exception as e:
+                # If backtest fails (e.g., not enough data), continue without forecast quality
+                logger.warning(f"⚠️  Could not calculate backtest metrics: {str(e)}")
+            
+            # Calculate price forecast volatility
+            from src.backend.risk_analysis import get_price_forecast_volatility
+            forecast_price_volatility = {}
+            try:
+                forecast_price_volatility = get_price_forecast_volatility(app_data_dir=app_data_dir)
+                logger.info(f"✅ Price forecast volatility calculated: σ={forecast_price_volatility.get('forecast_std_dev', 'N/A')} €/kWh")
+            except Exception as e:
+                logger.warning(f"⚠️  Could not calculate price forecast volatility: {str(e)}")
+            
+            # Calculate risk score TWICE: once for dynamic tariffs, once for fixed tariffs
+            # This avoids redundant calculations since metrics are the same for all dynamic/fixed tariffs
+            risk_assessment_dynamic = get_aggregated_risk_score(
+                historic_risk,
+                coincidence,
+                forecast_price_volatility,
+                is_dynamic=True,
+                usage_forecast_quality=usage_forecast_quality
+            )
+            logger.info(f"  📊 Dynamic tariff risk: {risk_assessment_dynamic['risk_level']} (score: {risk_assessment_dynamic['risk_score']})")
+            
+            risk_assessment_fixed = get_aggregated_risk_score(
+                historic_risk,
+                coincidence,
+                forecast_price_volatility,
+                is_dynamic=False,
+                usage_forecast_quality=usage_forecast_quality
+            )
+            logger.info(f"  📊 Fixed tariff risk: {risk_assessment_fixed['risk_level']} (score: {risk_assessment_fixed['risk_score']})")
+            
+            # Apply the appropriate risk assessment to each tariff based on its type
+            for tariff in tariffs:
+                try:
+                    is_dynamic = tariff.get('is_dynamic', True)
+                    risk_assessment = risk_assessment_dynamic if is_dynamic else risk_assessment_fixed
+                    
+                    # Add risk data to tariff
+                    tariff['risk_level'] = risk_assessment['risk_level']
+                    tariff['risk_score'] = risk_assessment['risk_score']
+                    tariff['risk_message'] = risk_assessment['risk_message']
+                    tariff['risk_factors'] = risk_assessment.get('risk_factors', [])
+                    
+                    logger.info(f"  ✅ {tariff['name']}: {risk_assessment['risk_level']} (score: {risk_assessment['risk_score']})")
+                    
+                except Exception as e:
+                    logger.error(f"  ❌ Error applying risk data for {tariff.get('name', 'unknown')}: {e}")
+                    # Set default risk values on error
+                    tariff['risk_level'] = 'moderate'
+                    tariff['risk_score'] = 50
+                    tariff['risk_message'] = 'Risikobewertung nicht verfügbar'
+                    
+        except Exception as e:
+            logger.error(f"❌ Error in risk analysis: {e}")
+            traceback.print_exc()
+    else:
+        logger.info("ℹ️ No CSV data provided, skipping risk analysis")
     
     logger.info(f"Total: {len(tariffs)} tariffs ({len(tariffs) - len(ENBW_TARIFFS)} scraped + {len(ENBW_TARIFFS)} conventional), {len(errors)} errors")
     
@@ -1832,7 +2105,8 @@ async def scrape_all_tariffs(request: ScraperTariffRequest):
         "success": len(tariffs) > 0,
         "tariffs": tariffs,
         "errors": errors if errors else None,
-        "timestamp": datetime.now().isoformat()
+        "timestamp": datetime.now().isoformat(),
+        "risk_analysis_performed": consumption_df is not None
     }
 
 

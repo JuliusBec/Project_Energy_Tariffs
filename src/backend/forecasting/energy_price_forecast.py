@@ -591,6 +591,27 @@ def main():
         logging.error(f"An error occurred: {str(e)}", exc_info=True)
         raise
 
+def get_forecast_volatility(forecast: pd.DataFrame) -> dict:
+    """
+    Calculate forecast volatility metrics from the forecast DataFrame
+    Args:
+        forecast: DataFrame with 'yhat', 'yhat_lower', 'yhat_upper' columns
+    Returns:
+        dict: Dictionary with forecast variance and average width of prediction intervals
+    """
+    try:
+        variance = forecast['yhat'].var()
+        avg_width = (forecast['yhat_upper'] - forecast['yhat_lower']).mean()
+        
+        return {
+            'variance': variance,
+            'avg_interval_width': avg_width
+        }
+        
+    except Exception as e:
+        logging.error(f"Error calculating forecast volatility: {str(e)}")
+        raise
+
 def create_chart_data(historical_file=None, 
                         forecast_file='germany_price_forecast_720h.csv',
                         app_data_dir='app_data'):

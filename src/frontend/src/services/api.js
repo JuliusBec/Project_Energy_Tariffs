@@ -168,6 +168,26 @@ export const apiService = {
   
   // Combined scraper endpoint - returns all tariffs in EnergyTariff format
   scrapeAllTariffs: (zipCode, annualConsumption, providers = ['enbw', 'tado', 'tibber'], options = {}) => {
+    // If a CSV file is provided, send as multipart/form-data
+    if (options.csvFile) {
+      const formData = new FormData()
+      formData.append('zip_code', zipCode)
+      formData.append('annual_consumption', annualConsumption)
+      formData.append('providers', JSON.stringify(providers))
+      formData.append('headless', options.headless !== false)
+      formData.append('debug_mode', options.debug_mode || false)
+      formData.append('days', options.days || 30)
+      formData.append('file', options.csvFile)
+      
+      return api.post('/scrape/tariffs', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        },
+        timeout: 180000  // 180 seconds for all scrapers
+      })
+    }
+    
+    // Otherwise, send as JSON (backward compatible)
     return api.post('/scrape/tariffs', {
       zip_code: zipCode,
       annual_consumption: annualConsumption,

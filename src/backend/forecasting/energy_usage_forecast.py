@@ -4,7 +4,6 @@ import numpy as np
 import pandas as pd
 from datetime import datetime, timedelta
 from prophet import Prophet
-import matplotlib.pyplot as plt
 
 
 
@@ -59,19 +58,18 @@ def forecast_prophet(df, days=30):
 
     return future_forecast
 
-def create_backtest(usage_df, return_data=False, show_daily_view=False, show_hourly_view=True):
+def create_backtest(usage_df):
     """
-    Create backtest visualization comparing actual vs forecasted energy usage.
+    Create backtest data for API response comparing actual vs forecasted energy usage.
     
     Parameters:
-    - usage_df: DataFrame with energy usage data
-    - return_data: If True, return structured data instead of displaying plots
-    - show_daily_view: Show daily aggregated view (mobile-friendly)
-    - show_hourly_view: Show detailed hourly view
+    - usage_df: DataFrame with energy usage data (must have 'datetime' and 'value' columns)
     
     Returns:
-    - If return_data=True: Dictionary with hourly_data, daily_data, and metrics
-    - If return_data=False: None (displays plots)
+    - Dictionary with hourly_data, daily_data, and metrics for visualization
+    
+    Note:
+    - For local plotting and testing, use test_backtest_visualization.py in the analysis folder
     """
     
     usage_df = usage_df.copy()
@@ -146,104 +144,52 @@ def create_backtest(usage_df, return_data=False, show_daily_view=False, show_hou
     mse = np.mean((merged_df['yhat'] - merged_df['value'])**2)
     print(f"Backtest MAE: {mae:.4f}")
     print(f"Backtest MSE: {mse:.4f}")
+    
+    # Calculate confidence interval metrics
+    confidence_interval_width = forecast_only['yhat_upper'] - forecast_only['yhat_lower']
+    avg_confidence_interval_width = confidence_interval_width.mean()
+    relative_confidence_interval_width = (avg_confidence_interval_width / forecast_only['yhat'].mean()) * 100
+    print(f"Average confidence interval width: {avg_confidence_interval_width:.4f} kWh")
+    print(f"Relative confidence interval width: {relative_confidence_interval_width:.2f}% of mean forecast")
 
-    # Prepare data for return if requested
-    if return_data:
-        # Aggregate to daily totals
-        forecast_daily = forecast_only.copy()
-        forecast_daily = forecast_daily.set_index('ds').resample('D').sum().reset_index()
-        
-        backtest_daily = backtest_df.copy()
-        backtest_daily = backtest_daily.set_index('datetime').resample('D').sum().reset_index()
-        
-        # Prepare hourly data
-        hourly_data = {
-            'timestamps': forecast_only['ds'].dt.strftime('%Y-%m-%d %H:%M:%S').tolist(),
-            'forecast': forecast_only['yhat'].tolist(),
-            'forecast_lower': forecast_only['yhat_lower'].tolist(),
-            'forecast_upper': forecast_only['yhat_upper'].tolist(),
-            'actual': backtest_df['value'].tolist()
-        }
-        
-        # Prepare daily data
-        daily_data = {
-            'timestamps': forecast_daily['ds'].dt.strftime('%Y-%m-%d').tolist(),
-            'forecast': forecast_daily['yhat'].tolist(),
-            'actual': backtest_daily['value'].tolist()
-        }
-        
-        # Metrics
-        metrics = {
-            'total_forecast_usage': float(total_forecast_usage),
-            'total_actual_usage': float(total_actual_usage),
-            'forecast_error_absolute': float(abs(total_forecast_usage - total_actual_usage)),
-            'forecast_error_percentage': float(abs(total_forecast_usage - total_actual_usage) / total_actual_usage * 100),
-            'mae': float(mae),
-            'mse': float(mse),
-            'forecast_period_days': len(forecast_daily)
-        }
-        
-        return {
-            'hourly_data': hourly_data,
-            'daily_data': daily_data,
-            'metrics': metrics
-        }
+    # Aggregate to daily totals
+    forecast_daily = forecast_only.copy()
+    forecast_daily = forecast_daily.set_index('ds').resample('D').sum().reset_index()
     
-    # Show daily aggregated view (mobile-friendly)
-    if show_daily_view:
-        # Aggregate to daily totals for cleaner visualization
-        forecast_daily = forecast_only.copy()
-        forecast_daily = forecast_daily.set_index('ds').resample('D').sum().reset_index()
-        
-        backtest_daily = backtest_df.copy()
-        backtest_daily = backtest_daily.set_index('datetime').resample('D').sum().reset_index()
-        
-        # Create mobile-friendly plot
-        plt.figure(figsize=(10, 6))
-        
-        # Plot with better styling
-        plt.plot(forecast_daily['ds'], forecast_daily['yhat'], 
-                label='Forecast', color='#2E86AB', linewidth=2, marker='o', markersize=4)
-        plt.plot(backtest_daily['datetime'], backtest_daily['value'], 
-                label='Actual', color='#F24236', linewidth=2, marker='s', markersize=4)
-        
-        plt.title('Daily Energy Usage: Actual vs Forecast\n(30-Day Backtest)', fontsize=14, fontweight='bold', pad=20)
-        plt.xlabel('Date', fontsize=12)
-        plt.ylabel('Daily Energy Usage (kWh)', fontsize=12)
-        
-        # Set y-axis to start at 0 and go up to 150% of maximum value
-        max_actual = backtest_daily['value'].max()
-        max_forecast = forecast_daily['yhat'].max()
-        y_max = max(max_actual, max_forecast) * 1.5
-        plt.ylim(bottom=0, top=y_max)
-        
-        # Improve legend and grid
-        plt.legend(loc='best', frameon=True, fancybox=True, shadow=True)
-        plt.grid(True, alpha=0.3, linestyle='--')
-        
-        # Better date formatting for mobile
-        plt.xticks(rotation=45)
-        plt.tight_layout()
-        
-        plt.show()
+    backtest_daily = backtest_df.copy()
+    backtest_daily = backtest_daily.set_index('datetime').resample('D').sum().reset_index()
     
-    # Show detailed hourly view if requested
-    if show_hourly_view:
-        plt.figure(figsize=(15, 8))
-        plt.plot(forecast_only['ds'], forecast_only['yhat'], label='Forecast', color='blue', alpha=0.8)
-        plt.fill_between(forecast_only['ds'], forecast_only['yhat_lower'], forecast_only['yhat_upper'], 
-                        color='blue', alpha=0.2, label='90% Confidence Interval')
-        plt.plot(backtest_df['datetime'], backtest_df['value'], label='Actual', color='orange', alpha=0.8)
-        
-        plt.title('Hourly Energy Usage: Actual vs Forecast (30-Day Backtest)', fontsize=14, fontweight='bold')
-        plt.xlabel('Date', fontsize=12)
-        plt.ylabel('Hourly Energy Usage (kWh)', fontsize=12)
-        
-        # Set y-axis to start at 0
-        plt.ylim(bottom=0)
-        
-        plt.legend()
-        plt.grid(True, alpha=0.3)
-        plt.xticks(rotation=45)
-        plt.tight_layout()
-        plt.show()
+    # Prepare hourly data
+    hourly_data = {
+        'timestamps': forecast_only['ds'].dt.strftime('%Y-%m-%d %H:%M:%S').tolist(),
+        'forecast': forecast_only['yhat'].tolist(),
+        'forecast_lower': forecast_only['yhat_lower'].tolist(),
+        'forecast_upper': forecast_only['yhat_upper'].tolist(),
+        'actual': backtest_df['value'].tolist()
+    }
+    
+    # Prepare daily data
+    daily_data = {
+        'timestamps': forecast_daily['ds'].dt.strftime('%Y-%m-%d').tolist(),
+        'forecast': forecast_daily['yhat'].tolist(),
+        'actual': backtest_daily['value'].tolist()
+    }
+    
+    # Metrics
+    metrics = {
+        'total_forecast_usage': float(total_forecast_usage),
+        'total_actual_usage': float(total_actual_usage),
+        'forecast_error_absolute': float(abs(total_forecast_usage - total_actual_usage)),
+        'forecast_error_percentage': float(abs(total_forecast_usage - total_actual_usage) / total_actual_usage * 100),
+        'mae': float(mae),
+        'mse': float(mse),
+        'forecast_period_days': len(forecast_daily),
+        'avg_confidence_interval_width': float(avg_confidence_interval_width),
+        'relative_confidence_interval_width': float(relative_confidence_interval_width)
+    }
+    
+    return {
+        'hourly_data': hourly_data,
+        'daily_data': daily_data,
+        'metrics': metrics
+    }

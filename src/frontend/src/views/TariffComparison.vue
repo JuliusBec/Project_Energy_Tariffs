@@ -1058,7 +1058,20 @@ export default {
         console.log(`🔍 Scraping tariffs for PLZ: ${zipCode}, Consumption: ${annualConsumption} kWh`)
         
         // Call combined scraper endpoint with actual consumption data
-        const scraperResponse = await apiService.scrapeAllTariffs(zipCode, annualConsumption)
+        // Pass CSV file if available for per-tariff risk analysis
+        const scraperOptions = {}
+        if (uploadedFile.value) {
+          scraperOptions.csvFile = uploadedFile.value
+          scraperOptions.days = 30
+          console.log('📊 Sending CSV file to scraper for per-tariff risk analysis')
+        }
+        
+        const scraperResponse = await apiService.scrapeAllTariffs(
+          zipCode, 
+          annualConsumption, 
+          ['enbw', 'tado', 'tibber'],
+          scraperOptions
+        )
         const scraperData = scraperResponse.data
         
         console.log('✅ Scraper response:', scraperData)
@@ -1163,16 +1176,29 @@ export default {
               // Add CSV-based metrics if available
               csv_based: csvAnalysis !== null,
               actual_annual_consumption: csvAnalysis ? annualConsumption : null,
-              // Add risk assessment from risk analysis
-              risk_level: riskAnalysisData.value?.risk_level,
-              risk_score: riskAnalysisData.value?.risk_score,
-              risk_message: riskAnalysisData.value?.risk_message
+              // Use per-tariff risk assessment from backend (if available)
+              risk_level: tariff.risk_level || riskAnalysisData.value?.risk_level,
+              risk_score: tariff.risk_score || riskAnalysisData.value?.risk_score,
+              risk_message: tariff.risk_message || riskAnalysisData.value?.risk_message,
+              risk_factors: tariff.risk_factors || []
             }
           })
           
           results.value = scrapedTariffs
           console.log('📊 Scraped tariffs with CSV data:', scrapedTariffs)
-          console.log('🛡️ Risk assessment applied:', riskAnalysisData.value?.risk_level)
+          
+          // Log risk assessment status
+          const tariffsWithRisk = scrapedTariffs.filter(t => t.risk_level).length
+          if (tariffsWithRisk > 0) {
+            console.log(`🛡️ Per-tariff risk assessment: ${tariffsWithRisk}/${scrapedTariffs.length} tariffs`)
+            scrapedTariffs.forEach(t => {
+              if (t.risk_level) {
+                console.log(`   ${t.name}: ${t.risk_level} (${t.risk_score})`)
+              }
+            })
+          } else if (riskAnalysisData.value?.risk_level) {
+            console.log('🛡️ Using global risk assessment:', riskAnalysisData.value.risk_level)
+          }
           
           // Fetch predictions and forecasts
           fetchSavingsPrediction()
