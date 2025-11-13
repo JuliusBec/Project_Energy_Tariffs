@@ -1531,13 +1531,18 @@ def scraper_to_tariff(scraper_data: dict, provider: str, tariff_type: str = "dyn
         })
     elif provider == "EnBW Strom":
         # EnBW Strom: Festpreis-Tarif
+        # Build features list for fixed-rate tariff
+        fixed_features = ["fixed"]
+        if scraper_data.get("renewable_energy"):
+            fixed_features.append("green")
+        
         tariff_dict.update({
             "base_price": scraper_data.get("base_price_monthly", 0),
             "kwh_rate": scraper_data.get("work_price_ct_per_kwh", 0) / 100,  # Arbeitspreis in €/kWh
             "network_fee": 0,  # Im Arbeitspreis enthalten
             "additional_price_ct_kwh": 0,  # Kein Markup bei Festpreis
             "min_duration": scraper_data.get("contract_duration_months", 12),
-            "features": ["fixed-rate", "renewable-energy"] if scraper_data.get("renewable_energy") else ["fixed-rate"]
+            "features": fixed_features
         })
         tariff_dict["is_dynamic"] = False  # Festpreis-Tarif
     elif provider == "Tado":

@@ -1746,10 +1746,15 @@ export default {
         'real-time-pricing': 'Echtzeitpreise',
         'smart-meter-required': 'Smart Meter erforderlich',
         'green': '100% Ökostrom',
+        'renewable-energy': '100% Ökostrom',
         'fixed': 'Fester Tarif',
+        'fixed-rate': 'Fester Tarif',
         'app': 'Appsteuerung',
         'app-available': 'Mobile App verfügbar',
-        'automation': 'Automatisierung möglich'
+        'automation': 'Automatisierung möglich',
+        'price-guarantee': 'Preisgarantie',
+        'no-cancellation-fee': 'Keine Kündigungsgebühr',
+        'online-service': 'Online-Kundenservice'
       }
       return featureMap[feature] || feature
     }
