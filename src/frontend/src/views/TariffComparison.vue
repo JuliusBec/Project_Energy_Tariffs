@@ -158,7 +158,8 @@
                     required
                   >
                   <div class="form-help">
-                    Durchschnittswerte: 1-Person: 2.000 kWh | 2-Personen: 3.500 kWh | 4-Personen: 4.500 kWh
+                    Richtwerte: 1-Person: 2.000 kWh, 2-Personen: 3.500 kWh<br>
+                    3-Personen: 4.500 kWh, 4+ Personen: 5.500 kWh
                   </div>
                 </div>
 
@@ -173,35 +174,6 @@
                   </select>
                   <div class="form-help">
                     Automatische Schätzung des Jahresverbrauchs basierend auf Ihrem Haushaltstyp
-                  </div>
-                </div>
-
-
-              </div>
-
-              <!-- Common fields for manual input only -->
-              <div v-if="formData.hasSmartMeter === false">
-                <div class="form-group">
-                  <label class="form-label">Flexibilität Ihres Verbrauchs</label>
-                  <select v-model="formData.flexibility" class="form-select">
-                    <option value="low">Niedrig - Fester Tagesablauf</option>
-                    <option value="medium">Mittel - Teilweise flexibel</option>
-                    <option value="high">Hoch - Sehr flexibel</option>
-                  </select>
-                  <div class="form-help">
-                    Höhere Flexibilität = größere Ersparnisse bei dynamischen Tarifen
-                  </div>
-                </div>
-
-                <div class="form-group">
-                  <label class="form-label">Smart Home Ausstattung</label>
-                  <select v-model="formData.smartHome" class="form-select">
-                    <option value="none">Keine Smart Home Geräte</option>
-                    <option value="basic">Grundausstattung (Smart Thermostat, etc.)</option>
-                    <option value="advanced">Erweitert (Home Energy Management)</option>
-                  </select>
-                  <div class="form-help">
-                    Smart Home hilft bei der automatischen Optimierung des Verbrauchs
                   </div>
                 </div>
 
@@ -1138,6 +1110,11 @@ export default {
       loading.value = true
       searchPerformed.value = true
       
+      // Reset risk analysis data at the start of each calculation
+      riskAnalysisData.value = null
+      riskAnalysisError.value = null
+      riskAnalysisLoading.value = false
+      
       try {
         const zipCode = formData.value.zipCode
         let annualConsumption = formData.value.annualKwh
@@ -1825,6 +1802,20 @@ export default {
       }
       return descriptions[providerName] || 'Einer der führenden Energieversorger in Deutschland.'
     }
+    
+    // Watch for changes in hasSmartMeter to clear uploaded file and risk data when switching to manual mode
+    watch(() => formData.value.hasSmartMeter, (newValue) => {
+      if (newValue === false) {
+        // Clear uploaded file and related data when switching to manual input
+        uploadedFile.value = null
+        csvData.value = null
+        fileError.value = ''
+        riskAnalysisData.value = null
+        riskAnalysisError.value = null
+        riskAnalysisLoading.value = false
+        console.log('Cleared CSV and risk analysis data - switched to manual mode')
+      }
+    })
     
     // Load URL parameters if any
     onMounted(() => {
