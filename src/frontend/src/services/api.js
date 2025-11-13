@@ -123,6 +123,18 @@ export const apiService = {
     })
   },
   
+  // Simplified risk score for yearly usage (no CSV)
+  getRiskScoreYearlyUsage: (annualKwh, isDynamic = true) => {
+    const formData = new FormData()
+    formData.append('annual_kwh', annualKwh)
+    formData.append('is_dynamic', isDynamic)
+    return api.post('/risk-score-yearly-usage', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    })
+  },
+  
   // Chart data endpoints
   getPriceChartData: () => {
     return api.get('/price-chart-data')

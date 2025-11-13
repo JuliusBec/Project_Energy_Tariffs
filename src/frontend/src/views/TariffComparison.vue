@@ -828,10 +828,9 @@
                   <div class="logo-placeholder">{{ selectedTariff.provider }}</div>
                 </div>
                 <div class="provider-content">
-                  <div class="provider-name">{{ selectedTariff.provider }} Energie AG</div>
+                  <div class="provider-name">{{ selectedTariff.provider }}</div>
                   <div class="provider-description">
-                    Einer der führenden Energieversorger in Deutschland mit über 5 Millionen Kunden.
-                    {{ selectedTariff.green_energy ? 'Spezialist für nachhaltige Energielösungen.' : '' }}
+                    {{ getProviderDescription(selectedTariff.provider) }}
                   </div>
                   <div class="provider-rating">
                     <span class="rating-stars">
@@ -1200,6 +1199,24 @@ export default {
         
         console.log('✅ Scraper response:', scraperData)
         
+        // If no CSV was uploaded, fetch simplified risk scores for dynamic and fixed tariffs
+        let simplifiedRiskDynamic = null
+        let simplifiedRiskFixed = null
+        if (!uploadedFile.value && annualConsumption) {
+          console.log('📊 No CSV uploaded - fetching simplified risk scores')
+          try {
+            const riskDynamicResponse = await apiService.getRiskScoreYearlyUsage(annualConsumption, true)
+            simplifiedRiskDynamic = riskDynamicResponse.data
+            console.log('Dynamic risk (simplified):', simplifiedRiskDynamic)
+            
+            const riskFixedResponse = await apiService.getRiskScoreYearlyUsage(annualConsumption, false)
+            simplifiedRiskFixed = riskFixedResponse.data
+            console.log('Fixed risk (simplified):', simplifiedRiskFixed)
+          } catch (riskError) {
+            console.error('⚠️ Simplified risk score failed:', riskError)
+          }
+        }
+        
         if (scraperData.success && scraperData.tariffs && scraperData.tariffs.length > 0) {
           // Lade Forecast-Daten für dynamische Preisberechnung
           let forecastAvgPrice = 0.25  // Default fallback in €/kWh
@@ -1284,6 +1301,34 @@ export default {
               console.log(`   Jahrespreis gesamt: ${annualCost.toFixed(2)}€`)
             }
             
+            // Determine which risk assessment to use
+            let tariffRiskLevel, tariffRiskScore, tariffRiskMessage, tariffRiskFactors
+            
+            if (tariff.risk_level) {
+              // Use per-tariff risk from backend (CSV uploaded)
+              tariffRiskLevel = tariff.risk_level
+              tariffRiskScore = tariff.risk_score
+              tariffRiskMessage = tariff.risk_message
+              tariffRiskFactors = tariff.risk_factors || []
+            } else if (uploadedFile.value && riskAnalysisData.value?.risk_level) {
+              // Use global risk from CSV analysis
+              tariffRiskLevel = riskAnalysisData.value.risk_level
+              tariffRiskScore = riskAnalysisData.value.risk_score
+              tariffRiskMessage = riskAnalysisData.value.risk_message
+              tariffRiskFactors = riskAnalysisData.value.risk_factors || []
+            } else if (!uploadedFile.value) {
+              // Use simplified risk scores for yearly usage (no CSV)
+              const isDynamic = tariff.is_dynamic !== false
+              const simplifiedRisk = isDynamic ? simplifiedRiskDynamic : simplifiedRiskFixed
+              
+              if (simplifiedRisk) {
+                tariffRiskLevel = simplifiedRisk.risk_level
+                tariffRiskScore = simplifiedRisk.risk_score
+                tariffRiskMessage = simplifiedRisk.risk_message
+                tariffRiskFactors = simplifiedRisk.risk_factors || []
+              }
+            }
+            
             return {
               id: `${tariff.provider.toLowerCase()}-${tariff.is_dynamic ? 'dynamic' : 'fixed'}-${tariff.name.toLowerCase().replace(/\s+/g, '-')}`,
               name: tariff.name,
@@ -1304,11 +1349,11 @@ export default {
               // Add CSV-based metrics if available
               csv_based: csvAnalysis !== null,
               actual_annual_consumption: csvAnalysis ? annualConsumption : null,
-              // Use per-tariff risk assessment from backend (if available)
-              risk_level: tariff.risk_level || riskAnalysisData.value?.risk_level,
-              risk_score: tariff.risk_score || riskAnalysisData.value?.risk_score,
-              risk_message: tariff.risk_message || riskAnalysisData.value?.risk_message,
-              risk_factors: tariff.risk_factors || []
+              // Risk assessment (from CSV, global, or simplified)
+              risk_level: tariffRiskLevel,
+              risk_score: tariffRiskScore,
+              risk_message: tariffRiskMessage,
+              risk_factors: tariffRiskFactors
             }
           })
           
@@ -1759,6 +1804,16 @@ export default {
       return featureMap[feature] || feature
     }
     
+    // Get provider description based on provider name
+    const getProviderDescription = (providerName) => {
+      const descriptions = {
+        'Tado': 'tado° ist primär ein Smart-Home-Anbieter für intelligente Heizungssteuerung und bietet in Kooperation mit Energieversorgern dynamische Stromtarife an. Das Unternehmen verbindet smarte Thermostate mit flexiblen Energietarifen für optimierte Energiekosten.',
+        'EnBW': 'EnBW ist einer der größten Energieversorger Deutschlands und bietet bundesweit Ökostrom sowie Gas aus konventionellen und erneuerbaren Quellen. Das Unternehmen betreibt ein großes Ladenetz für Elektrofahrzeuge und investiert stark in erneuerbare Energien.',
+        'Tibber': 'Tibber ist ein digitaler Stromanbieter, der Strom zum Einkaufspreis ohne Aufschlag weitergibt und sich über eine monatliche Gebühr finanziert. Die App ermöglicht stundenbasierte Strompreise und intelligente Steuerung von Haushaltsgeräten für maximale Kostenersparnis.'
+      }
+      return descriptions[providerName] || 'Einer der führenden Energieversorger in Deutschland.'
+    }
+    
     // Load URL parameters if any
     onMounted(() => {
       const urlParams = new URLSearchParams(window.location.search)
@@ -1799,7 +1854,8 @@ export default {
       updateConsumptionFromHousehold,
       getDayName,
       getPriceBarWidth,
-      translateFeature
+      translateFeature,
+      getProviderDescription
     }
   }
 }
@@ -3581,16 +3637,23 @@ export default {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  flex-wrap: nowrap;
 }
 
 .rating-stars {
   color: #f59e0b;
   font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  gap: 0.1rem;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .rating-text {
   color: #6b7280;
   font-size: 0.8rem;
+  white-space: nowrap;
 }
 
 /* Charts Container Styles */

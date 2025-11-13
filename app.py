@@ -1414,6 +1414,76 @@ async def get_risk_score_per_tariff(
         raise HTTPException(status_code=500, detail=error_msg)
 
 
+@app.post("/api/risk-score-yearly-usage")
+async def get_risk_score_yearly_usage(
+    annual_kwh: float = Form(...),
+    is_dynamic: bool = Form(True)
+):
+    """
+    Get simplified risk score when only yearly usage is provided (no CSV uploaded).
+    
+    This endpoint calculates a simplified risk assessment based on:
+    - Price volatility (historic and forecasted) for dynamic tariffs
+    - Fixed tariff advantage (inherent stability)
+    
+    Since no actual consumption patterns are available, the risk score focuses
+    on market price uncertainty rather than user-specific consumption patterns.
+    
+    Parameters:
+    - annual_kwh: Annual energy consumption in kWh
+    - is_dynamic: Whether to calculate risk for a dynamic (True) or fixed (False) tariff
+    
+    Returns:
+    - Simplified risk assessment with risk_level, risk_score, risk_message, and factors
+    """
+    import traceback
+    from src.backend.risk_analysis import (
+        get_simplified_risk_score_for_yearly_usage,
+        get_price_forecast_volatility,
+        _load_historic_prices,
+        _get_most_recent_price_file
+    )
+    
+    try:
+        # Determine app_data directory
+        app_data_dir = os.path.join(os.path.dirname(__file__), "app_data")
+        
+        # Calculate price forecast volatility
+        forecast_price_volatility = {}
+        try:
+            forecast_price_volatility = get_price_forecast_volatility(app_data_dir=app_data_dir)
+        except Exception as e:
+            print(f"Warning: Could not calculate price forecast volatility: {str(e)}")
+        
+        # Calculate historic price volatility (optional but helpful)
+        historic_price_volatility = None
+        try:
+            price_file = _get_most_recent_price_file(app_data_dir)
+            historic_prices = _load_historic_prices(price_file, days=30)
+            historic_price_volatility = historic_prices['price_eur_per_kwh'].std()
+        except Exception as e:
+            print(f"Warning: Could not calculate historic price volatility: {str(e)}")
+        
+        # Get simplified risk score
+        risk_assessment = get_simplified_risk_score_for_yearly_usage(
+            forecast_price_volatility=forecast_price_volatility,
+            is_dynamic=is_dynamic,
+            historic_price_volatility=historic_price_volatility
+        )
+        
+        # Add tariff type and consumption to response
+        risk_assessment['tariff_type'] = 'dynamic' if is_dynamic else 'fixed'
+        risk_assessment['annual_kwh'] = annual_kwh
+        
+        return risk_assessment
+        
+    except Exception as e:
+        error_msg = f"Error calculating simplified risk score: {str(e)}"
+        print(f"Unexpected error in simplified risk score: {error_msg}")
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=error_msg)
+
+
 # =============================================================================
 # SCRAPER ENDPOINTS - EnBW, Tado, Tibber
 # =============================================================================

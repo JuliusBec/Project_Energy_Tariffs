@@ -652,6 +652,140 @@ def get_price_forecast_volatility(app_data_dir: str = None) -> dict:
     }
 
     
+
+
+def get_simplified_risk_score_for_yearly_usage(forecast_price_volatility: dict, is_dynamic: bool, 
+                                                historic_price_volatility: float = None) -> dict:
+    """
+    Calculate a simplified risk score when only yearly usage is provided (no CSV uploaded).
+    
+    Since we don't have actual consumption patterns, we can only assess risk based on:
+    - Price volatility (both historic and forecasted) for dynamic tariffs
+    - Fixed tariff advantage (inherently lower risk)
+    
+    Parameters:
+    forecast_price_volatility (dict): Output from price volatility analysis
+    is_dynamic (bool): Whether the tariff is dynamic
+    historic_price_volatility (float): Optional historic price volatility from market data
+    
+    Returns:
+    dict: Contains risk_level, risk_score, risk_message, risk_factors, simplified flag
+    """
+    score = 40  # Start with moderate baseline
+    factors = []
+    
+    if is_dynamic:
+        # For dynamic tariffs without consumption data, risk is primarily about price uncertainty
+        price_std_dev = forecast_price_volatility.get('forecast_std_dev', None)
+        
+        if price_std_dev is not None:
+            # Assess based on forecasted price volatility
+            if price_std_dev > 0.05:
+                score += 15
+                factors.append({
+                    'factor': 'Preisvolatilität (Prognose)', 
+                    'impact': 'negative', 
+                    'detail': f'Sehr hohe erwartete Preisschwankungen (σ: {price_std_dev:.4f} €/kWh)'
+                })
+            elif price_std_dev > 0.035:
+                score += 8
+                factors.append({
+                    'factor': 'Preisvolatilität (Prognose)', 
+                    'impact': 'negative', 
+                    'detail': f'Hohe erwartete Preisschwankungen (σ: {price_std_dev:.4f} €/kWh)'
+                })
+            elif price_std_dev > 0.025:
+                score += 3
+                factors.append({
+                    'factor': 'Preisvolatilität (Prognose)', 
+                    'impact': 'neutral', 
+                    'detail': f'Moderate erwartete Preisschwankungen (σ: {price_std_dev:.4f} €/kWh)'
+                })
+            else:
+                score -= 5
+                factors.append({
+                    'factor': 'Preisvolatilität (Prognose)', 
+                    'impact': 'positive', 
+                    'detail': f'Niedrige erwartete Preisschwankungen (σ: {price_std_dev:.4f} €/kWh)'
+                })
+        
+        # Add historic price volatility if available
+        if historic_price_volatility is not None:
+            if historic_price_volatility > 0.06:
+                score += 10
+                factors.append({
+                    'factor': 'Historische Preisvolatilität', 
+                    'impact': 'negative', 
+                    'detail': f'Sehr hohe historische Preisschwankungen (σ: {historic_price_volatility:.4f} €/kWh)'
+                })
+            elif historic_price_volatility > 0.045:
+                score += 6
+                factors.append({
+                    'factor': 'Historische Preisvolatilität', 
+                    'impact': 'negative', 
+                    'detail': f'Hohe historische Preisschwankungen (σ: {historic_price_volatility:.4f} €/kWh)'
+                })
+            elif historic_price_volatility > 0.03:
+                score += 2
+                factors.append({
+                    'factor': 'Historische Preisvolatilität', 
+                    'impact': 'neutral', 
+                    'detail': f'Moderate historische Preisschwankungen (σ: {historic_price_volatility:.4f} €/kWh)'
+                })
+            else:
+                score -= 4
+                factors.append({
+                    'factor': 'Historische Preisvolatilität', 
+                    'impact': 'positive', 
+                    'detail': f'Niedrige historische Preisschwankungen (σ: {historic_price_volatility:.4f} €/kWh)'
+                })
+        
+        factors.append({
+            'factor': 'Verbrauchsdaten', 
+            'impact': 'neutral', 
+            'detail': 'Keine individuellen Verbrauchsdaten - Bewertung basiert auf Standardlastprofil'
+        })
+    else:
+        # Fixed tariffs are inherently lower risk
+        score -= 20
+        factors.append({
+            'factor': 'Tariftyp', 
+            'impact': 'positive', 
+            'detail': 'Fester Tarif - Keine Preisschwankungen'
+        })
+    
+    # Ensure score is within bounds
+    overall_risk_score = max(0, min(100, score))
+    
+    # Determine risk level and message
+    if overall_risk_score <= 30:
+        risk_level = 'low'
+        if is_dynamic:
+            risk_message = 'Niedriges Risiko: Geringe erwartete Preisvolatilität macht dynamische Tarife attraktiv'
+        else:
+            risk_message = 'Niedriges Risiko: Fester Tarif bietet volle Preissicherheit'
+    elif overall_risk_score <= 50:
+        risk_level = 'moderate'
+        if is_dynamic:
+            risk_message = 'Moderates Risiko: Moderate Preisschwankungen erwartet. Empfehlung: Verbrauchsdaten für genauere Analyse hochladen'
+        else:
+            risk_message = 'Moderates Risiko: Fester Tarif bietet Preissicherheit'
+    else:
+        risk_level = 'high'
+        if is_dynamic:
+            risk_message = 'Höheres Risiko: Hohe Preisvolatilität erwartet. Bitte Verbrauchsdaten hochladen für detaillierte Analyse'
+        else:
+            risk_message = 'Moderates Risiko: Fester Tarif bietet stabile Preise'
+    
+    return {
+        'risk_level': risk_level,
+        'risk_score': int(overall_risk_score),
+        'risk_message': risk_message,
+        'risk_factors': factors,
+        'forecast_quality_included': False,
+        'simplified': True,
+        'note': 'Vereinfachte Risikobewertung basierend auf Standardlastprofil. Für genauere Analyse bitte Verbrauchsdaten hochladen.'
+    }
     
     
 def get_aggregated_risk_score(historic_risk_analysis: dict, coincidence_factor: dict, forecast_price_volatility: dict,
