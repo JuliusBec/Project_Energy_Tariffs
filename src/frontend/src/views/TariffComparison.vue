@@ -1746,6 +1746,7 @@ export default {
         'smart-meter-required': 'Smart Meter erforderlich',
         'green': '100% Ökostrom',
         'fixed': 'Fester Tarif',
+        'app': 'Appsteuerung',
         'app-available': 'Mobile App verfügbar',
         'automation': 'Automatisierung möglich'
       }
@@ -4131,7 +4132,7 @@ export default {
 }
 
 .risk-summary-header i {
-  color: #3b82f6;
+  color: #000000;
 }
 
 .risk-summary-body {

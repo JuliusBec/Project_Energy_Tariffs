@@ -30,6 +30,28 @@ def _get_most_recent_price_file(app_data_dir: str) -> str:
     return most_recent_file
 
 
+def _get_price_forecast_file(app_data_dir: str) -> str:
+    """
+    Find the price forecast file in the app_data directory.
+    
+    Parameters:
+    app_data_dir (str): Path to the app_data directory
+    
+    Returns:
+    str: Path to the price forecast file
+    
+    Raises:
+    FileNotFoundError: If no forecast file is found
+    """
+    # Look for the forecast file (static name for now)
+    forecast_file = os.path.join(app_data_dir, "germany_price_forecast_720h.csv")
+    
+    if not os.path.exists(forecast_file):
+        raise FileNotFoundError(f"Price forecast file not found: {forecast_file}")
+    
+    return forecast_file
+
+
 def _load_historic_prices(price_file_path: str, days: int, end_date: datetime = None) -> pd.DataFrame:
     """
     Load historic price data for the last n days.
@@ -555,9 +577,9 @@ def get_price_forecast_volatility(app_data_dir: str = None) -> dict:
         project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         app_data_dir = os.path.join(project_root, "app_data")
     
-    # Find the most recent forecast file
+    # Find the price forecast file
     try:
-        forecast_file = _get_most_recent_price_file(app_data_dir)
+        forecast_file = _get_price_forecast_file(app_data_dir)
     except FileNotFoundError as e:
         raise FileNotFoundError(f"Cannot analyze price forecast volatility: {str(e)}")
     
@@ -582,9 +604,14 @@ def get_price_forecast_volatility(app_data_dir: str = None) -> dict:
         raise ValueError(f"No price column found in forecast file. Available columns: {df.columns.tolist()}")
     
     # Convert price to €/kWh if it's in €/MWh
-    if 'mwh' in price_col.lower():
+    # Check both column name and value range to determine if conversion is needed
+    # Prices in €/MWh are typically > 10, while €/kWh are typically < 1
+    mean_price = df[price_col].mean()
+    if 'mwh' in price_col.lower() or mean_price > 10:
+        # Prices are in €/MWh, convert to €/kWh
         df['price_eur_per_kwh'] = df[price_col] / 1000
     else:
+        # Already in €/kWh
         df['price_eur_per_kwh'] = df[price_col]
     
     # Calculate standard deviation
@@ -604,10 +631,14 @@ def get_price_forecast_volatility(app_data_dir: str = None) -> dict:
     
     if lower_col and upper_col:
         # Convert to €/kWh if needed
-        if 'mwh' in lower_col.lower():
+        # Check both column name and value range
+        mean_lower = df[lower_col].mean()
+        if 'mwh' in lower_col.lower() or mean_lower > 10:
+            # Values are in €/MWh, convert to €/kWh
             df['lower_kwh'] = df[lower_col] / 1000
             df['upper_kwh'] = df[upper_col] / 1000
         else:
+            # Already in €/kWh
             df['lower_kwh'] = df[lower_col]
             df['upper_kwh'] = df[upper_col]
         

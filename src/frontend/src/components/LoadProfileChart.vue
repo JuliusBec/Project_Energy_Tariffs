@@ -18,7 +18,7 @@
       <div class="chart-legend">
         <div class="legend-item">
           <span class="legend-color" style="background: #3b82f6;"></span>
-          <span>Durchschn. Verbrauch (kWh)</span>
+          <span>Ihr durchschn. Verbrauch (kWh)</span>
         </div>
         <div class="legend-item">
           <span class="legend-color" style="background: #f59e0b;"></span>
@@ -85,7 +85,7 @@ export default {
           labels: hours.map(h => `${h}:00`),
           datasets: [
             {
-              label: 'Verbrauch (kWh)',
+              label: 'Ihr durchschn. Verbrauch (kWh)',
               data: consumption,
               borderColor: '#3b82f6',
               backgroundColor: 'rgba(59, 130, 246, 0.1)',
@@ -162,7 +162,7 @@ export default {
               position: 'left',
               title: {
                 display: true,
-                text: 'Verbrauch (kWh)',
+                text: 'Ihr durchschn. Verbrauch (kWh)',
                 font: {
                   size: 12,
                   weight: 'bold'
