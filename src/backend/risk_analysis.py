@@ -648,44 +648,66 @@ def get_aggregated_risk_score(historic_risk_analysis: dict, coincidence_factor: 
         - forecast_quality_included: boolean indicating if forecast quality was factored in
     """
     # Initialize score (lower is better/less risky)
-    score = 50  # Start at neutral
+    # Start with a lower baseline to allow for more differentiation
+    score = 35  # Start at lower baseline for better differentiation
     factors = []
     
     # Adjust score based on historic risk analysis
+    # Using more granular thresholds to better differentiate user patterns
     price_diff_pct = historic_risk_analysis.get('price_differential_pct', 0)
-    if price_diff_pct < -5:
-        score -= 15  # Favorable - user already benefits
+    if price_diff_pct < -10:
+        score -= 12  # Very favorable - excellent consumption timing
+        factors.append({'factor': 'Historischer Verbrauch', 'impact': 'positive', 'detail': f'{abs(price_diff_pct):.1f}% unter Marktdurchschnitt'})
+    elif price_diff_pct < -5:
+        score -= 8  # Favorable - good consumption timing
         factors.append({'factor': 'Historischer Verbrauch', 'impact': 'positive', 'detail': f'{abs(price_diff_pct):.1f}% unter Marktdurchschnitt'})
     elif -5 <= price_diff_pct <= 5:
-        score -= 5  # Neutral
+        score += 0  # Neutral - no adjustment
         factors.append({'factor': 'Historischer Verbrauch', 'impact': 'neutral', 'detail': 'Im Marktdurchschnitt'})
+    elif price_diff_pct <= 10:
+        score += 8  # Slightly unfavorable
+        factors.append({'factor': 'Historischer Verbrauch', 'impact': 'negative', 'detail': f'{price_diff_pct:.1f}% über Marktdurchschnitt'})
     else:
-        score += 15  # Unfavorable - user consumes at expensive times
+        score += 12  # Very unfavorable - poor consumption timing
         factors.append({'factor': 'Historischer Verbrauch', 'impact': 'negative', 'detail': f'{price_diff_pct:.1f}% über Marktdurchschnitt'})
     
     # Adjust score based on coincidence factor
+    # More nuanced thresholds to capture different consumption patterns
     consumption_coincidence = coincidence_factor.get('consumption_coincidence_pct', 0)
     expensive_hours_pct = coincidence_factor.get('expensive_hours_pct', 20.0)
     
-    if consumption_coincidence < expensive_hours_pct - 5:
-        score -= 15  # Favorable - avoids expensive hours
+    # Calculate how much the user deviates from the expensive hours percentage
+    coincidence_deviation = consumption_coincidence - expensive_hours_pct
+    
+    if coincidence_deviation < -10:
+        score -= 12  # Excellent - significantly avoids expensive hours
+        factors.append({'factor': 'Verbrauchstiming', 'impact': 'positive', 'detail': 'Vermeidet teure Stunden deutlich'})
+    elif coincidence_deviation < -5:
+        score -= 8  # Good - avoids expensive hours
         factors.append({'factor': 'Verbrauchstiming', 'impact': 'positive', 'detail': 'Vermeidet teure Stunden'})
-    elif expensive_hours_pct - 5 <= consumption_coincidence <= expensive_hours_pct + 10:
-        score -= 5  # Neutral
+    elif -5 <= coincidence_deviation <= 5:
+        score += 0  # Neutral - typical pattern, no adjustment
         factors.append({'factor': 'Verbrauchstiming', 'impact': 'neutral', 'detail': 'Typisches Verbrauchsmuster'})
+    elif coincidence_deviation <= 15:
+        score += 8  # Slightly unfavorable
+        factors.append({'factor': 'Verbrauchstiming', 'impact': 'negative', 'detail': 'Erhöhter Verbrauch zu teuren Zeiten'})
     else:
-        score += 15  # Unfavorable - high coincidence with expensive hours
+        score += 12  # Very unfavorable - high consumption during expensive hours
         factors.append({'factor': 'Verbrauchstiming', 'impact': 'negative', 'detail': 'Hoher Verbrauch zu teuren Zeiten'})
     
-    # Check price volatility
+    # Check price volatility with adjusted thresholds
     volatility = historic_risk_analysis.get('price_volatility', 0)
-    if volatility > 0.05:  # High volatility (>5 ct/kWh std dev)
-        score += 10
+    if volatility > 0.06:  # Very high volatility (>6 ct/kWh std dev)
+        score += 8
+        factors.append({'factor': 'Preisvolatilität', 'impact': 'negative', 'detail': 'Sehr hohe Preisschwankungen'})
+    elif volatility > 0.045:  # High volatility
+        score += 5
         factors.append({'factor': 'Preisvolatilität', 'impact': 'negative', 'detail': 'Hohe Preisschwankungen'})
     elif volatility > 0.03:  # Medium volatility
-        score += 5
+        score += 2
         factors.append({'factor': 'Preisvolatilität', 'impact': 'neutral', 'detail': 'Moderate Preisschwankungen'})
     else:
+        score -= 3  # Low volatility is favorable
         factors.append({'factor': 'Preisvolatilität', 'impact': 'positive', 'detail': 'Niedrige Preisschwankungen'})
     
     # Adjust score based on forecast quality (if provided)
@@ -700,35 +722,35 @@ def get_aggregated_risk_score(historic_risk_analysis: dict, coincidence_factor: 
         if relative_ci_width is not None:
             # Confidence interval width analysis
             # Lower CI width = more confident predictions = lower risk
-            # Typical ranges: <30% excellent, 30-50% good, 50-70% fair, >70% poor
+            # Adjusted ranges for better differentiation
             
-            if relative_ci_width < 30:
+            if relative_ci_width < 25:
                 # Excellent forecast quality - reduces risk for dynamic tariffs
-                score -= 10
+                score -= 8
                 factors.append({
                     'factor': 'Prognosequalität', 
                     'impact': 'positive', 
-                    'detail': f'Hohe Vorhersagegenauigkeit (CI: {relative_ci_width:.1f}%)'
+                    'detail': f'Sehr hohe Vorhersagegenauigkeit (CI: {relative_ci_width:.1f}%)'
                 })
-            elif relative_ci_width < 50:
+            elif relative_ci_width < 40:
                 # Good forecast quality - slight risk reduction
-                score -= 5
+                score -= 4
                 factors.append({
                     'factor': 'Prognosequalität', 
                     'impact': 'positive', 
                     'detail': f'Gute Vorhersagegenauigkeit (CI: {relative_ci_width:.1f}%)'
                 })
-            elif relative_ci_width < 70:
+            elif relative_ci_width < 60:
                 # Fair forecast quality - neutral to slight risk increase
-                score += 5
+                score += 3
                 factors.append({
                     'factor': 'Prognosequalität', 
                     'impact': 'neutral', 
                     'detail': f'Moderate Vorhersageunsicherheit (CI: {relative_ci_width:.1f}%)'
                 })
             else:
-                # Poor forecast quality - increases risk significantly
-                score += 15
+                # Poor forecast quality - increases risk
+                score += 10
                 factors.append({
                     'factor': 'Prognosequalität', 
                     'impact': 'negative', 
@@ -738,28 +760,28 @@ def get_aggregated_risk_score(historic_risk_analysis: dict, coincidence_factor: 
         elif forecast_error_pct is not None:
             # Fallback to forecast error percentage if CI width not available
             if forecast_error_pct < 10:
-                score -= 10
+                score -= 8
                 factors.append({
                     'factor': 'Prognosequalität', 
                     'impact': 'positive', 
-                    'detail': f'Hohe Vorhersagegenauigkeit (Fehler: {forecast_error_pct:.1f}%)'
+                    'detail': f'Sehr hohe Vorhersagegenauigkeit (Fehler: {forecast_error_pct:.1f}%)'
                 })
             elif forecast_error_pct < 20:
-                score -= 5
+                score -= 4
                 factors.append({
                     'factor': 'Prognosequalität', 
                     'impact': 'positive', 
                     'detail': f'Gute Vorhersagegenauigkeit (Fehler: {forecast_error_pct:.1f}%)'
                 })
             elif forecast_error_pct < 30:
-                score += 5
+                score += 3
                 factors.append({
                     'factor': 'Prognosequalität', 
                     'impact': 'neutral', 
                     'detail': f'Moderate Vorhersageunsicherheit (Fehler: {forecast_error_pct:.1f}%)'
                 })
             else:
-                score += 15
+                score += 10
                 factors.append({
                     'factor': 'Prognosequalität', 
                     'impact': 'negative', 
@@ -774,19 +796,27 @@ def get_aggregated_risk_score(historic_risk_analysis: dict, coincidence_factor: 
         
         if price_std_dev is not None:
             # Standard deviation thresholds (in €/kWh)
-            # Low: <0.02, Medium: 0.02-0.04, High: >0.04
+            # Adjusted thresholds: Low: <0.025, Medium: 0.025-0.045, High: >0.045
             
-            if price_std_dev > 0.04:
-                # High price volatility increases risk
-                score += 10
+            if price_std_dev > 0.05:
+                # Very high price volatility increases risk significantly
+                score += 8
+                factors.append({
+                    'factor': 'Preisvolatilität (Prognose)', 
+                    'impact': 'negative', 
+                    'detail': f'Sehr hohe erwartete Preisschwankungen (σ: {price_std_dev:.4f} €/kWh)'
+                })
+            elif price_std_dev > 0.035:
+                # High price volatility
+                score += 5
                 factors.append({
                     'factor': 'Preisvolatilität (Prognose)', 
                     'impact': 'negative', 
                     'detail': f'Hohe erwartete Preisschwankungen (σ: {price_std_dev:.4f} €/kWh)'
                 })
-            elif price_std_dev > 0.02:
+            elif price_std_dev > 0.025:
                 # Medium price volatility
-                score += 5
+                score += 2
                 factors.append({
                     'factor': 'Preisvolatilität (Prognose)', 
                     'impact': 'neutral', 
@@ -794,7 +824,7 @@ def get_aggregated_risk_score(historic_risk_analysis: dict, coincidence_factor: 
                 })
             else:
                 # Low price volatility reduces risk
-                score -= 5
+                score -= 3
                 factors.append({
                     'factor': 'Preisvolatilität (Prognose)', 
                     'impact': 'positive', 
@@ -802,9 +832,9 @@ def get_aggregated_risk_score(historic_risk_analysis: dict, coincidence_factor: 
                 })
         
         # Additional check for confidence interval width if available
-        if price_ci_width is not None and price_ci_width > 0.08:
+        if price_ci_width is not None and price_ci_width > 0.10:
             # Very wide confidence intervals indicate high uncertainty in price forecasts
-            score += 5
+            score += 4
             factors.append({
                 'factor': 'Preisprognose-Unsicherheit', 
                 'impact': 'negative', 
@@ -813,20 +843,21 @@ def get_aggregated_risk_score(historic_risk_analysis: dict, coincidence_factor: 
             
     # Adjust score for fixed tariffs
     if not is_dynamic:
-        score -= 25  # Fixed tariffs are generally less risky
+        score -= 20  # Fixed tariffs are less risky (reduced from 25)
         factors.append({'factor': 'Tariftyp', 'impact': 'positive', 'detail': 'Fester Tarif'})
     
     # Ensure score is within bounds (0-100, lower is better)
     overall_risk_score = max(0, min(100, score))
     
-    # Determine risk level and message
-    if overall_risk_score <= 40:
+    # Determine risk level and message with adjusted thresholds
+    # Lower thresholds to account for lower starting baseline
+    if overall_risk_score <= 30:
         risk_level = 'low'
         if forecast_quality_included:
             risk_message = 'Niedriges Risiko: Ihr Verbrauchsprofil und zuverlässige Prognosen eignen sich gut für dynamische Tarife'
         else:
             risk_message = 'Niedriges Risiko: Ihr Verbrauchsprofil eignet sich gut für dynamische Tarife'
-    elif overall_risk_score <= 60:
+    elif overall_risk_score <= 50:
         risk_level = 'moderate'
         if forecast_quality_included:
             risk_message = 'Moderates Risiko: Dynamische Tarife können vorteilhaft sein. Berücksichtigen Sie die Prognosequalität'
