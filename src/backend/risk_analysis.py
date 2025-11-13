@@ -630,17 +630,9 @@ def get_price_forecast_volatility(app_data_dir: str = None) -> dict:
             upper_col = col
     
     if lower_col and upper_col:
-        # Convert to €/kWh if needed
-        # Check both column name and value range
-        mean_lower = df[lower_col].mean()
-        if 'mwh' in lower_col.lower() or mean_lower > 10:
-            # Values are in €/MWh, convert to €/kWh
-            df['lower_kwh'] = df[lower_col] / 1000
-            df['upper_kwh'] = df[upper_col] / 1000
-        else:
-            # Already in €/kWh
-            df['lower_kwh'] = df[lower_col]
-            df['upper_kwh'] = df[upper_col]
+        # Convert confidence intervals from €/MWh to €/kWh
+        df['lower_kwh'] = df[lower_col] / 1000
+        df['upper_kwh'] = df[upper_col] / 1000
         
         # Calculate average confidence interval width
         df['ci_width'] = df['upper_kwh'] - df['lower_kwh']
@@ -817,63 +809,66 @@ def get_aggregated_risk_score(historic_risk_analysis: dict, coincidence_factor: 
     score = 35  # Start at lower baseline for better differentiation
     factors = []
     
-    # Adjust score based on historic risk analysis
-    # Using more granular thresholds to better differentiate user patterns
-    price_diff_pct = historic_risk_analysis.get('price_differential_pct', 0)
-    if price_diff_pct < -10:
-        score -= 12  # Very favorable - excellent consumption timing
-        factors.append({'factor': 'Historischer Verbrauch', 'impact': 'positive', 'detail': f'{abs(price_diff_pct):.1f}% unter Marktdurchschnitt'})
-    elif price_diff_pct < -5:
-        score -= 8  # Favorable - good consumption timing
-        factors.append({'factor': 'Historischer Verbrauch', 'impact': 'positive', 'detail': f'{abs(price_diff_pct):.1f}% unter Marktdurchschnitt'})
-    elif -5 <= price_diff_pct <= 5:
-        score += 0  # Neutral - no adjustment
-        factors.append({'factor': 'Historischer Verbrauch', 'impact': 'neutral', 'detail': 'Im Marktdurchschnitt'})
-    elif price_diff_pct <= 10:
-        score += 8  # Slightly unfavorable
-        factors.append({'factor': 'Historischer Verbrauch', 'impact': 'negative', 'detail': f'{price_diff_pct:.1f}% über Marktdurchschnitt'})
-    else:
-        score += 12  # Very unfavorable - poor consumption timing
-        factors.append({'factor': 'Historischer Verbrauch', 'impact': 'negative', 'detail': f'{price_diff_pct:.1f}% über Marktdurchschnitt'})
-    
-    # Adjust score based on coincidence factor
-    # More nuanced thresholds to capture different consumption patterns
-    consumption_coincidence = coincidence_factor.get('consumption_coincidence_pct', 0)
-    expensive_hours_pct = coincidence_factor.get('expensive_hours_pct', 20.0)
-    
-    # Calculate how much the user deviates from the expensive hours percentage
-    coincidence_deviation = consumption_coincidence - expensive_hours_pct
-    
-    if coincidence_deviation < -10:
-        score -= 12  # Excellent - significantly avoids expensive hours
-        factors.append({'factor': 'Verbrauchstiming', 'impact': 'positive', 'detail': 'Vermeidet teure Stunden deutlich'})
-    elif coincidence_deviation < -5:
-        score -= 8  # Good - avoids expensive hours
-        factors.append({'factor': 'Verbrauchstiming', 'impact': 'positive', 'detail': 'Vermeidet teure Stunden'})
-    elif -5 <= coincidence_deviation <= 5:
-        score += 0  # Neutral - typical pattern, no adjustment
-        factors.append({'factor': 'Verbrauchstiming', 'impact': 'neutral', 'detail': 'Typisches Verbrauchsmuster'})
-    elif coincidence_deviation <= 15:
-        score += 8  # Slightly unfavorable
-        factors.append({'factor': 'Verbrauchstiming', 'impact': 'negative', 'detail': 'Erhöhter Verbrauch zu teuren Zeiten'})
-    else:
-        score += 12  # Very unfavorable - high consumption during expensive hours
-        factors.append({'factor': 'Verbrauchstiming', 'impact': 'negative', 'detail': 'Hoher Verbrauch zu teuren Zeiten'})
-    
-    # Check price volatility with adjusted thresholds
-    volatility = historic_risk_analysis.get('price_volatility', 0)
-    if volatility > 0.06:  # Very high volatility (>6 ct/kWh std dev)
-        score += 8
-        factors.append({'factor': 'Preisvolatilität', 'impact': 'negative', 'detail': 'Sehr hohe Preisschwankungen'})
-    elif volatility > 0.045:  # High volatility
-        score += 5
-        factors.append({'factor': 'Preisvolatilität', 'impact': 'negative', 'detail': 'Hohe Preisschwankungen'})
-    elif volatility > 0.03:  # Medium volatility
-        score += 2
-        factors.append({'factor': 'Preisvolatilität', 'impact': 'neutral', 'detail': 'Moderate Preisschwankungen'})
-    else:
-        score -= 3  # Low volatility is favorable
-        factors.append({'factor': 'Preisvolatilität', 'impact': 'positive', 'detail': 'Niedrige Preisschwankungen'})
+    # For fixed tariffs, skip consumption-pattern-based risk factors
+    # since prices don't vary with market conditions
+    if is_dynamic:
+        # Adjust score based on historic risk analysis
+        # Using more granular thresholds to better differentiate user patterns
+        price_diff_pct = historic_risk_analysis.get('price_differential_pct', 0)
+        if price_diff_pct < -10:
+            score -= 12  # Very favorable - excellent consumption timing
+            factors.append({'factor': 'Historischer Verbrauch', 'impact': 'positive', 'detail': f'{abs(price_diff_pct):.1f}% unter Marktdurchschnitt'})
+        elif price_diff_pct < -5:
+            score -= 8  # Favorable - good consumption timing
+            factors.append({'factor': 'Historischer Verbrauch', 'impact': 'positive', 'detail': f'{abs(price_diff_pct):.1f}% unter Marktdurchschnitt'})
+        elif -5 <= price_diff_pct <= 5:
+            score += 0  # Neutral - no adjustment
+            factors.append({'factor': 'Historischer Verbrauch', 'impact': 'neutral', 'detail': 'Im Marktdurchschnitt'})
+        elif price_diff_pct <= 10:
+            score += 8  # Slightly unfavorable
+            factors.append({'factor': 'Historischer Verbrauch', 'impact': 'negative', 'detail': f'{price_diff_pct:.1f}% über Marktdurchschnitt'})
+        else:
+            score += 12  # Very unfavorable - poor consumption timing
+            factors.append({'factor': 'Historischer Verbrauch', 'impact': 'negative', 'detail': f'{price_diff_pct:.1f}% über Marktdurchschnitt'})
+        
+        # Adjust score based on coincidence factor
+        # More nuanced thresholds to capture different consumption patterns
+        consumption_coincidence = coincidence_factor.get('consumption_coincidence_pct', 0)
+        expensive_hours_pct = coincidence_factor.get('expensive_hours_pct', 20.0)
+        
+        # Calculate how much the user deviates from the expensive hours percentage
+        coincidence_deviation = consumption_coincidence - expensive_hours_pct
+        
+        if coincidence_deviation < -10:
+            score -= 12  # Excellent - significantly avoids expensive hours
+            factors.append({'factor': 'Verbrauchstiming', 'impact': 'positive', 'detail': 'Vermeidet teure Stunden deutlich'})
+        elif coincidence_deviation < -5:
+            score -= 8  # Good - avoids expensive hours
+            factors.append({'factor': 'Verbrauchstiming', 'impact': 'positive', 'detail': 'Vermeidet teure Stunden'})
+        elif -5 <= coincidence_deviation <= 5:
+            score += 0  # Neutral - typical pattern, no adjustment
+            factors.append({'factor': 'Verbrauchstiming', 'impact': 'neutral', 'detail': 'Typisches Verbrauchsmuster'})
+        elif coincidence_deviation <= 15:
+            score += 8  # Slightly unfavorable
+            factors.append({'factor': 'Verbrauchstiming', 'impact': 'negative', 'detail': 'Erhöhter Verbrauch zu teuren Zeiten'})
+        else:
+            score += 12  # Very unfavorable - high consumption during expensive hours
+            factors.append({'factor': 'Verbrauchstiming', 'impact': 'negative', 'detail': 'Hoher Verbrauch zu teuren Zeiten'})
+        
+        # Check price volatility with adjusted thresholds
+        volatility = historic_risk_analysis.get('price_volatility', 0)
+        if volatility > 0.06:  # Very high volatility (>6 ct/kWh std dev)
+            score += 8
+            factors.append({'factor': 'Preisvolatilität', 'impact': 'negative', 'detail': 'Sehr hohe Preisschwankungen'})
+        elif volatility > 0.045:  # High volatility
+            score += 5
+            factors.append({'factor': 'Preisvolatilität', 'impact': 'negative', 'detail': 'Hohe Preisschwankungen'})
+        elif volatility > 0.03:  # Medium volatility
+            score += 2
+            factors.append({'factor': 'Preisvolatilität', 'impact': 'neutral', 'detail': 'Moderate Preisschwankungen'})
+        else:
+            score -= 3  # Low volatility is favorable
+            factors.append({'factor': 'Preisvolatilität', 'impact': 'positive', 'detail': 'Niedrige Preisschwankungen'})
     
     # Adjust score based on forecast quality (if provided)
     forecast_quality_included = False
@@ -1004,14 +999,42 @@ def get_aggregated_risk_score(historic_risk_analysis: dict, coincidence_factor: 
                 })
         
         # Additional check for confidence interval width if available
-        if price_ci_width is not None and price_ci_width > 0.10:
-            # Very wide confidence intervals indicate high uncertainty in price forecasts
-            score += 4
-            factors.append({
-                'factor': 'Preisprognose-Unsicherheit', 
-                'impact': 'negative', 
-                'detail': f'Hohe Unsicherheit in Preisprognose (CI: {price_ci_width:.4f} €/kWh)'
-            })
+        # CI width reflects forecast uncertainty (±half the width from the mean)
+        # E.g., 0.15 €/kWh (150 €/MWh) means ±75 €/MWh uncertainty
+        if price_ci_width is not None:
+            if price_ci_width > 0.20:
+                # Very wide confidence intervals (>200 €/MWh) indicate very high uncertainty
+                score += 10
+                factors.append({
+                    'factor': 'Preisprognose-Unsicherheit', 
+                    'impact': 'negative', 
+                    'detail': f'Sehr hohe Unsicherheit in Preisprognose (Breite Konfidenzintervall: {price_ci_width:.4f} €/kWh)'
+                })
+            elif price_ci_width > 0.12:
+                # Wide confidence intervals (>120 €/MWh) indicate high uncertainty
+                # This includes typical values around 150-180 €/MWh
+                score += 6
+                factors.append({
+                    'factor': 'Preisprognose-Unsicherheit', 
+                    'impact': 'negative', 
+                    'detail': f'Hohe Prognoseunsicherheit (Breite Konfidenzintervall: {price_ci_width:.4f} €/kWh)'
+                })
+            elif price_ci_width > 0.08:
+                # Medium confidence intervals (80-120 €/MWh) - moderate uncertainty
+                score += 3
+                factors.append({
+                    'factor': 'Preisprognose-Unsicherheit', 
+                    'impact': 'neutral', 
+                    'detail': f'Moderate Prognoseunsicherheit (Breite Konfidenzintervall: {price_ci_width:.4f} €/kWh)'
+                })
+            else:
+                # Narrow confidence intervals (<80 €/MWh) indicate good forecast quality
+                score -= 3
+                factors.append({
+                    'factor': 'Preisprognose-Qualität', 
+                    'impact': 'positive', 
+                    'detail': f'Gute Prognosequalität (Breite Konfidenzintervall: {price_ci_width:.4f} €/kWh)'
+                })
             
     # Adjust score for fixed tariffs
     if not is_dynamic:

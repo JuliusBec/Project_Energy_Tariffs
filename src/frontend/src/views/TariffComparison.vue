@@ -884,8 +884,9 @@
               </div>
               
               <div v-else-if="riskAnalysisData" class="risk-analysis-content">
+                <!-- Only show these metrics for dynamic tariffs -->
                 <!-- Historic Risk Summary -->
-                <div class="risk-summary-card">
+                <div v-if="selectedTariff.is_dynamic" class="risk-summary-card">
                   <div class="risk-summary-header">
                     <i class="fas fa-history"></i>
                     <span>Historisches Risiko</span>
@@ -912,7 +913,7 @@
                 </div>
 
                 <!-- Coincidence Factor Summary -->
-                <div class="risk-summary-card">
+                <div v-if="selectedTariff.is_dynamic" class="risk-summary-card">
                   <div class="risk-summary-header">
                     <i class="fas fa-chart-pie"></i>
                     <span>Koinzidenzfaktor</span>
@@ -943,13 +944,24 @@
                 </div>
 
                 <!-- Load Profile Chart -->
-                <div class="risk-chart-card">
+                <div v-if="selectedTariff.is_dynamic" class="risk-chart-card">
                   <div class="risk-summary-header">
                     <i class="fas fa-chart-area"></i>
                     <span>Lastprofil & Preiskorrelation</span>
                   </div>
                   <div class="risk-chart-body">
                     <LoadProfileChart :loadProfileData="riskAnalysisData.load_profile" />
+                  </div>
+                </div>
+
+                <!-- Message for fixed tariffs -->
+                <div v-if="!selectedTariff.is_dynamic" class="fixed-tariff-note">
+                  <div class="info-banner">
+                    <i class="fas fa-info-circle"></i>
+                    <p>
+                      Bei Festpreistarifen sind die historische Risikoanalyse, der Koinzidenzfaktor und die 
+                      Preisvolatilität nicht relevant, da die Preise nicht vom Markt abhängig sind.
+                    </p>
                   </div>
                 </div>
               </div>
@@ -4179,6 +4191,34 @@ export default {
   display: flex;
   flex-direction: column;
   gap: 1rem;
+}
+
+.fixed-tariff-note {
+  padding: 1rem;
+}
+
+.info-banner {
+  background: linear-gradient(135deg, #dbeafe, #e0f2fe);
+  border: 1px solid #3b82f6;
+  border-radius: 8px;
+  padding: 1rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.info-banner i {
+  color: #3b82f6;
+  font-size: 1.25rem;
+  margin-top: 0.125rem;
+  flex-shrink: 0;
+}
+
+.info-banner p {
+  margin: 0;
+  color: #1e3a8a;
+  font-size: 0.9rem;
+  line-height: 1.5;
 }
 
 .risk-summary-card {
