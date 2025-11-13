@@ -171,7 +171,7 @@ export default {
       // Build datasets
       const datasets = [
         {
-          label: 'Tatsächlicher Verbrauch',
+          label: 'Ihr tatsächlicher Verbrauch im vergangenen Monat',
           data: currentData.actual,
           borderColor: '#f97316',
           backgroundColor: 'rgba(249, 115, 22, 0.1)',
@@ -182,7 +182,7 @@ export default {
           fill: true
         },
         {
-          label: 'Prognose',
+          label: 'Unsere Prognose für den vergangenen Monat',
           data: currentData.forecast,
           borderColor: '#10b981',
           backgroundColor: 'rgba(16, 185, 129, 0.1)',

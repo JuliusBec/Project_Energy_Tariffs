@@ -30,6 +30,28 @@ def _get_most_recent_price_file(app_data_dir: str) -> str:
     return most_recent_file
 
 
+def _get_price_forecast_file(app_data_dir: str) -> str:
+    """
+    Find the price forecast file in the app_data directory.
+    
+    Parameters:
+    app_data_dir (str): Path to the app_data directory
+    
+    Returns:
+    str: Path to the price forecast file
+    
+    Raises:
+    FileNotFoundError: If no forecast file is found
+    """
+    # Look for the forecast file (static name for now)
+    forecast_file = os.path.join(app_data_dir, "germany_price_forecast_720h.csv")
+    
+    if not os.path.exists(forecast_file):
+        raise FileNotFoundError(f"Price forecast file not found: {forecast_file}")
+    
+    return forecast_file
+
+
 def _load_historic_prices(price_file_path: str, days: int, end_date: datetime = None) -> pd.DataFrame:
     """
     Load historic price data for the last n days.
@@ -555,9 +577,9 @@ def get_price_forecast_volatility(app_data_dir: str = None) -> dict:
         project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         app_data_dir = os.path.join(project_root, "app_data")
     
-    # Find the most recent forecast file
+    # Find the price forecast file
     try:
-        forecast_file = _get_most_recent_price_file(app_data_dir)
+        forecast_file = _get_price_forecast_file(app_data_dir)
     except FileNotFoundError as e:
         raise FileNotFoundError(f"Cannot analyze price forecast volatility: {str(e)}")
     
@@ -582,9 +604,14 @@ def get_price_forecast_volatility(app_data_dir: str = None) -> dict:
         raise ValueError(f"No price column found in forecast file. Available columns: {df.columns.tolist()}")
     
     # Convert price to €/kWh if it's in €/MWh
-    if 'mwh' in price_col.lower():
+    # Check both column name and value range to determine if conversion is needed
+    # Prices in €/MWh are typically > 10, while €/kWh are typically < 1
+    mean_price = df[price_col].mean()
+    if 'mwh' in price_col.lower() or mean_price > 10:
+        # Prices are in €/MWh, convert to €/kWh
         df['price_eur_per_kwh'] = df[price_col] / 1000
     else:
+        # Already in €/kWh
         df['price_eur_per_kwh'] = df[price_col]
     
     # Calculate standard deviation
@@ -604,10 +631,14 @@ def get_price_forecast_volatility(app_data_dir: str = None) -> dict:
     
     if lower_col and upper_col:
         # Convert to €/kWh if needed
-        if 'mwh' in lower_col.lower():
+        # Check both column name and value range
+        mean_lower = df[lower_col].mean()
+        if 'mwh' in lower_col.lower() or mean_lower > 10:
+            # Values are in €/MWh, convert to €/kWh
             df['lower_kwh'] = df[lower_col] / 1000
             df['upper_kwh'] = df[upper_col] / 1000
         else:
+            # Already in €/kWh
             df['lower_kwh'] = df[lower_col]
             df['upper_kwh'] = df[upper_col]
         
@@ -715,16 +746,54 @@ def get_aggregated_risk_score(historic_risk_analysis: dict, coincidence_factor: 
     if usage_forecast_quality:
         forecast_quality_included = True
         
-        # Use relative confidence interval width as primary metric
-        relative_ci_width = usage_forecast_quality.get('relative_confidence_interval_width', None)
+        # Prioritize forecast_error_percentage as it's more reliable than relative CI width
+        # (relative CI width can be misleading for low-consumption households)
         forecast_error_pct = usage_forecast_quality.get('forecast_error_percentage', None)
+        relative_ci_width = usage_forecast_quality.get('relative_confidence_interval_width', None)
         
-        if relative_ci_width is not None:
-            # Confidence interval width analysis
-            # Lower CI width = more confident predictions = lower risk
-            # Adjusted ranges for better differentiation
+        if forecast_error_pct is not None:
+            # Use forecast error percentage as primary metric (most reliable)
+            # Lower error = better predictions = lower risk
             
-            if relative_ci_width < 25:
+            if forecast_error_pct < 10:
+                # Excellent forecast quality - significantly reduces risk
+                score -= 8
+                factors.append({
+                    'factor': 'Prognosequalität', 
+                    'impact': 'positive', 
+                    'detail': f'Sehr hohe Vorhersagegenauigkeit (Fehler: {forecast_error_pct:.1f}%)'
+                })
+            elif forecast_error_pct < 20:
+                # Good forecast quality - reduces risk
+                score -= 4
+                factors.append({
+                    'factor': 'Prognosequalität', 
+                    'impact': 'positive', 
+                    'detail': f'Gute Vorhersagegenauigkeit (Fehler: {forecast_error_pct:.1f}%)'
+                })
+            elif forecast_error_pct < 30:
+                # Fair forecast quality - slight risk increase
+                score += 3
+                factors.append({
+                    'factor': 'Prognosequalität', 
+                    'impact': 'neutral', 
+                    'detail': f'Moderate Vorhersageunsicherheit (Fehler: {forecast_error_pct:.1f}%)'
+                })
+            else:
+                # Poor forecast quality - increases risk
+                score += 10
+                factors.append({
+                    'factor': 'Prognosequalität', 
+                    'impact': 'negative', 
+                    'detail': f'Hohe Vorhersageunsicherheit (Fehler: {forecast_error_pct:.1f}%)'
+                })
+        
+        elif relative_ci_width is not None:
+            # Fallback to relative confidence interval width if forecast error not available
+            # Note: This can be misleading for low-consumption households
+            # Adjusted ranges to be more lenient
+            
+            if relative_ci_width < 40:
                 # Excellent forecast quality - reduces risk for dynamic tariffs
                 score -= 8
                 factors.append({
@@ -732,7 +801,7 @@ def get_aggregated_risk_score(historic_risk_analysis: dict, coincidence_factor: 
                     'impact': 'positive', 
                     'detail': f'Sehr hohe Vorhersagegenauigkeit (CI: {relative_ci_width:.1f}%)'
                 })
-            elif relative_ci_width < 40:
+            elif relative_ci_width < 80:
                 # Good forecast quality - slight risk reduction
                 score -= 4
                 factors.append({
@@ -740,7 +809,7 @@ def get_aggregated_risk_score(historic_risk_analysis: dict, coincidence_factor: 
                     'impact': 'positive', 
                     'detail': f'Gute Vorhersagegenauigkeit (CI: {relative_ci_width:.1f}%)'
                 })
-            elif relative_ci_width < 60:
+            elif relative_ci_width < 120:
                 # Fair forecast quality - neutral to slight risk increase
                 score += 3
                 factors.append({
@@ -755,37 +824,6 @@ def get_aggregated_risk_score(historic_risk_analysis: dict, coincidence_factor: 
                     'factor': 'Prognosequalität', 
                     'impact': 'negative', 
                     'detail': f'Hohe Vorhersageunsicherheit (CI: {relative_ci_width:.1f}%)'
-                })
-        
-        elif forecast_error_pct is not None:
-            # Fallback to forecast error percentage if CI width not available
-            if forecast_error_pct < 10:
-                score -= 8
-                factors.append({
-                    'factor': 'Prognosequalität', 
-                    'impact': 'positive', 
-                    'detail': f'Sehr hohe Vorhersagegenauigkeit (Fehler: {forecast_error_pct:.1f}%)'
-                })
-            elif forecast_error_pct < 20:
-                score -= 4
-                factors.append({
-                    'factor': 'Prognosequalität', 
-                    'impact': 'positive', 
-                    'detail': f'Gute Vorhersagegenauigkeit (Fehler: {forecast_error_pct:.1f}%)'
-                })
-            elif forecast_error_pct < 30:
-                score += 3
-                factors.append({
-                    'factor': 'Prognosequalität', 
-                    'impact': 'neutral', 
-                    'detail': f'Moderate Vorhersageunsicherheit (Fehler: {forecast_error_pct:.1f}%)'
-                })
-            else:
-                score += 10
-                factors.append({
-                    'factor': 'Prognosequalität', 
-                    'impact': 'negative', 
-                    'detail': f'Hohe Vorhersageunsicherheit (Fehler: {forecast_error_pct:.1f}%)'
                 })
     
     # Adjust score based on price forecast volatility (ONLY for dynamic tariffs)
