@@ -1004,46 +1004,68 @@ async def get_price_breakdown():
 
 @app.get("/api/forecast")
 async def get_price_forecast():
-    """Get price forecast for the next 7 days from Prophet model"""
+    """Get price forecast for the next 7 days from day-ahead market prices"""
     import os
     import pandas as pd
-    from datetime import datetime
+    from datetime import datetime, timedelta
     
     try:
-        # Load the actual Prophet forecast data
+        # Load the most recent day-ahead prices data
         project_root = os.path.dirname(os.path.abspath(__file__))
         app_data_path = os.path.join(project_root, "app_data")
         
-        # Find the most recent price forecast file
-        forecast_files = [f for f in os.listdir(app_data_path) if f.startswith('germany_price_forecast_') and f.endswith('.csv')]
-        if not forecast_files:
-            raise FileNotFoundError("No price forecast files found")
+        # Find the most recent day-ahead prices file
+        dayahead_files = [f for f in os.listdir(app_data_path) if f.startswith('germany_dayahead_prices_raw_') and f.endswith('.csv')]
+        if not dayahead_files:
+            raise FileNotFoundError("No day-ahead prices files found")
         
-        latest_forecast_file = sorted(forecast_files)[-1]
-        forecast_path = os.path.join(app_data_path, latest_forecast_file)
+        # Sort by filename (which contains timestamp) and get the latest
+        latest_dayahead_file = sorted(dayahead_files)[-1]
+        dayahead_path = os.path.join(app_data_path, latest_dayahead_file)
         
-        # Read forecast data
-        df = pd.read_csv(forecast_path)
-        df['ds'] = pd.to_datetime(df['ds'])
+        print(f"📊 Loading day-ahead prices from: {latest_dayahead_file}")
         
-        # Use only next 7 days (168 hours)
-        df = df.head(168)
+        # Read day-ahead prices data
+        df = pd.read_csv(dayahead_path)
         
-        # Convert yhat_energy from EUR/MWh to EUR/kWh
-        df['price_eur_kwh'] = df['yhat_energy'] / 10 / 100  # EUR/MWh -> ct/kWh -> EUR/kWh
+        # Parse datetime column (column is named 'ds')
+        df['datetime'] = pd.to_datetime(df['ds'])
+        
+        # Get price column (EUR/MWh) - column is named 'price_eur_per_mwh'
+        df['price_eur_kwh'] = df['price_eur_per_mwh'] / 1000  # EUR/MWh -> EUR/kWh
+        
+        # Sort by datetime
+        df = df.sort_values('datetime')
+        
+        # Get current date and filter for next 7 days (168 hours)
+        now = datetime.now()
+        future_data = df[df['datetime'] >= now].head(168)
+        
+        if len(future_data) == 0:
+            # If no future data, use the most recent data available
+            print("⚠️ No future data available, using most recent 168 hours")
+            future_data = df.tail(168)
         
         # Group by day
         forecast_data = []
-        for date in df['ds'].dt.date.unique()[:7]:
-            day_data = df[df['ds'].dt.date == date]
+        for date in future_data['datetime'].dt.date.unique()[:7]:
+            day_data = future_data[future_data['datetime'].dt.date == date]
+            
+            if len(day_data) == 0:
+                continue
             
             hourly_prices = []
             for _, row in day_data.iterrows():
                 hourly_prices.append({
-                    "hour": row['ds'].hour,
+                    "hour": row['datetime'].hour,
                     "price": round(row['price_eur_kwh'], 4),
-                    "datetime": row['ds'].isoformat()
+                    "datetime": row['datetime'].isoformat()
                 })
+            
+            # Sort hourly prices to find best/worst hours
+            sorted_hours = sorted(hourly_prices, key=lambda x: x['price'])
+            best_hours = [f"{h['hour']:02d}:00" for h in sorted_hours[:3]]
+            worst_hours = [f"{h['hour']:02d}:00" for h in sorted_hours[-3:]]
             
             forecast_data.append({
                 "date": str(date),
@@ -1051,62 +1073,23 @@ async def get_price_forecast():
                 "hourly_prices": hourly_prices,
                 "avg_price": round(day_data['price_eur_kwh'].mean(), 4),
                 "min_price": round(day_data['price_eur_kwh'].min(), 4),
-                "max_price": round(day_data['price_eur_kwh'].max(), 4)
+                "max_price": round(day_data['price_eur_kwh'].max(), 4),
+                "best_hours": ", ".join(best_hours),
+                "worst_hours": ", ".join(worst_hours)
             })
+        
+        print(f"✅ Loaded {len(forecast_data)} days of forecast data")
         
         return {
             "forecast": forecast_data,
-            "generated_at": datetime.now().isoformat(),
-            "currency": "EUR/kWh",
-            "source": "prophet_model"
+            "data_source": latest_dayahead_file,
+            "last_updated": datetime.fromtimestamp(os.path.getmtime(dayahead_path)).isoformat()
         }
-        
     except Exception as e:
-        # Fallback to mock data if Prophet data not available
-        import random
-        from datetime import datetime, timedelta
-        print(f"⚠️ Could not load Prophet forecast: {e}, using mock data")
-        forecast_data = []
-        base_date = datetime.now()
-    
-        for day in range(7):
-            current_date = base_date + timedelta(days=day)
-            daily_prices = []
-            
-            # Simulate realistic hourly price patterns
-            for hour in range(24):
-                # Lower prices at night (23-6h), higher during peak times (17-20h)
-                if 23 <= hour or hour <= 6:  # Night hours
-                    base_price = random.uniform(0.05, 0.12)
-                elif 17 <= hour <= 20:  # Peak hours
-                    base_price = random.uniform(0.20, 0.35)
-                else:  # Regular hours
-                    base_price = random.uniform(0.12, 0.22)
-                
-                # Add some volatility
-                price = base_price + random.uniform(-0.03, 0.03)
-                price = max(0.02, price)  # Minimum price
-                
-                daily_prices.append({
-                    "hour": hour,
-                    "price": round(price, 4),
-                    "datetime": current_date.replace(hour=hour).isoformat()
-                })
-            
-            forecast_data.append({
-                "date": current_date.strftime("%Y-%m-%d"),
-                "day_name": current_date.strftime("%A"),
-                "hourly_prices": daily_prices,
-                "avg_price": round(sum(p["price"] for p in daily_prices) / 24, 4),
-                "min_price": round(min(p["price"] for p in daily_prices), 4),
-                "max_price": round(max(p["price"] for p in daily_prices), 4)
-            })
-        
-        return {
-            "forecast": forecast_data,
-            "generated_at": datetime.now().isoformat(),
-            "currency": "EUR/kWh"
-        }
+        import traceback
+        print(f"❌ Error loading forecast data: {str(e)}")
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Error loading forecast data: {str(e)}")
 
 @app.post("/api/predict-savings")
 async def predict_savings(usage_data: dict):

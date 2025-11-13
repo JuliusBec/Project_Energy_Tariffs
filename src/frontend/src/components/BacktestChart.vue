@@ -182,7 +182,7 @@ export default {
           fill: true
         },
         {
-          label: 'Prognose',
+          label: 'Unsere Prognose für den vergangenen Monat',
           data: currentData.forecast,
           borderColor: '#10b981',
           backgroundColor: 'rgba(16, 185, 129, 0.1)',

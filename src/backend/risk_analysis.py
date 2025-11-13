@@ -715,16 +715,54 @@ def get_aggregated_risk_score(historic_risk_analysis: dict, coincidence_factor: 
     if usage_forecast_quality:
         forecast_quality_included = True
         
-        # Use relative confidence interval width as primary metric
-        relative_ci_width = usage_forecast_quality.get('relative_confidence_interval_width', None)
+        # Prioritize forecast_error_percentage as it's more reliable than relative CI width
+        # (relative CI width can be misleading for low-consumption households)
         forecast_error_pct = usage_forecast_quality.get('forecast_error_percentage', None)
+        relative_ci_width = usage_forecast_quality.get('relative_confidence_interval_width', None)
         
-        if relative_ci_width is not None:
-            # Confidence interval width analysis
-            # Lower CI width = more confident predictions = lower risk
-            # Adjusted ranges for better differentiation
+        if forecast_error_pct is not None:
+            # Use forecast error percentage as primary metric (most reliable)
+            # Lower error = better predictions = lower risk
             
-            if relative_ci_width < 25:
+            if forecast_error_pct < 10:
+                # Excellent forecast quality - significantly reduces risk
+                score -= 8
+                factors.append({
+                    'factor': 'Prognosequalität', 
+                    'impact': 'positive', 
+                    'detail': f'Sehr hohe Vorhersagegenauigkeit (Fehler: {forecast_error_pct:.1f}%)'
+                })
+            elif forecast_error_pct < 20:
+                # Good forecast quality - reduces risk
+                score -= 4
+                factors.append({
+                    'factor': 'Prognosequalität', 
+                    'impact': 'positive', 
+                    'detail': f'Gute Vorhersagegenauigkeit (Fehler: {forecast_error_pct:.1f}%)'
+                })
+            elif forecast_error_pct < 30:
+                # Fair forecast quality - slight risk increase
+                score += 3
+                factors.append({
+                    'factor': 'Prognosequalität', 
+                    'impact': 'neutral', 
+                    'detail': f'Moderate Vorhersageunsicherheit (Fehler: {forecast_error_pct:.1f}%)'
+                })
+            else:
+                # Poor forecast quality - increases risk
+                score += 10
+                factors.append({
+                    'factor': 'Prognosequalität', 
+                    'impact': 'negative', 
+                    'detail': f'Hohe Vorhersageunsicherheit (Fehler: {forecast_error_pct:.1f}%)'
+                })
+        
+        elif relative_ci_width is not None:
+            # Fallback to relative confidence interval width if forecast error not available
+            # Note: This can be misleading for low-consumption households
+            # Adjusted ranges to be more lenient
+            
+            if relative_ci_width < 40:
                 # Excellent forecast quality - reduces risk for dynamic tariffs
                 score -= 8
                 factors.append({
@@ -732,7 +770,7 @@ def get_aggregated_risk_score(historic_risk_analysis: dict, coincidence_factor: 
                     'impact': 'positive', 
                     'detail': f'Sehr hohe Vorhersagegenauigkeit (CI: {relative_ci_width:.1f}%)'
                 })
-            elif relative_ci_width < 40:
+            elif relative_ci_width < 80:
                 # Good forecast quality - slight risk reduction
                 score -= 4
                 factors.append({
@@ -740,7 +778,7 @@ def get_aggregated_risk_score(historic_risk_analysis: dict, coincidence_factor: 
                     'impact': 'positive', 
                     'detail': f'Gute Vorhersagegenauigkeit (CI: {relative_ci_width:.1f}%)'
                 })
-            elif relative_ci_width < 60:
+            elif relative_ci_width < 120:
                 # Fair forecast quality - neutral to slight risk increase
                 score += 3
                 factors.append({
@@ -755,37 +793,6 @@ def get_aggregated_risk_score(historic_risk_analysis: dict, coincidence_factor: 
                     'factor': 'Prognosequalität', 
                     'impact': 'negative', 
                     'detail': f'Hohe Vorhersageunsicherheit (CI: {relative_ci_width:.1f}%)'
-                })
-        
-        elif forecast_error_pct is not None:
-            # Fallback to forecast error percentage if CI width not available
-            if forecast_error_pct < 10:
-                score -= 8
-                factors.append({
-                    'factor': 'Prognosequalität', 
-                    'impact': 'positive', 
-                    'detail': f'Sehr hohe Vorhersagegenauigkeit (Fehler: {forecast_error_pct:.1f}%)'
-                })
-            elif forecast_error_pct < 20:
-                score -= 4
-                factors.append({
-                    'factor': 'Prognosequalität', 
-                    'impact': 'positive', 
-                    'detail': f'Gute Vorhersagegenauigkeit (Fehler: {forecast_error_pct:.1f}%)'
-                })
-            elif forecast_error_pct < 30:
-                score += 3
-                factors.append({
-                    'factor': 'Prognosequalität', 
-                    'impact': 'neutral', 
-                    'detail': f'Moderate Vorhersageunsicherheit (Fehler: {forecast_error_pct:.1f}%)'
-                })
-            else:
-                score += 10
-                factors.append({
-                    'factor': 'Prognosequalität', 
-                    'impact': 'negative', 
-                    'detail': f'Hohe Vorhersageunsicherheit (Fehler: {forecast_error_pct:.1f}%)'
                 })
     
     # Adjust score based on price forecast volatility (ONLY for dynamic tariffs)

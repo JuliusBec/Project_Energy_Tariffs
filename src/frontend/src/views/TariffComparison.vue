@@ -70,6 +70,21 @@
                     Für Tarifverfügbarkeit in Ihrer Region
                   </div>
                 </div>
+
+                <div class="form-group">
+                  <label class="form-label">Aktuelle Monatskosten (€)</label>
+                  <input 
+                    type="number" 
+                    v-model="formData.currentCost" 
+                    class="form-input"
+                    placeholder="z.B. 100"
+                    step="1"
+                    min="0"
+                  >
+                  <div class="form-help">
+                    Optional: Für Ersparnis-Berechnung (aktuelle monatliche Stromkosten)
+                  </div>
+                </div>
                
                 <div class="form-group">
                   <label class="form-label">Verbrauchsdaten hochladen *</label>
@@ -213,7 +228,7 @@
                     v-model="formData.currentCost" 
                     class="form-input"
                     placeholder="z.B. 100"
-                    step="0.01"
+                    step="1"
                     min="0"
                   >
                   <div class="form-help">
@@ -291,9 +306,13 @@
                     <p class="tariff-description">{{ tariff.description }}</p>
                     
                     <div class="tariff-badges">
-                      <span v-if="tariff.features && tariff.features.includes('dynamic')" class="badge badge-dynamic">
+                      <span v-if="tariff.is_dynamic" class="badge badge-dynamic">
                         <i class="fas fa-chart-line"></i>
                         Dynamisch
+                      </span>
+                      <span v-else class="badge badge-fixed">
+                        <i class="fas fa-lock"></i>
+                        Festpreis
                       </span>
                       <span v-if="tariff.features && tariff.features.includes('green')" class="badge badge-green">
                         <i class="fas fa-leaf"></i>
@@ -345,7 +364,7 @@
                     </div>
                     <div class="detail-item">
                       <i class="fas fa-bolt"></i>
-                      <span>Gesamt-kWh-Preis: {{ tariff.kwh_price.toFixed(4) }}€/kWh</span>
+                      <span>Arbeitspreis{{ tariff.is_dynamic ? ' (Ø)' : '' }}: {{ tariff.kwh_price.toFixed(4) }}€/kWh</span>
                     </div>
                     <div class="detail-item">
                       <i class="fas fa-calendar"></i>
@@ -377,14 +396,10 @@
                         <span class="breakdown-label">Verbrauchskosten/Jahr:</span>
                         <span class="breakdown-value">{{ (tariff.annual_cost - (tariff.base_price * 12)).toFixed(2) }}€</span>
                       </div>
-                      <div class="breakdown-item">
-                        <span class="breakdown-label">Kosten pro kWh (Ø):</span>
-                        <span class="breakdown-value">{{ (tariff.annual_cost / formData.annualKwh).toFixed(4) }}€</span>
-                      </div>
-                      <div v-if="tariff.is_dynamic" class="breakdown-item highlight">
+                      <div v-if="formData.currentCost && (formData.currentCost * 12) > tariff.annual_cost" class="breakdown-item highlight">
                         <span class="breakdown-label">Einsparungspotenzial:</span>
                         <span class="breakdown-value savings">
-                          bis zu {{ (tariff.annual_cost * 0.15).toFixed(2) }}€/Jahr
+                          {{ ((formData.currentCost * 12) - tariff.annual_cost).toFixed(2) }}€/Jahr
                         </span>
                       </div>
                     </div>
@@ -420,12 +435,12 @@
                     </ul>
                   </div>
                   
-                  <div v-if="tariff.special_features" class="special-features">
+                  <div v-if="tariff.special_features && tariff.special_features.length > 0" class="special-features">
                     <h4><i class="fas fa-star"></i> Besondere Leistungen</h4>
                     <ul>
                       <li v-for="feature in tariff.special_features" :key="feature">
                         <i class="fas fa-check text-green-600"></i>
-                        {{ feature }}
+                        {{ translateFeature(feature) }}
                       </li>
                     </ul>
                   </div>
@@ -489,69 +504,32 @@
           <!-- Prognose und Vorhersage Sektion -->
           <div v-if="results.length > 0 && !loading" class="forecast-section">
             <div class="forecast-cards">
-              <!-- Ersparnisvorhersage -->
-              <div class="forecast-card">
+              <!-- Preisvorhersage -->
+              <div class="forecast-card forecast-card-full">
                 <div class="forecast-header">
                   <h4>
                     <i class="fas fa-chart-line"></i>
-                    KI-basierte Ersparnisvorhersage
-                  </h4>
-                </div>
-                <div class="forecast-content">
-                  <div v-if="savingsPrediction" class="prediction-result">
-                    <div class="prediction-main">
-                      <span class="prediction-percentage">{{ savingsPrediction.percentage }}%</span>
-                      <span class="prediction-label">Einsparpotential</span>
-                    </div>
-                    <div class="prediction-details">
-                      <div class="prediction-item">
-                        <span class="label">Monatlich:</span>
-                        <span class="value">{{ savingsPrediction.monthly_euro }}€</span>
-                      </div>
-                      <div class="prediction-item">
-                        <span class="label">Jährlich:</span>
-                        <span class="value">{{ savingsPrediction.annual_euro }}€</span>
-                      </div>
-                    </div>
-                    <div class="prediction-recommendations">
-                      <h5>Empfehlungen:</h5>
-                      <ul>
-                        <li v-for="rec in savingsPrediction.recommendations" :key="rec">{{ rec }}</li>
-                      </ul>
-                    </div>
-                  </div>
-                  <div v-else class="loading-prediction">
-                    <div class="loading-spinner small"></div>
-                    <span>Berechne Einsparpotential...</span>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Preisvorhersage -->
-              <div class="forecast-card">
-                <div class="forecast-header">
-                  <h4>
-                    <i class="fas fa-crystal-ball"></i>
                     7-Tage Strompreis-Prognose
                   </h4>
                 </div>
                 <div class="forecast-content">
                   <div v-if="priceForecast" class="price-forecast">
                     <div class="forecast-chart">
-                      <div v-for="day in priceForecast.slice(0, 5)" :key="day.date" class="day-forecast">
+                      <div v-for="day in priceForecast.slice(0, 7)" :key="day.date" class="day-forecast">
                         <div class="day-name">{{ getDayName(day.day_name) }}</div>
                         <div class="price-range">
-                          <span class="min-price">{{ (day.min_price * 100).toFixed(1) }}ct</span>
+                          <span class="min-price">{{ (day.min_price * 1000).toFixed(1) }}ct</span>
                           <div class="price-bar">
                             <div class="price-fill" :style="{ width: getPriceBarWidth(day) + '%' }"></div>
                           </div>
-                          <span class="max-price">{{ (day.max_price * 100).toFixed(1) }}ct</span>
+                          <span class="max-price">{{ (day.max_price * 1000).toFixed(1) }}ct</span>
                         </div>
+                        <div class="price-avg">Ø {{ (day.avg_price * 1000).toFixed(1) }}ct</div>
                       </div>
                     </div>
                     <div class="forecast-summary">
-                      <p><strong>Beste Zeiten:</strong> Nachts 23:00-06:00 Uhr</p>
-                      <p><strong>Teuerste Zeiten:</strong> Abends 17:00-20:00 Uhr</p>
+                      <p><strong>Günstigste Stunden:</strong> {{ priceForecast[0]?.best_hours || 'Nachts 23:00-06:00 Uhr' }}</p>
+                      <p><strong>Teuerste Stunden:</strong> {{ priceForecast[0]?.worst_hours || 'Abends 17:00-20:00 Uhr' }}</p>
                     </div>
                   </div>
                   <div v-else class="loading-forecast">
@@ -591,14 +569,43 @@
           <div class="overview-grid">
             <div class="overview-item">
               <h3>{{ selectedTariff.provider }}</h3>
-              <p class="tariff-type">
+              
+              <!-- All Badges in one row -->
+              <div class="tariff-badges">
                 <span v-if="selectedTariff.is_dynamic" class="badge badge-dynamic">
-                  <i class="fas fa-chart-line"></i> Dynamischer Tarif
+                  <i class="fas fa-chart-line"></i>
+                  Dynamisch
                 </span>
                 <span v-else class="badge badge-fixed">
-                  <i class="fas fa-lock"></i> Fester Tarif
+                  <i class="fas fa-lock"></i>
+                  Fester Tarif
                 </span>
-              </p>
+                
+                <span v-if="selectedTariff.features && selectedTariff.features.includes('green')" class="badge badge-green">
+                  <i class="fas fa-leaf"></i>
+                  Ökostrom
+                </span>
+                <span v-if="selectedTariff.app_available" class="badge badge-tech">
+                  <i class="fas fa-mobile-alt"></i>
+                  App
+                </span>
+                <span v-if="selectedTariff.automation_ready" class="badge badge-smart">
+                  <i class="fas fa-home"></i>
+                  Smart Ready
+                </span>
+                <span v-if="selectedTariff.risk_level === 'low'" class="badge badge-success">
+                  <i class="fas fa-shield-alt"></i>
+                  Niedriges Risiko
+                </span>
+                <span v-if="selectedTariff.risk_level === 'moderate'" class="badge badge-warning">
+                  <i class="fas fa-exclamation-triangle"></i>
+                  Moderates Risiko
+                </span>
+                <span v-if="selectedTariff.risk_level === 'high'" class="badge badge-danger">
+                  <i class="fas fa-exclamation-circle"></i>
+                  Höheres Risiko
+                </span>
+              </div>
             </div>
             
             <div class="overview-item">
@@ -621,8 +628,8 @@
                 <span class="value">{{ selectedTariff.base_price }}€/Monat</span>
               </div>
               <div class="detail-row">
-                <span class="label">Arbeitspreis:</span>
-                <span class="value">{{ selectedTariff.kwh_price }}€/kWh</span>
+                <span class="label">Arbeitspreis{{ selectedTariff.is_dynamic ? ' (Ø)' : '' }}:</span>
+                <span class="value">{{ selectedTariff.kwh_price.toFixed(4) }}€/kWh</span>
               </div>
               <div class="detail-row">
                 <span class="label">Vertragslaufzeit:</span>
@@ -650,11 +657,69 @@
               </div>
             </div>
             
+            <!-- Tarifmerkmale -->
             <div class="features-list">
               <h4><i class="fas fa-star"></i> Tarifmerkmale</h4>
               <ul>
-                <li v-for="feature in selectedTariff.features" :key="feature">
-                  <i class="fas fa-check"></i> {{ feature }}
+                <li v-if="selectedTariff.is_dynamic">
+                  <i class="fas fa-chart-line"></i>
+                  <span>Dynamischer Stromtarif mit stündlich variablen Preisen</span>
+                </li>
+                <li v-if="selectedTariff.features && selectedTariff.features.includes('green')">
+                  <i class="fas fa-leaf"></i>
+                  <span>100% Ökostrom aus erneuerbaren Energien</span>
+                </li>
+                <li v-if="selectedTariff.app_available">
+                  <i class="fas fa-mobile-alt"></i>
+                  <span>App-Steuerung mit Preisbenachrichtigungen möglich</span>
+                </li>
+                <li v-if="selectedTariff.automation_ready">
+                  <i class="fas fa-home"></i>
+                  <span>Smart Home Integration für automatische Verbrauchssteuerung</span>
+                </li>
+                <li v-if="!selectedTariff.is_dynamic">
+                  <i class="fas fa-lock"></i>
+                  <span>Fester Strompreis - keine Preisschwankungen</span>
+                </li>
+                <li v-if="selectedTariff.contract_duration === 1">
+                  <i class="fas fa-calendar-check"></i>
+                  <span>Flexible Laufzeit - monatlich kündbar</span>
+                </li>
+                <li v-if="selectedTariff.risk_level === 'low'" class="risk-info-low">
+                  <i class="fas fa-shield-alt"></i>
+                  <span>Niedriges Risiko - geringe Abweichungen vom geschätzten Preis erwartet</span>
+                  <button 
+                    v-if="selectedTariff.risk_factors && selectedTariff.risk_factors.length > 0"
+                    @click="scrollToRiskBreakdown"
+                    class="risk-info-button"
+                    title="Zur detaillierten Risikoanalyse"
+                  >
+                    <i class="fas fa-info-circle"></i>
+                  </button>
+                </li>
+                <li v-if="selectedTariff.risk_level === 'moderate'" class="risk-info-moderate">
+                  <i class="fas fa-exclamation-triangle"></i>
+                  <span>Moderates Risiko - signifikante Abweichungen vom geschätzten Preis möglich</span>
+                  <button 
+                    v-if="selectedTariff.risk_factors && selectedTariff.risk_factors.length > 0"
+                    @click="scrollToRiskBreakdown"
+                    class="risk-info-button"
+                    title="Zur detaillierten Risikoanalyse"
+                  >
+                    <i class="fas fa-info-circle"></i>
+                  </button>
+                </li>
+                <li v-if="selectedTariff.risk_level === 'high'" class="risk-info-high">
+                  <i class="fas fa-exclamation-circle"></i>
+                  <span>Höheres Risiko - starke Abweichungen vom geschätzten Preis wahrscheinlich</span>
+                  <button 
+                    v-if="selectedTariff.risk_factors && selectedTariff.risk_factors.length > 0"
+                    @click="scrollToRiskBreakdown"
+                    class="risk-info-button"
+                    title="Zur detaillierten Risikoanalyse"
+                  >
+                    <i class="fas fa-info-circle"></i>
+                  </button>
                 </li>
               </ul>
             </div>
@@ -783,16 +848,10 @@
           </div>
         </div>
 
-        <!-- Diagramme nebeneinander -->
+        <!-- Diagramme untereinander -->
         <div class="charts-container">
           <h3 class="charts-title"><i class="fas fa-chart-line"></i> Prognose & Analyse</h3>
           <div class="charts-grid">
-            <!-- Backtest Chart -->
-            <div class="chart-section">
-              <h4><i class="fas fa-chart-area"></i> Verbrauchsprognose Backtest</h4>
-              <BacktestChart :uploadedFile="uploadedFile" />
-            </div>
-
             <!-- Risk Analysis Box (replaces Einsparungspotenzial) -->
             <div class="chart-section">
               <h4><i class="fas fa-shield-alt"></i> Risikoanalyse</h4>
@@ -895,6 +954,71 @@
                 </div>
               </div>
             </div>
+
+            <!-- Backtest Chart -->
+            <div class="chart-section">
+              <h4><i class="fas fa-chart-area"></i> Verbrauchsprognose Backtest</h4>
+              <BacktestChart :uploadedFile="uploadedFile" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Detailed Risk Breakdown -->
+        <div v-if="selectedTariff.risk_factors && selectedTariff.risk_factors.length > 0" id="risk-breakdown" class="risk-breakdown-section">
+          <h3 class="risk-breakdown-title">
+            <i class="fas fa-analytics"></i>
+            Detaillierte Risikoanalyse
+          </h3>
+          
+          <div class="risk-overview-card">
+            <div class="risk-score-display">
+              <div class="risk-score-circle" :class="{
+                'score-low': selectedTariff.risk_level === 'low',
+                'score-moderate': selectedTariff.risk_level === 'moderate',
+                'score-high': selectedTariff.risk_level === 'high'
+              }">
+                <span class="score-number">{{ selectedTariff.risk_score }}</span>
+                <span class="score-label">/ 100</span>
+              </div>
+              <div class="risk-score-info">
+                <div class="risk-level-badge" :class="{
+                  'badge-success': selectedTariff.risk_level === 'low',
+                  'badge-warning': selectedTariff.risk_level === 'moderate',
+                  'badge-danger': selectedTariff.risk_level === 'high'
+                }">
+                  {{ selectedTariff.risk_level === 'low' ? 'Niedriges Risiko' : selectedTariff.risk_level === 'moderate' ? 'Moderates Risiko' : 'Höheres Risiko' }}
+                </div>
+                <p class="risk-message">{{ selectedTariff.risk_message }}</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="risk-factors-grid">
+            <div 
+              v-for="(factor, index) in selectedTariff.risk_factors" 
+              :key="index"
+              class="risk-factor-card"
+              :class="{
+                'factor-positive': factor.impact === 'positive',
+                'factor-neutral': factor.impact === 'neutral',
+                'factor-negative': factor.impact === 'negative'
+              }"
+            >
+              <div class="factor-header">
+                <div class="factor-icon">
+                  <i v-if="factor.impact === 'positive'" class="fas fa-check-circle"></i>
+                  <i v-else-if="factor.impact === 'neutral'" class="fas fa-minus-circle"></i>
+                  <i v-else class="fas fa-exclamation-circle"></i>
+                </div>
+                <h4 class="factor-title">{{ factor.factor }}</h4>
+              </div>
+              <p class="factor-detail">{{ factor.detail }}</p>
+              <div class="factor-impact-label">
+                <span v-if="factor.impact === 'positive'">Positiver Einfluss</span>
+                <span v-else-if="factor.impact === 'neutral'">Neutraler Einfluss</span>
+                <span v-else>Negativer Einfluss</span>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -963,8 +1087,7 @@ export default {
     const fileError = ref('')
     const isDragOver = ref(false)
     
-    // Prognose and prediction data
-    const savingsPrediction = ref(null)
+    // Prognose data
     const priceForecast = ref(null)
     
     // Risk analysis data
@@ -1200,8 +1323,7 @@ export default {
             console.log('🛡️ Using global risk assessment:', riskAnalysisData.value.risk_level)
           }
           
-          // Fetch predictions and forecasts
-          fetchSavingsPrediction()
+          // Fetch price forecast
           fetchPriceForecast()
           
           loading.value = false
@@ -1219,22 +1341,6 @@ export default {
         results.value = []
       } finally {
         loading.value = false
-      }
-    }
-    
-    // Fetch savings prediction from backend
-    const fetchSavingsPrediction = async () => {
-      try {
-        console.log('Fetching savings prediction...')
-        const response = await apiService.predictSavings({
-          annual_kwh: formData.value.annualKwh,
-          has_smart_meter: formData.value.hasSmartMeter
-        })
-        
-        savingsPrediction.value = response.data.savings_potential
-        console.log('Savings prediction received:', response.data)
-      } catch (error) {
-        console.error('Error fetching savings prediction:', error)
       }
     }
     
@@ -1449,6 +1555,13 @@ export default {
       selectedTariff.value = null
     }
     
+    const scrollToRiskBreakdown = () => {
+      const element = document.getElementById('risk-breakdown')
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }
+    }
+    
     const fetchRiskAnalysis = async () => {
       // Only fetch if we have uploaded file
       if (!uploadedFile.value) {
@@ -1621,6 +1734,20 @@ export default {
       return (maxPrice / 40) * 100
     }
     
+    // Translate technical feature keys to German user-friendly descriptions
+    const translateFeature = (feature) => {
+      const featureMap = {
+        'dynamic': 'Dynamischer Tarif',
+        'real-time-pricing': 'Echtzeitpreise',
+        'smart-meter-required': 'Smart Meter erforderlich',
+        'green': '100% Ökostrom',
+        'fixed': 'Fester Tarif',
+        'app-available': 'Mobile App verfügbar',
+        'automation': 'Automatisierung möglich'
+      }
+      return featureMap[feature] || feature
+    }
+    
     // Load URL parameters if any
     onMounted(() => {
       const urlParams = new URLSearchParams(window.location.search)
@@ -1641,7 +1768,6 @@ export default {
       csvData,
       fileError,
       isDragOver,
-      savingsPrediction,
       priceForecast,
       riskAnalysisData,
       riskAnalysisLoading,
@@ -1653,6 +1779,7 @@ export default {
       selectTariff,
       showTariffDetails,
       closeDetailsModal,
+      scrollToRiskBreakdown,
       fetchRiskAnalysis,
       handleFileSelect,
       handleFileDrop,
@@ -1660,7 +1787,8 @@ export default {
       formatFileSize,
       updateConsumptionFromHousehold,
       getDayName,
-      getPriceBarWidth
+      getPriceBarWidth,
+      translateFeature
     }
   }
 }
@@ -2369,8 +2497,8 @@ export default {
 }
 
 .badge-dynamic {
-  background: #dbeafe;
-  color: #1e40af;
+  background: #e0e7ff;
+  color: #4338ca;
 }
 
 .badge-tech {
@@ -2379,8 +2507,8 @@ export default {
 }
 
 .badge-smart {
-  background: #fef3c7;
-  color: #92400e;
+  background: #ccfbf1;
+  color: #0f766e;
 }
 
 .price-model-info {
@@ -2551,7 +2679,7 @@ export default {
 
 .forecast-cards {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 1.5rem;
   margin-top: 1rem;
 }
@@ -2561,6 +2689,10 @@ export default {
   border-radius: 12px;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
   overflow: hidden;
+}
+
+.forecast-card-full {
+  width: 100%;
 }
 
 .forecast-header {
@@ -2697,8 +2829,16 @@ export default {
 .min-price, .max-price {
   font-size: 0.75rem;
   color: #6b7280;
-  min-width: 35px;
+  min-width: 40px;
   font-weight: 500;
+}
+
+.price-avg {
+  font-size: 0.75rem;
+  color: #059669;
+  min-width: 45px;
+  font-weight: 600;
+  text-align: right;
 }
 
 .price-bar {
@@ -3007,7 +3147,16 @@ export default {
 }
 
 .tariff-type {
-  margin: 0;
+  margin: 0 0 0.75rem 0;
+}
+
+.overview-item .tariff-badges {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  margin-top: 0.5rem;
+  padding-bottom: 0.25rem;
 }
 
 .cost-display {
@@ -3101,11 +3250,73 @@ export default {
   gap: 0.5rem;
   padding: 0.5rem 0;
   color: #4b5563;
+  position: relative;
+}
+
+.features-list li .risk-info-button {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: #3b82f6;
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.features-list li .risk-info-button:hover {
+  background: #eff6ff;
+  color: #1d4ed8;
+  transform: scale(1.1);
+}
+
+.features-list li .risk-info-button:active {
+  transform: scale(0.95);
 }
 
 .features-list li i {
   color: #059669;
   font-size: 0.9rem;
+}
+
+.features-list li.risk-info-low {
+  background: #f0fdf4;
+  padding: 0.75rem;
+  border-radius: 6px;
+  border-left: 3px solid #10b981;
+  margin-top: 0.5rem;
+}
+
+.features-list li.risk-info-low i {
+  color: #10b981;
+}
+
+.features-list li.risk-info-moderate {
+  background: #fffbeb;
+  padding: 0.75rem;
+  border-radius: 6px;
+  border-left: 3px solid #f59e0b;
+  margin-top: 0.5rem;
+}
+
+.features-list li.risk-info-moderate i {
+  color: #f59e0b;
+}
+
+.features-list li.risk-info-high {
+  background: #fef2f2;
+  padding: 0.75rem;
+  border-radius: 6px;
+  border-left: 3px solid #ef4444;
+  margin-top: 0.5rem;
+}
+
+.features-list li.risk-info-high i {
+  color: #ef4444;
 }
 
 .detail-row.highlight-row {
@@ -3391,7 +3602,7 @@ export default {
 
 .charts-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 2rem;
 }
 
@@ -3446,11 +3657,6 @@ export default {
 /* Responsive Design for Charts */
 @media (max-width: 768px) {
   .modal-info-grid {
-    grid-template-columns: 1fr;
-    gap: 1.5rem;
-  }
-  
-  .charts-grid {
     grid-template-columns: 1fr;
     gap: 1.5rem;
   }
@@ -3886,13 +4092,8 @@ export default {
   margin-top: 0.25rem;
 }
 
-.badge-dynamic {
-  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
-  color: white;
-}
-
 .badge-fixed {
-  background: linear-gradient(135deg, #6b7280, #374151);
+  background: #9ca3af;
   color: white;
 }
 
@@ -4043,6 +4244,203 @@ export default {
   padding: 1rem;
 }
 
+/* Detailed Risk Breakdown Section */
+.risk-breakdown-section {
+  margin-top: 2rem;
+  padding: 2rem;
+  background: #f9fafb;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+}
+
+.risk-breakdown-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1f2937;
+  margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.risk-breakdown-title i {
+  color: #3b82f6;
+}
+
+.risk-overview-card {
+  background: white;
+  border-radius: 12px;
+  padding: 2rem;
+  margin-bottom: 2rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.risk-score-display {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+}
+
+.risk-score-circle {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 6px solid;
+  flex-shrink: 0;
+}
+
+.risk-score-circle.score-low {
+  border-color: #10b981;
+  background: linear-gradient(135deg, #d1fae5, #a7f3d0);
+}
+
+.risk-score-circle.score-moderate {
+  border-color: #f59e0b;
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+}
+
+.risk-score-circle.score-high {
+  border-color: #ef4444;
+  background: linear-gradient(135deg, #fee2e2, #fecaca);
+}
+
+.score-number {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: #1f2937;
+  line-height: 1;
+}
+
+.score-label {
+  font-size: 0.875rem;
+  color: #6b7280;
+  margin-top: 0.25rem;
+}
+
+.risk-score-info {
+  flex: 1;
+}
+
+.risk-level-badge {
+  display: inline-block;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+}
+
+.risk-message {
+  font-size: 1rem;
+  color: #4b5563;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.risk-factors-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1rem;
+}
+
+.risk-factor-card {
+  background: white;
+  border-radius: 8px;
+  padding: 1.5rem;
+  border-left: 4px solid;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.risk-factor-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.risk-factor-card.factor-positive {
+  border-left-color: #10b981;
+  background: linear-gradient(to right, #f0fdf4 0%, white 100%);
+}
+
+.risk-factor-card.factor-neutral {
+  border-left-color: #6b7280;
+  background: linear-gradient(to right, #f9fafb 0%, white 100%);
+}
+
+.risk-factor-card.factor-negative {
+  border-left-color: #ef4444;
+  background: linear-gradient(to right, #fef2f2 0%, white 100%);
+}
+
+.factor-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.factor-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.125rem;
+}
+
+.factor-positive .factor-icon {
+  background: #d1fae5;
+  color: #059669;
+}
+
+.factor-neutral .factor-icon {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.factor-negative .factor-icon {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.factor-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0;
+}
+
+.factor-detail {
+  color: #4b5563;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  margin: 0 0 0.75rem 0;
+}
+
+.factor-impact-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.factor-positive .factor-impact-label {
+  color: #059669;
+}
+
+.factor-neutral .factor-impact-label {
+  color: #6b7280;
+}
+
+.factor-negative .factor-impact-label {
+  color: #dc2626;
+}
+
 /* Responsive Modal */
 @media (max-width: 1024px) {
   .modal-grid {
@@ -4085,6 +4483,19 @@ export default {
   
   .modal-actions .btn {
     width: 100%;
+  }
+  
+  .risk-score-display {
+    flex-direction: column;
+    text-align: center;
+  }
+  
+  .risk-factors-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .risk-breakdown-section {
+    padding: 1rem;
   }
 }
 </style>
