@@ -206,7 +206,7 @@
                 </div>
 
                 <div class="form-group">
-                  <label class="form-label">Postleitzahl</label>
+                  <label class="form-label">Postleitzahl *</label>
                   <input 
                     type="text" 
                     v-model="formData.zipCode" 
@@ -214,9 +214,10 @@
                     placeholder="z.B. 80331"
                     pattern="[0-9]{5}"
                     maxlength="5"
+                    required
                   >
                   <div class="form-help">
-                    Für regionale Tarifverfügbarkeit (optional)
+                    Für regionale Tarifverfügbarkeit (Pflichtfeld)
                   </div>
                 </div>
                 
@@ -1192,7 +1193,7 @@ export default {
         const scraperResponse = await apiService.scrapeAllTariffs(
           zipCode, 
           annualConsumption, 
-          ['enbw', 'tado', 'tibber'],
+          ['enbw', 'enbw_strom', 'tado', 'tibber'],
           scraperOptions
         )
         const scraperData = scraperResponse.data

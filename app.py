@@ -1,4 +1,4 @@
-from fastapi import FastAPI, File, HTTPException, UploadFile, Form, Response
+from fastapi import FastAPI, File, HTTPException, UploadFile, Form, Response, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import List, Optional
@@ -1529,6 +1529,17 @@ def scraper_to_tariff(scraper_data: dict, provider: str, tariff_type: str = "dyn
             "additional_price_ct_kwh": scraper_data.get("markup_ct_kwh", 15.36),  # Netzentgelte, Steuern, Umlagen in ct/kWh
             "min_duration": None
         })
+    elif provider == "EnBW Strom":
+        # EnBW Strom: Festpreis-Tarif
+        tariff_dict.update({
+            "base_price": scraper_data.get("base_price_monthly", 0),
+            "kwh_rate": scraper_data.get("work_price_ct_per_kwh", 0) / 100,  # Arbeitspreis in €/kWh
+            "network_fee": 0,  # Im Arbeitspreis enthalten
+            "additional_price_ct_kwh": 0,  # Kein Markup bei Festpreis
+            "min_duration": scraper_data.get("contract_duration_months", 12),
+            "features": ["fixed-rate", "renewable-energy"] if scraper_data.get("renewable_energy") else ["fixed-rate"]
+        })
+        tariff_dict["is_dynamic"] = False  # Festpreis-Tarif
     elif provider == "Tado":
         # Tado: markup_ct_kwh enthält nur Netzentgelte/Steuern (ohne aktuellen Börsenpreis)
         # Der Scraper berechnet: kwh_price_ct (gesamt) - tatsächlicher Börsenpreis = markup_ct_kwh
@@ -1898,16 +1909,18 @@ class ScraperTariffRequest(BaseModel):
 
 @app.post("/api/scrape/tariffs")
 async def scrape_all_tariffs(
-    zip_code: str = Form(...),
-    annual_consumption: float = Form(...),
-    providers: str = Form('["enbw", "tado", "tibber"]'),  # JSON string
-    headless: bool = Form(True),
-    debug_mode: bool = Form(False),
-    days: int = Form(30),
-    file: Optional[UploadFile] = File(None)  # Optional CSV file for risk analysis
+    request: Request,
+    zip_code: Optional[str] = Form(None),
+    annual_consumption: Optional[float] = Form(None),
+    providers: Optional[str] = Form(None),
+    headless: Optional[bool] = Form(None),
+    debug_mode: Optional[bool] = Form(None),
+    days: Optional[int] = Form(None),
+    file: Optional[UploadFile] = File(None)
 ):
     """
     Scrape multiple providers and return data in EnergyTariff-compatible format.
+    Accepts both JSON and FormData requests.
     Optionally calculates risk scores per tariff if CSV consumption data is provided.
     
     Returns tariff objects with fields matching EnergyTariff class structure:
@@ -1917,14 +1930,36 @@ async def scrape_all_tariffs(
     import json
     import traceback
     
+    # Check if request is JSON
+    content_type = request.headers.get('content-type', '')
+    if 'application/json' in content_type:
+        # Parse JSON body
+        body = await request.json()
+        zip_code = body.get('zip_code')
+        annual_consumption = body.get('annual_consumption')
+        providers_list = body.get('providers', ['enbw', 'tado', 'tibber'])
+        headless = body.get('headless', True)
+        debug_mode = body.get('debug_mode', False)
+        days = body.get('days', 30)
+    else:
+        # Use FormData
+        if providers:
+            try:
+                providers_list = json.loads(providers)
+            except:
+                providers_list = ["enbw", "tado", "tibber"]
+        else:
+            providers_list = ["enbw", "tado", "tibber"]
+        
+        if headless is None:
+            headless = True
+        if debug_mode is None:
+            debug_mode = False
+        if days is None:
+            days = 30
+    
     tariffs = []
     errors = []
-    
-    # Parse providers from JSON string
-    try:
-        providers_list = json.loads(providers)
-    except:
-        providers_list = ["enbw", "tado", "tibber"]  # Default
     
     logger.info(f"🔍 Scraping tariffs for providers: {providers_list}, PLZ: {zip_code}, {annual_consumption} kWh")
     
@@ -1962,6 +1997,22 @@ async def scrape_all_tariffs(
                 else:
                     errors.append({"provider": "EnBW", "error": "No data returned"})
                     
+            elif provider.lower() == "enbw_strom":
+                from src.webscraping.scraper_enbw_strom import scrape_enbw_strom_tariff
+                results = await scrape_enbw_strom_tariff(
+                    postal_code=zip_code,
+                    annual_consumption_kwh=int(annual_consumption)
+                )
+                # EnBW Strom gibt eine Liste von Tarifen zurück (normalerweise 3)
+                if results and len(results) > 0:
+                    for result in results:
+                        if result.get('base_price_monthly') is not None:
+                            tariff_data = scraper_to_tariff(result, "EnBW Strom", "fixed")
+                            tariffs.append(tariff_data)
+                    logger.info(f"✅ EnBW Strom: {len(results)} Tarife hinzugefügt")
+                else:
+                    errors.append({"provider": "EnBW Strom", "error": "No data returned"})
+                    
             elif provider.lower() == "tado":
                 from src.webscraping.scraper_tado import scrape_tado_tariff
                 result = await scrape_tado_tariff(
@@ -1992,21 +2043,22 @@ async def scrape_all_tariffs(
             logger.error(f"❌ Error scraping {provider}: {e}")
             errors.append({"provider": provider, "error": str(e)})
     
-    # Add conventional (fixed-rate) tariffs from ENBW_TARIFFS
-    logger.info(f"Adding {len(ENBW_TARIFFS)} conventional fixed-rate tariffs")
-    for conv_tariff in ENBW_TARIFFS:
-        tariff_data = {
-            "name": conv_tariff.name,
-            "provider": conv_tariff.provider,
-            "is_dynamic": conv_tariff.is_dynamic,
-            "start_date": conv_tariff.start_date.isoformat(),
-            "features": conv_tariff.features if conv_tariff.features else [],
-            "base_price": conv_tariff.base_price,
-            "kwh_rate": conv_tariff.kwh_rate,
-            "min_duration": getattr(conv_tariff, 'min_duration', None),
-            "postal_code": zip_code
-        }
-        tariffs.append(tariff_data)
+    # ENTFERNT: Hardcodierte ENBW_TARIFFS werden nicht mehr automatisch hinzugefügt
+    # Diese Tarife sind veraltet und sollten durch echte gescrapte Tarife ersetzt werden
+    # logger.info(f"Adding {len(ENBW_TARIFFS)} conventional fixed-rate tariffs")
+    # for conv_tariff in ENBW_TARIFFS:
+    #     tariff_data = {
+    #         "name": conv_tariff.name,
+    #         "provider": conv_tariff.provider,
+    #         "is_dynamic": conv_tariff.is_dynamic,
+    #         "start_date": conv_tariff.start_date.isoformat(),
+    #         "features": conv_tariff.features if conv_tariff.features else [],
+    #         "base_price": conv_tariff.base_price,
+    #         "kwh_rate": conv_tariff.kwh_rate,
+    #         "min_duration": getattr(conv_tariff, 'min_duration', None),
+    #         "postal_code": zip_code
+    #     }
+    #     tariffs.append(tariff_data)
     
     # Calculate risk scores per tariff if CSV data is available
     if consumption_df is not None:
@@ -2100,7 +2152,7 @@ async def scrape_all_tariffs(
     else:
         logger.info("ℹ️ No CSV data provided, skipping risk analysis")
     
-    logger.info(f"Total: {len(tariffs)} tariffs ({len(tariffs) - len(ENBW_TARIFFS)} scraped + {len(ENBW_TARIFFS)} conventional), {len(errors)} errors")
+    logger.info(f"Total: {len(tariffs)} scraped tariffs, {len(errors)} errors")
     
     return {
         "success": len(tariffs) > 0,
