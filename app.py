@@ -143,6 +143,15 @@ ENBW_TARIFFS = create_enbw_tariffs()
 async def root():
     return {"message": "DYNERGY API is running", "status": "active"}
 
+@app.get("/health")
+async def health_check():
+    """Health check endpoint for Docker container monitoring"""
+    return {
+        "status": "healthy",
+        "service": "DYNERGY API",
+        "timestamp": datetime.now().isoformat()
+    }
+
 @app.get("/api/tariffs")
 async def get_tariffs():
     """Get available tariffs using real EnergyTariff objects"""
