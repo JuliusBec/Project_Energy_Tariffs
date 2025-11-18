@@ -1,9 +1,9 @@
-Project Energy Tariffs
+Projektseminar Dynergy
 ======================
 
-Energy tariff analysis and forecasting system.
+Projekt zur Analyse und Bewertung dynamischer Stromtarife in Deutschland
 
-This project provides tools for energy price analysis, load forecasting, risk analysis, and tariff comparison.
+Dieses Projekt bietet Werkzeuge zur Analyse von Energiepreisen, Lastprognosen, Risikoanalysen und Tarifvergleichen.
 
 .. toctree::
    :maxdepth: 2
