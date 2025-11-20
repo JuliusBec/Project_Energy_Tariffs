@@ -176,12 +176,13 @@ if [[ ! $REPLY =~ ^[Nn]$ ]]; then
     # Final check
     echo ""
     echo "=================================="
-    echo "🎉 DYNERGY is running!"
+    echo -e "${GREEN}🎉 DYNERGY is running!${NC}"
+    echo "=================================="
     echo ""
-    echo "Access the application:"
-    echo "  🌐 Frontend:     http://localhost:3000"
-    echo "  🔧 Backend API:  http://localhost:8000"
-    echo "  📚 API Docs:     http://localhost:8000/docs"
+    echo -e "${GREEN}Access the application:${NC}"
+    echo -e "  ${GREEN}🌐 Frontend:${NC}     http://localhost:3000"
+    echo -e "  ${GREEN}🔧 Backend API:${NC}  http://localhost:8000"
+    echo -e "  ${GREEN}📚 API Docs:${NC}     http://localhost:8000/docs"
     echo ""
     echo "Useful commands:"
     echo "  View logs:       $COMPOSE_CMD logs -f"
@@ -189,10 +190,14 @@ if [[ ! $REPLY =~ ^[Nn]$ ]]; then
     echo "  Restart:         $COMPOSE_CMD restart"
     echo "  Full cleanup:    $COMPOSE_CMD down -v"
     echo ""
-    echo "Press Ctrl+C to stop watching logs, containers will keep running."
+    echo "=================================="
     echo ""
+    read -p "Press Enter to view logs (or Ctrl+C to exit)..."
     
     # Follow logs
+    echo ""
+    echo "Streaming logs... (Press Ctrl+C to stop, containers will keep running)"
+    echo ""
     $COMPOSE_CMD logs -f
 else
     echo ""
