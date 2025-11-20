@@ -2,23 +2,36 @@ from fastapi import FastAPI, File, HTTPException, UploadFile, Form, Response, Re
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import List, Optional
+from datetime import datetime, timedelta
 import uvicorn
 import random
-from datetime import datetime
 import pandas as pd
+import numpy as np
 import io
 import sys
 import os
 import logging
-from src.backend.energy_tariff import FixedTariff, DynamicTariff
-from src.backend.forecasting.energy_usage_forecast import create_backtest
+import traceback
+import json
+
+# Application imports
+from .energy_tariff import FixedTariff, DynamicTariff
+from .forecasting.energy_usage_forecast import create_backtest
+from .forecasting.energy_price_forecast import create_chart_data, get_price_breakdown
+from .risk_analysis import (
+    create_historic_risk_analysis,
+    calculate_coincidence_factor,
+    get_aggregated_risk_score,
+    get_price_forecast_volatility
+)
+from ..webscraping.scraper_tibber import scrape_tibber_price
+from ..webscraping.scraper_enbw import scrape_enbw_tariff
+from ..webscraping.scraper_tado import scrape_tado_tariff
+from ..webscraping.scraper_enbw_strom import scrape_enbw_strom_tariff
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-
-sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
 
 
 app = FastAPI(title="DYNERGY API", description="Backend for Dynamic Energy Tariff Comparison")
@@ -408,7 +421,7 @@ async def compare_tariffs_with_csv(
                 print(f"\n🔍 Scrape {provider.upper()} für PLZ {zip_code}...")
                 
                 if provider.lower() == "tibber":
-                    from src.webscraping.scraper_tibber import scrape_tibber_price
+                    from ..webscraping.scraper_tibber import scrape_tibber_price
                     scraped_data = await scrape_tibber_price(
                         postal_code=zip_code,
                         annual_consumption_kwh=int(annual_kwh)
@@ -429,7 +442,7 @@ async def compare_tariffs_with_csv(
                     print(f"   ✓ Zusatz-Komponenten: {scraped_data['additional_price_ct_kwh']:.2f} ct/kWh")
                     
                 elif provider.lower() == "enbw":
-                    from src.webscraping.scraper_enbw import scrape_enbw_tariff
+                    from ..webscraping.scraper_enbw import scrape_enbw_tariff
                     scraped_data = await scrape_enbw_tariff(
                         zip_code=zip_code,
                         annual_consumption=int(annual_kwh)
@@ -981,7 +994,7 @@ async def get_market_prices():
 async def get_price_chart_data():
     """Get historical and forecast price data for chart visualization"""
     try:
-        from src.backend.forecasting.energy_price_forecast import create_chart_data
+        from .forecasting.energy_price_forecast import create_chart_data
         
         # Generate chart data
         chart_data = create_chart_data()
@@ -999,7 +1012,7 @@ async def get_price_chart_data():
 async def get_price_breakdown():
     """Get energy price component breakdown for doughnut chart visualization"""
     try:
-        from src.backend.forecasting.energy_price_forecast import get_price_breakdown
+        from .forecasting.energy_price_forecast import get_price_breakdown
         
         # Generate price breakdown data
         breakdown_data = get_price_breakdown()
@@ -1016,9 +1029,6 @@ async def get_price_breakdown():
 @app.get("/api/forecast")
 async def get_price_forecast():
     """Get price forecast for the next 7 days from day-ahead market prices"""
-    import os
-    import pandas as pd
-    from datetime import datetime, timedelta
     
     try:
         # Load the most recent day-ahead prices data
@@ -1160,8 +1170,7 @@ async def get_risk_analysis(file: UploadFile = File(...), days: int = Form(30)):
     Perform comprehensive risk analysis on user consumption data.
     Returns historic risk analysis, coincidence factor, and load profile data.
     """
-    import traceback
-    from src.backend.risk_analysis import (
+    from .risk_analysis import (
         create_historic_risk_analysis,
         calculate_coincidence_factor,
         get_user_load_profile
@@ -1232,8 +1241,7 @@ async def get_risk_score(file: UploadFile = File(...), days: int = Form(30)):
     - risk_dynamic: Risk assessment for dynamic tariffs
     - risk_fixed: Risk assessment for fixed tariffs
     """
-    import traceback
-    from src.backend.risk_analysis import (
+    from .risk_analysis import (
         create_historic_risk_analysis,
         calculate_coincidence_factor,
         get_aggregated_risk_score
@@ -1275,7 +1283,7 @@ async def get_risk_score(file: UploadFile = File(...), days: int = Form(30)):
             print(f"Warning: Could not calculate backtest metrics: {str(e)}")
         
         # Calculate price forecast volatility
-        from src.backend.risk_analysis import get_price_forecast_volatility
+        from .risk_analysis import get_price_forecast_volatility
         forecast_price_volatility = {}
         try:
             forecast_price_volatility = get_price_forecast_volatility(app_data_dir=app_data_dir)
@@ -1341,8 +1349,7 @@ async def get_risk_score_per_tariff(
     - days: Number of days to analyze (default: 30)
     - is_dynamic: Whether to calculate risk for a dynamic (True) or fixed (False) tariff
     """
-    import traceback
-    from src.backend.risk_analysis import (
+    from .risk_analysis import (
         create_historic_risk_analysis,
         calculate_coincidence_factor,
         get_aggregated_risk_score
@@ -1384,7 +1391,7 @@ async def get_risk_score_per_tariff(
             print(f"Warning: Could not calculate backtest metrics: {str(e)}")
         
         # Calculate price forecast volatility
-        from src.backend.risk_analysis import get_price_forecast_volatility
+        from .risk_analysis import get_price_forecast_volatility
         forecast_price_volatility = {}
         try:
             forecast_price_volatility = get_price_forecast_volatility(app_data_dir=app_data_dir)
@@ -1445,8 +1452,7 @@ async def get_risk_score_yearly_usage(
     Returns:
     - Simplified risk assessment with risk_level, risk_score, risk_message, and factors
     """
-    import traceback
-    from src.backend.risk_analysis import (
+    from .risk_analysis import (
         get_simplified_risk_score_for_yearly_usage,
         get_price_forecast_volatility,
         _load_historic_prices,
@@ -1509,7 +1515,6 @@ def create_dynamic_tariff_from_scraper(scraper_data: dict, provider: str) -> Dyn
     Returns:
         DynamicTariff: Configured tariff object with scraped pricing data
     """
-    from datetime import datetime
     
     # Extract common fields
     base_price = scraper_data.get("total_base_monthly", scraper_data.get("base_price_monthly", 0))
@@ -1576,7 +1581,6 @@ def scraper_to_tariff(scraper_data: dict, provider: str, tariff_type: str = "dyn
     Returns:
         dict: EnergyTariff-compatible data structure
     """
-    from datetime import datetime
     
     # Build features list based on provider
     features = []
@@ -1694,7 +1698,7 @@ async def scrape_enbw_tariff(request: EnbwScraperRequest):
     """
     try:
         # Import EnBW scraper
-        from src.webscraping.scraper_enbw import scrape_enbw_tariff as scrape_tariff
+        from ..webscraping.scraper_enbw import scrape_enbw_tariff as scrape_tariff
         
         logger.info(f"🔍 EnBW Scraper API Request: PLZ {request.zip_code}, {request.annual_consumption} kWh")
         
@@ -1801,7 +1805,7 @@ async def scrape_tado_tariff(request: TadoScraperRequest):
     """
     try:
         # Import Tado scraper
-        from src.webscraping.scraper_tado import scrape_tado_tariff as scrape_tariff
+        from ..webscraping.scraper_tado import scrape_tado_tariff as scrape_tariff
         
         logger.info(f"🔍 Tado Energy API Request: PLZ {request.zip_code}, {request.annual_consumption} kWh")
         
@@ -1929,7 +1933,7 @@ async def scrape_tibber_tariff(request: TibberScraperRequest):
         logger.info(f"📞 Tibber-Scraper API-Request: PLZ {request.zip_code}, {request.annual_consumption} kWh/Jahr")
         
         # Import Scraper function
-        from src.webscraping.scraper_tibber import scrape_tibber_price
+        from ..webscraping.scraper_tibber import scrape_tibber_price
         
         # Scrape prices (async)
         result = await scrape_tibber_price(
@@ -2011,8 +2015,6 @@ async def scrape_all_tariffs(
     - name, provider, base_price, kwh_rate, is_dynamic, start_date, features
     - risk_level, risk_score, risk_message (if CSV file is provided)
     """
-    import json
-    import traceback
     
     # Check if request is JSON
     content_type = request.headers.get('content-type', '')
@@ -2069,7 +2071,7 @@ async def scrape_all_tariffs(
     for provider in providers_list:
         try:
             if provider.lower() == "enbw":
-                from src.webscraping.scraper_enbw import scrape_enbw_tariff
+                from ..webscraping.scraper_enbw import scrape_enbw_tariff
                 result = await scrape_enbw_tariff(
                     zip_code=zip_code,
                     annual_consumption=annual_consumption
@@ -2082,7 +2084,7 @@ async def scrape_all_tariffs(
                     errors.append({"provider": "EnBW", "error": "No data returned"})
                     
             elif provider.lower() == "enbw_strom":
-                from src.webscraping.scraper_enbw_strom import scrape_enbw_strom_tariff
+                from ..webscraping.scraper_enbw_strom import scrape_enbw_strom_tariff
                 results = await scrape_enbw_strom_tariff(
                     postal_code=zip_code,
                     annual_consumption_kwh=int(annual_consumption)
@@ -2098,7 +2100,7 @@ async def scrape_all_tariffs(
                     errors.append({"provider": "EnBW Strom", "error": "No data returned"})
                     
             elif provider.lower() == "tado":
-                from src.webscraping.scraper_tado import scrape_tado_tariff
+                from ..webscraping.scraper_tado import scrape_tado_tariff
                 result = await scrape_tado_tariff(
                     zip_code=zip_code,
                     annual_consumption=annual_consumption
@@ -2111,7 +2113,7 @@ async def scrape_all_tariffs(
                     errors.append({"provider": "Tado", "error": "No data returned"})
                     
             elif provider.lower() == "tibber":
-                from src.webscraping.scraper_tibber import scrape_tibber_price
+                from ..webscraping.scraper_tibber import scrape_tibber_price
                 result = await scrape_tibber_price(
                     postal_code=zip_code,
                     annual_consumption_kwh=annual_consumption
@@ -2148,7 +2150,7 @@ async def scrape_all_tariffs(
     if consumption_df is not None:
         logger.info(f"🛡️ Calculating risk scores for {len(tariffs)} tariffs...")
         try:
-            from src.backend.risk_analysis import (
+            from .risk_analysis import (
                 create_historic_risk_analysis,
                 calculate_coincidence_factor,
                 get_aggregated_risk_score
@@ -2181,7 +2183,7 @@ async def scrape_all_tariffs(
                 logger.warning(f"⚠️  Could not calculate backtest metrics: {str(e)}")
             
             # Calculate price forecast volatility
-            from src.backend.risk_analysis import get_price_forecast_volatility
+            from .risk_analysis import get_price_forecast_volatility
             forecast_price_volatility = {}
             try:
                 forecast_price_volatility = get_price_forecast_volatility(app_data_dir=app_data_dir)
