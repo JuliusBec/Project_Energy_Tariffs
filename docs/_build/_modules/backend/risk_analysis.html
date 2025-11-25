@@ -1,0 +1,1192 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>backend.risk_analysis &#8212; Project Energy Tariffs  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="../../_static/alabaster.css?v=12dfc556" />
+    <script src="../../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+   
+  <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for backend.risk_analysis</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">datetime</span><span class="w"> </span><span class="kn">import</span> <span class="n">datetime</span><span class="p">,</span> <span class="n">time</span><span class="p">,</span> <span class="n">timedelta</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">glob</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_get_most_recent_price_file</span><span class="p">(</span><span class="n">app_data_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Find the most recent price data file in the app_data directory.</span>
+<span class="sd">    </span>
+<span class="sd">    Parameters:</span>
+<span class="sd">    app_data_dir (str): Path to the app_data directory</span>
+<span class="sd">    </span>
+<span class="sd">    Returns:</span>
+<span class="sd">    str: Path to the most recent price file</span>
+<span class="sd">    </span>
+<span class="sd">    Raises:</span>
+<span class="sd">    FileNotFoundError: If no price files are found</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Pattern for price files: germany_dayahead_prices_raw_YYYYMMDD_HHMMSS.csv</span>
+    <span class="n">pattern</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">app_data_dir</span><span class="p">,</span> <span class="s2">&quot;germany_dayahead_prices_raw_*.csv&quot;</span><span class="p">)</span>
+    <span class="n">price_files</span> <span class="o">=</span> <span class="n">glob</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="n">pattern</span><span class="p">)</span>
+    
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">price_files</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">FileNotFoundError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;No price data files found in </span><span class="si">{</span><span class="n">app_data_dir</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    
+    <span class="c1"># Sort by filename (which includes timestamp) to get the most recent</span>
+    <span class="n">most_recent_file</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">price_files</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+    <span class="k">return</span> <span class="n">most_recent_file</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_get_price_forecast_file</span><span class="p">(</span><span class="n">app_data_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Find the price forecast file in the app_data directory.</span>
+<span class="sd">    </span>
+<span class="sd">    Parameters:</span>
+<span class="sd">    app_data_dir (str): Path to the app_data directory</span>
+<span class="sd">    </span>
+<span class="sd">    Returns:</span>
+<span class="sd">    str: Path to the price forecast file</span>
+<span class="sd">    </span>
+<span class="sd">    Raises:</span>
+<span class="sd">    FileNotFoundError: If no forecast file is found</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Look for the forecast file (static name for now)</span>
+    <span class="n">forecast_file</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">app_data_dir</span><span class="p">,</span> <span class="s2">&quot;germany_price_forecast_720h.csv&quot;</span><span class="p">)</span>
+    
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">forecast_file</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">FileNotFoundError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Price forecast file not found: </span><span class="si">{</span><span class="n">forecast_file</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    
+    <span class="k">return</span> <span class="n">forecast_file</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_load_historic_prices</span><span class="p">(</span><span class="n">price_file_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">days</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">end_date</span><span class="p">:</span> <span class="n">datetime</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Load historic price data for the last n days.</span>
+<span class="sd">    </span>
+<span class="sd">    Parameters:</span>
+<span class="sd">    price_file_path (str): Path to the price data file</span>
+<span class="sd">    days (int): Number of days to look back</span>
+<span class="sd">    end_date (datetime): End date for the analysis period. If None, uses the most recent date in the file.</span>
+<span class="sd">    </span>
+<span class="sd">    Returns:</span>
+<span class="sd">    pd.DataFrame: DataFrame with columns [&#39;ds&#39;, &#39;price_eur_per_mwh&#39;, &#39;price_eur_per_kwh&#39;]</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">price_file_path</span><span class="p">)</span>
+    <span class="n">df</span><span class="p">[</span><span class="s1">&#39;ds&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">to_datetime</span><span class="p">(</span><span class="n">df</span><span class="p">[</span><span class="s1">&#39;ds&#39;</span><span class="p">])</span>
+    
+    <span class="c1"># Use specified end date or the latest date in the file</span>
+    <span class="k">if</span> <span class="n">end_date</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">end_date</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="s1">&#39;ds&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">max</span><span class="p">()</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="c1"># Ensure end_date doesn&#39;t exceed available data</span>
+        <span class="n">end_date</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">end_date</span><span class="p">,</span> <span class="n">df</span><span class="p">[</span><span class="s1">&#39;ds&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">max</span><span class="p">())</span>
+    
+    <span class="c1"># Filter to last n days from end_date</span>
+    <span class="n">start_date</span> <span class="o">=</span> <span class="n">end_date</span> <span class="o">-</span> <span class="n">timedelta</span><span class="p">(</span><span class="n">days</span><span class="o">=</span><span class="n">days</span><span class="p">)</span>
+    <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="p">[(</span><span class="n">df</span><span class="p">[</span><span class="s1">&#39;ds&#39;</span><span class="p">]</span> <span class="o">&gt;=</span> <span class="n">start_date</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">df</span><span class="p">[</span><span class="s1">&#39;ds&#39;</span><span class="p">]</span> <span class="o">&lt;=</span> <span class="n">end_date</span><span class="p">)]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    
+    <span class="c1"># Convert price from €/MWh to €/kWh</span>
+    <span class="n">df</span><span class="p">[</span><span class="s1">&#39;price_eur_per_kwh&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="s1">&#39;price_eur_per_mwh&#39;</span><span class="p">]</span> <span class="o">/</span> <span class="mi">1000</span>
+    
+    <span class="k">return</span> <span class="n">df</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_calculate_weighted_average_price</span><span class="p">(</span><span class="n">prices</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">consumption</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Calculate the weighted average price based on consumption profile.</span>
+<span class="sd">    </span>
+<span class="sd">    Parameters:</span>
+<span class="sd">    prices (pd.DataFrame): Price data with columns [&#39;ds&#39;, &#39;price_eur_per_kwh&#39;]</span>
+<span class="sd">    consumption (pd.DataFrame): Consumption data with columns [&#39;datetime&#39;, &#39;value&#39;]</span>
+<span class="sd">    </span>
+<span class="sd">    Returns:</span>
+<span class="sd">    dict: Contains weighted_avg_price, total_consumption, total_cost</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Ensure datetime columns are properly formatted</span>
+    <span class="n">prices</span> <span class="o">=</span> <span class="n">prices</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="n">consumption</span> <span class="o">=</span> <span class="n">consumption</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    
+    <span class="k">if</span> <span class="s1">&#39;ds&#39;</span> <span class="ow">in</span> <span class="n">prices</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+        <span class="n">prices</span><span class="p">[</span><span class="s1">&#39;datetime&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">to_datetime</span><span class="p">(</span><span class="n">prices</span><span class="p">[</span><span class="s1">&#39;ds&#39;</span><span class="p">])</span>
+    
+    <span class="n">consumption</span><span class="p">[</span><span class="s1">&#39;datetime&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">to_datetime</span><span class="p">(</span><span class="n">consumption</span><span class="p">[</span><span class="s1">&#39;datetime&#39;</span><span class="p">])</span>
+    
+    <span class="c1"># Resample consumption to hourly if it&#39;s not already</span>
+    <span class="n">time_diff</span> <span class="o">=</span> <span class="n">consumption</span><span class="p">[</span><span class="s1">&#39;datetime&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">diff</span><span class="p">()</span><span class="o">.</span><span class="n">mode</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">consumption</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span> <span class="k">else</span> <span class="n">pd</span><span class="o">.</span><span class="n">Timedelta</span><span class="p">(</span><span class="n">hours</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+    
+    <span class="k">if</span> <span class="n">time_diff</span> <span class="o">==</span> <span class="n">pd</span><span class="o">.</span><span class="n">Timedelta</span><span class="p">(</span><span class="n">minutes</span><span class="o">=</span><span class="mi">15</span><span class="p">):</span>
+        <span class="c1"># Convert 15-minute kW readings to kWh (multiply by 0.25 hours)</span>
+        <span class="n">consumption</span><span class="p">[</span><span class="s1">&#39;value&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">consumption</span><span class="p">[</span><span class="s1">&#39;value&#39;</span><span class="p">]</span> <span class="o">*</span> <span class="mf">0.25</span>
+        <span class="n">consumption</span> <span class="o">=</span> <span class="n">consumption</span><span class="o">.</span><span class="n">set_index</span><span class="p">(</span><span class="s1">&#39;datetime&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">resample</span><span class="p">(</span><span class="s1">&#39;h&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span><span class="o">.</span><span class="n">reset_index</span><span class="p">()</span>
+    
+    <span class="c1"># Merge consumption with prices on datetime</span>
+    <span class="n">merged</span> <span class="o">=</span> <span class="n">consumption</span><span class="o">.</span><span class="n">merge</span><span class="p">(</span><span class="n">prices</span><span class="p">[[</span><span class="s1">&#39;datetime&#39;</span><span class="p">,</span> <span class="s1">&#39;price_eur_per_kwh&#39;</span><span class="p">]],</span> <span class="n">on</span><span class="o">=</span><span class="s1">&#39;datetime&#39;</span><span class="p">,</span> <span class="n">how</span><span class="o">=</span><span class="s1">&#39;inner&#39;</span><span class="p">)</span>
+    
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">merged</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;No matching timestamps between consumption and price data&quot;</span><span class="p">)</span>
+    
+    <span class="c1"># Calculate weighted average price</span>
+    <span class="n">merged</span><span class="p">[</span><span class="s1">&#39;cost&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">merged</span><span class="p">[</span><span class="s1">&#39;value&#39;</span><span class="p">]</span> <span class="o">*</span> <span class="n">merged</span><span class="p">[</span><span class="s1">&#39;price_eur_per_kwh&#39;</span><span class="p">]</span>
+    <span class="n">total_cost</span> <span class="o">=</span> <span class="n">merged</span><span class="p">[</span><span class="s1">&#39;cost&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+    <span class="n">total_consumption</span> <span class="o">=</span> <span class="n">merged</span><span class="p">[</span><span class="s1">&#39;value&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+    
+    <span class="n">weighted_avg_price</span> <span class="o">=</span> <span class="n">total_cost</span> <span class="o">/</span> <span class="n">total_consumption</span> <span class="k">if</span> <span class="n">total_consumption</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">else</span> <span class="mi">0</span>
+    
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="s1">&#39;weighted_avg_price&#39;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">weighted_avg_price</span><span class="p">),</span>
+        <span class="s1">&#39;total_consumption&#39;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">total_consumption</span><span class="p">),</span>
+        <span class="s1">&#39;total_cost&#39;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">total_cost</span><span class="p">),</span>
+        <span class="s1">&#39;num_hours&#39;</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">merged</span><span class="p">))</span>
+    <span class="p">}</span>
+
+
+<div class="viewcode-block" id="create_historic_risk_analysis">
+<a class="viewcode-back" href="../../backend.html#backend.risk_analysis.create_historic_risk_analysis">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">create_historic_risk_analysis</span><span class="p">(</span><span class="n">consumption_data</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">days</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">30</span><span class="p">,</span> <span class="n">app_data_dir</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Perform historic risk analysis by comparing market average prices with user&#39;s weighted average price.</span>
+<span class="sd">    </span>
+<span class="sd">    This function analyzes how much exposure the user had to price fluctuations by comparing:</span>
+<span class="sd">    - The simple market average price over the period</span>
+<span class="sd">    - The weighted average price the user actually faced based on their consumption pattern</span>
+<span class="sd">    </span>
+<span class="sd">    Parameters:</span>
+<span class="sd">    consumption_data (pd.DataFrame): DataFrame with user consumption data, must have &#39;datetime&#39; and &#39;value&#39; columns</span>
+<span class="sd">    days (int): Number of days to analyze (default: 30)</span>
+<span class="sd">    app_data_dir (str): Path to app_data directory. If None, uses default path</span>
+<span class="sd">    </span>
+<span class="sd">    Returns:</span>
+<span class="sd">    dict: A dictionary containing:</span>
+<span class="sd">        - market_avg_price: Simple average of all hourly prices (€/kWh)</span>
+<span class="sd">        - user_weighted_price: Weighted average price based on consumption (€/kWh)</span>
+<span class="sd">        - price_differential: Difference between user&#39;s price and market average (€/kWh)</span>
+<span class="sd">        - price_differential_pct: Percentage difference</span>
+<span class="sd">        - risk_exposure: &#39;favorable&#39; if user paid less than average, &#39;unfavorable&#39; if more</span>
+<span class="sd">        - total_consumption: Total consumption over the period (kWh)</span>
+<span class="sd">        - total_cost: Total cost over the period (€)</span>
+<span class="sd">        - price_volatility: Standard deviation of prices over the period</span>
+<span class="sd">        - days_analyzed: Actual number of days in the analysis</span>
+<span class="sd">        - num_hours: Number of hours with matching price and consumption data</span>
+<span class="sd">        - price_file_used: Name of the price data file used</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Determine app_data directory</span>
+    <span class="k">if</span> <span class="n">app_data_dir</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">project_root</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="vm">__file__</span><span class="p">))))</span>
+        <span class="n">app_data_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">project_root</span><span class="p">,</span> <span class="s2">&quot;app_data&quot;</span><span class="p">)</span>
+    
+    <span class="c1"># Find and load the most recent price file</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">price_file</span> <span class="o">=</span> <span class="n">_get_most_recent_price_file</span><span class="p">(</span><span class="n">app_data_dir</span><span class="p">)</span>
+        <span class="n">price_file_name</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">price_file</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">FileNotFoundError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">FileNotFoundError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Cannot perform risk analysis: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    
+    <span class="c1"># Prepare consumption data</span>
+    <span class="n">consumption_data</span> <span class="o">=</span> <span class="n">consumption_data</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="n">consumption_data</span><span class="p">[</span><span class="s1">&#39;datetime&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">to_datetime</span><span class="p">(</span><span class="n">consumption_data</span><span class="p">[</span><span class="s1">&#39;datetime&#39;</span><span class="p">])</span>
+    
+    <span class="c1"># Determine the analysis period based on consumption data availability</span>
+    <span class="c1"># Use the most recent data available in the consumption dataset</span>
+    <span class="n">consumption_end</span> <span class="o">=</span> <span class="n">consumption_data</span><span class="p">[</span><span class="s1">&#39;datetime&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">max</span><span class="p">()</span>
+    
+    <span class="c1"># Load historic prices matching the consumption timeframe</span>
+    <span class="n">prices</span> <span class="o">=</span> <span class="n">_load_historic_prices</span><span class="p">(</span><span class="n">price_file</span><span class="p">,</span> <span class="n">days</span><span class="p">,</span> <span class="n">end_date</span><span class="o">=</span><span class="n">consumption_end</span><span class="p">)</span>
+    
+    <span class="c1"># Filter consumption data to match the price data timeframe</span>
+    <span class="n">price_start</span> <span class="o">=</span> <span class="n">prices</span><span class="p">[</span><span class="s1">&#39;ds&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">min</span><span class="p">()</span>
+    <span class="n">price_end</span> <span class="o">=</span> <span class="n">prices</span><span class="p">[</span><span class="s1">&#39;ds&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">max</span><span class="p">()</span>
+    <span class="n">consumption_filtered</span> <span class="o">=</span> <span class="n">consumption_data</span><span class="p">[</span>
+        <span class="p">(</span><span class="n">consumption_data</span><span class="p">[</span><span class="s1">&#39;datetime&#39;</span><span class="p">]</span> <span class="o">&gt;=</span> <span class="n">price_start</span><span class="p">)</span> <span class="o">&amp;</span> 
+        <span class="p">(</span><span class="n">consumption_data</span><span class="p">[</span><span class="s1">&#39;datetime&#39;</span><span class="p">]</span> <span class="o">&lt;=</span> <span class="n">price_end</span><span class="p">)</span>
+    <span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">consumption_filtered</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;No consumption data overlaps with price data period &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;(</span><span class="si">{</span><span class="n">price_start</span><span class="o">.</span><span class="n">date</span><span class="p">()</span><span class="si">}</span><span class="s2"> to </span><span class="si">{</span><span class="n">price_end</span><span class="o">.</span><span class="n">date</span><span class="p">()</span><span class="si">}</span><span class="s2">). &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;Consumption data range: </span><span class="si">{</span><span class="n">consumption_data</span><span class="p">[</span><span class="s1">&#39;datetime&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">min</span><span class="p">()</span><span class="o">.</span><span class="n">date</span><span class="p">()</span><span class="si">}</span><span class="s2"> to </span><span class="si">{</span><span class="n">consumption_data</span><span class="p">[</span><span class="s1">&#39;datetime&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">max</span><span class="p">()</span><span class="o">.</span><span class="n">date</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
+    
+    <span class="c1"># Calculate market average price</span>
+    <span class="n">market_avg_price</span> <span class="o">=</span> <span class="n">prices</span><span class="p">[</span><span class="s1">&#39;price_eur_per_kwh&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+    <span class="n">price_volatility</span> <span class="o">=</span> <span class="n">prices</span><span class="p">[</span><span class="s1">&#39;price_eur_per_kwh&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">std</span><span class="p">()</span>
+    
+    <span class="c1"># Calculate user&#39;s weighted average price</span>
+    <span class="n">weighted_results</span> <span class="o">=</span> <span class="n">_calculate_weighted_average_price</span><span class="p">(</span><span class="n">prices</span><span class="p">,</span> <span class="n">consumption_filtered</span><span class="p">)</span>
+    <span class="n">user_weighted_price</span> <span class="o">=</span> <span class="n">weighted_results</span><span class="p">[</span><span class="s1">&#39;weighted_avg_price&#39;</span><span class="p">]</span>
+    
+    <span class="c1"># Calculate differential</span>
+    <span class="n">price_differential</span> <span class="o">=</span> <span class="n">user_weighted_price</span> <span class="o">-</span> <span class="n">market_avg_price</span>
+    <span class="n">price_differential_pct</span> <span class="o">=</span> <span class="p">(</span><span class="n">price_differential</span> <span class="o">/</span> <span class="n">market_avg_price</span> <span class="o">*</span> <span class="mi">100</span><span class="p">)</span> <span class="k">if</span> <span class="n">market_avg_price</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">else</span> <span class="mi">0</span>
+    
+    <span class="c1"># Determine risk exposure</span>
+    <span class="k">if</span> <span class="n">price_differential</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">risk_exposure</span> <span class="o">=</span> <span class="s1">&#39;favorable&#39;</span>
+        <span class="n">risk_message</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;User consumed more during low-price periods, saving </span><span class="si">{</span><span class="nb">abs</span><span class="p">(</span><span class="n">price_differential_pct</span><span class="p">)</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">%&quot;</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">risk_exposure</span> <span class="o">=</span> <span class="s1">&#39;unfavorable&#39;</span>
+        <span class="n">risk_message</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;User consumed more during high-price periods, paying </span><span class="si">{</span><span class="n">price_differential_pct</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">% more&quot;</span>
+    
+    <span class="c1"># Calculate actual days analyzed</span>
+    <span class="n">days_analyzed</span> <span class="o">=</span> <span class="p">(</span><span class="n">price_end</span> <span class="o">-</span> <span class="n">price_start</span><span class="p">)</span><span class="o">.</span><span class="n">days</span>
+    
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="s1">&#39;market_avg_price&#39;</span><span class="p">:</span> <span class="nb">round</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">market_avg_price</span><span class="p">),</span> <span class="mi">4</span><span class="p">),</span>
+        <span class="s1">&#39;user_weighted_price&#39;</span><span class="p">:</span> <span class="nb">round</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">user_weighted_price</span><span class="p">),</span> <span class="mi">4</span><span class="p">),</span>
+        <span class="s1">&#39;price_differential&#39;</span><span class="p">:</span> <span class="nb">round</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">price_differential</span><span class="p">),</span> <span class="mi">4</span><span class="p">),</span>
+        <span class="s1">&#39;price_differential_pct&#39;</span><span class="p">:</span> <span class="nb">round</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">price_differential_pct</span><span class="p">),</span> <span class="mi">2</span><span class="p">),</span>
+        <span class="s1">&#39;risk_exposure&#39;</span><span class="p">:</span> <span class="n">risk_exposure</span><span class="p">,</span>
+        <span class="s1">&#39;risk_message&#39;</span><span class="p">:</span> <span class="n">risk_message</span><span class="p">,</span>
+        <span class="s1">&#39;total_consumption&#39;</span><span class="p">:</span> <span class="nb">round</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">weighted_results</span><span class="p">[</span><span class="s1">&#39;total_consumption&#39;</span><span class="p">]),</span> <span class="mi">2</span><span class="p">),</span>
+        <span class="s1">&#39;total_cost&#39;</span><span class="p">:</span> <span class="nb">round</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">weighted_results</span><span class="p">[</span><span class="s1">&#39;total_cost&#39;</span><span class="p">]),</span> <span class="mi">2</span><span class="p">),</span>
+        <span class="s1">&#39;price_volatility&#39;</span><span class="p">:</span> <span class="nb">round</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">price_volatility</span><span class="p">),</span> <span class="mi">4</span><span class="p">),</span>
+        <span class="s1">&#39;days_analyzed&#39;</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="n">days_analyzed</span><span class="p">),</span>
+        <span class="s1">&#39;num_hours&#39;</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="n">weighted_results</span><span class="p">[</span><span class="s1">&#39;num_hours&#39;</span><span class="p">]),</span>
+        <span class="s1">&#39;price_file_used&#39;</span><span class="p">:</span> <span class="n">price_file_name</span><span class="p">,</span>
+        <span class="s1">&#39;analysis_period&#39;</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s1">&#39;start&#39;</span><span class="p">:</span> <span class="n">price_start</span><span class="o">.</span><span class="n">strftime</span><span class="p">(</span><span class="s1">&#39;%Y-%m-</span><span class="si">%d</span><span class="s1">&#39;</span><span class="p">),</span>
+            <span class="s1">&#39;end&#39;</span><span class="p">:</span> <span class="n">price_end</span><span class="o">.</span><span class="n">strftime</span><span class="p">(</span><span class="s1">&#39;%Y-%m-</span><span class="si">%d</span><span class="s1">&#39;</span><span class="p">)</span>
+        <span class="p">}</span>
+    <span class="p">}</span></div>
+
+
+<div class="viewcode-block" id="calculate_coincidence_factor">
+<a class="viewcode-back" href="../../backend.html#backend.risk_analysis.calculate_coincidence_factor">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">calculate_coincidence_factor</span><span class="p">(</span><span class="n">consumption_data</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">days</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">30</span><span class="p">,</span> 
+                                <span class="n">expensive_hours_pct</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">20.0</span><span class="p">,</span> <span class="n">app_data_dir</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Calculate the coincidence factor by analyzing how much energy usage occurred during </span>
+<span class="sd">    the most expensive hours in the last n days.</span>
+<span class="sd">    </span>
+<span class="sd">    This function identifies the most expensive X% of hours and calculates what percentage </span>
+<span class="sd">    of the user&#39;s total consumption occurred during those expensive periods. A high coincidence</span>
+<span class="sd">    factor indicates that the user consumes more energy when prices are high (unfavorable),</span>
+<span class="sd">    while a low factor suggests better consumption timing.</span>
+<span class="sd">    </span>
+<span class="sd">    Parameters:</span>
+<span class="sd">    consumption_data (pd.DataFrame): DataFrame with user consumption data, must have &#39;datetime&#39; and &#39;value&#39; columns</span>
+<span class="sd">    days (int): Number of days to analyze (default: 30)</span>
+<span class="sd">    expensive_hours_pct (float): Percentage of most expensive hours to analyze (default: 20.0, range: 0-100)</span>
+<span class="sd">    app_data_dir (str): Path to app_data directory. If None, uses default path</span>
+<span class="sd">    </span>
+<span class="sd">    Returns:</span>
+<span class="sd">    dict: A dictionary containing:</span>
+<span class="sd">        - expensive_hours_pct: Percentage threshold used for expensive hours</span>
+<span class="sd">        - num_expensive_hours: Number of hours classified as expensive</span>
+<span class="sd">        - total_hours: Total number of hours analyzed</span>
+<span class="sd">        - consumption_during_expensive_hours: kWh consumed during expensive hours</span>
+<span class="sd">        - total_consumption: Total kWh consumed</span>
+<span class="sd">        - consumption_coincidence_pct: % of total consumption during expensive hours</span>
+<span class="sd">        - cost_during_expensive_hours: Cost incurred during expensive hours (€)</span>
+<span class="sd">        - total_cost: Total cost (€)</span>
+<span class="sd">        - cost_coincidence_pct: % of total cost during expensive hours</span>
+<span class="sd">        - avg_price_expensive_hours: Average price during expensive hours (€/kWh)</span>
+<span class="sd">        - avg_price_cheap_hours: Average price during cheap hours (€/kWh)</span>
+<span class="sd">        - price_threshold: Price threshold for expensive hours (€/kWh)</span>
+<span class="sd">        - correlation: Correlation coefficient between consumption and prices</span>
+<span class="sd">        - coincidence_rating: &#39;high&#39;, &#39;medium&#39;, or &#39;low&#39; based on consumption_coincidence_pct</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Validate percentage</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="mi">0</span> <span class="o">&lt;</span> <span class="n">expensive_hours_pct</span> <span class="o">&lt;=</span> <span class="mi">100</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;expensive_hours_pct must be between 0 and 100, got </span><span class="si">{</span><span class="n">expensive_hours_pct</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    
+    <span class="c1"># Determine app_data directory</span>
+    <span class="k">if</span> <span class="n">app_data_dir</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">project_root</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="vm">__file__</span><span class="p">))))</span>
+        <span class="n">app_data_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">project_root</span><span class="p">,</span> <span class="s2">&quot;app_data&quot;</span><span class="p">)</span>
+    
+    <span class="c1"># Find and load the most recent price file</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">price_file</span> <span class="o">=</span> <span class="n">_get_most_recent_price_file</span><span class="p">(</span><span class="n">app_data_dir</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">FileNotFoundError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">FileNotFoundError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Cannot perform coincidence analysis: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    
+    <span class="c1"># Prepare consumption data</span>
+    <span class="n">consumption_data</span> <span class="o">=</span> <span class="n">consumption_data</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="n">consumption_data</span><span class="p">[</span><span class="s1">&#39;datetime&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">to_datetime</span><span class="p">(</span><span class="n">consumption_data</span><span class="p">[</span><span class="s1">&#39;datetime&#39;</span><span class="p">])</span>
+    
+    <span class="c1"># Determine the analysis period based on consumption data availability</span>
+    <span class="n">consumption_end</span> <span class="o">=</span> <span class="n">consumption_data</span><span class="p">[</span><span class="s1">&#39;datetime&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">max</span><span class="p">()</span>
+    
+    <span class="c1"># Load historic prices matching the consumption timeframe</span>
+    <span class="n">prices</span> <span class="o">=</span> <span class="n">_load_historic_prices</span><span class="p">(</span><span class="n">price_file</span><span class="p">,</span> <span class="n">days</span><span class="p">,</span> <span class="n">end_date</span><span class="o">=</span><span class="n">consumption_end</span><span class="p">)</span>
+    
+    <span class="c1"># Prepare price data</span>
+    <span class="n">prices</span> <span class="o">=</span> <span class="n">prices</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="n">prices</span><span class="p">[</span><span class="s1">&#39;datetime&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">to_datetime</span><span class="p">(</span><span class="n">prices</span><span class="p">[</span><span class="s1">&#39;ds&#39;</span><span class="p">])</span>
+    
+    <span class="c1"># Filter consumption data to match the price data timeframe</span>
+    <span class="n">price_start</span> <span class="o">=</span> <span class="n">prices</span><span class="p">[</span><span class="s1">&#39;datetime&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">min</span><span class="p">()</span>
+    <span class="n">price_end</span> <span class="o">=</span> <span class="n">prices</span><span class="p">[</span><span class="s1">&#39;datetime&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">max</span><span class="p">()</span>
+    <span class="n">consumption_filtered</span> <span class="o">=</span> <span class="n">consumption_data</span><span class="p">[</span>
+        <span class="p">(</span><span class="n">consumption_data</span><span class="p">[</span><span class="s1">&#39;datetime&#39;</span><span class="p">]</span> <span class="o">&gt;=</span> <span class="n">price_start</span><span class="p">)</span> <span class="o">&amp;</span> 
+        <span class="p">(</span><span class="n">consumption_data</span><span class="p">[</span><span class="s1">&#39;datetime&#39;</span><span class="p">]</span> <span class="o">&lt;=</span> <span class="n">price_end</span><span class="p">)</span>
+    <span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">consumption_filtered</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;No consumption data overlaps with price data period &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;(</span><span class="si">{</span><span class="n">price_start</span><span class="o">.</span><span class="n">date</span><span class="p">()</span><span class="si">}</span><span class="s2"> to </span><span class="si">{</span><span class="n">price_end</span><span class="o">.</span><span class="n">date</span><span class="p">()</span><span class="si">}</span><span class="s2">)&quot;</span>
+        <span class="p">)</span>
+    
+    <span class="c1"># Resample consumption to hourly if it&#39;s not already</span>
+    <span class="n">time_diff</span> <span class="o">=</span> <span class="n">consumption_filtered</span><span class="p">[</span><span class="s1">&#39;datetime&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">diff</span><span class="p">()</span><span class="o">.</span><span class="n">mode</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">consumption_filtered</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span> <span class="k">else</span> <span class="n">pd</span><span class="o">.</span><span class="n">Timedelta</span><span class="p">(</span><span class="n">hours</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+    
+    <span class="k">if</span> <span class="n">time_diff</span> <span class="o">==</span> <span class="n">pd</span><span class="o">.</span><span class="n">Timedelta</span><span class="p">(</span><span class="n">minutes</span><span class="o">=</span><span class="mi">15</span><span class="p">):</span>
+        <span class="c1"># Convert 15-minute kW readings to kWh (multiply by 0.25 hours)</span>
+        <span class="n">consumption_filtered</span><span class="p">[</span><span class="s1">&#39;value&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">consumption_filtered</span><span class="p">[</span><span class="s1">&#39;value&#39;</span><span class="p">]</span> <span class="o">*</span> <span class="mf">0.25</span>
+        <span class="n">consumption_filtered</span> <span class="o">=</span> <span class="n">consumption_filtered</span><span class="o">.</span><span class="n">set_index</span><span class="p">(</span><span class="s1">&#39;datetime&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">resample</span><span class="p">(</span><span class="s1">&#39;h&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span><span class="o">.</span><span class="n">reset_index</span><span class="p">()</span>
+    
+    <span class="c1"># Merge consumption with prices on datetime</span>
+    <span class="n">merged</span> <span class="o">=</span> <span class="n">consumption_filtered</span><span class="o">.</span><span class="n">merge</span><span class="p">(</span><span class="n">prices</span><span class="p">[[</span><span class="s1">&#39;datetime&#39;</span><span class="p">,</span> <span class="s1">&#39;price_eur_per_kwh&#39;</span><span class="p">]],</span> <span class="n">on</span><span class="o">=</span><span class="s1">&#39;datetime&#39;</span><span class="p">,</span> <span class="n">how</span><span class="o">=</span><span class="s1">&#39;inner&#39;</span><span class="p">)</span>
+    
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">merged</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;No matching timestamps between consumption and price data&quot;</span><span class="p">)</span>
+    
+    <span class="c1"># Calculate the price threshold for expensive hours</span>
+    <span class="n">price_threshold</span> <span class="o">=</span> <span class="n">merged</span><span class="p">[</span><span class="s1">&#39;price_eur_per_kwh&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">quantile</span><span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="p">(</span><span class="n">expensive_hours_pct</span> <span class="o">/</span> <span class="mi">100</span><span class="p">))</span>
+    
+    <span class="c1"># Identify expensive hours</span>
+    <span class="n">merged</span><span class="p">[</span><span class="s1">&#39;is_expensive&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">merged</span><span class="p">[</span><span class="s1">&#39;price_eur_per_kwh&#39;</span><span class="p">]</span> <span class="o">&gt;=</span> <span class="n">price_threshold</span>
+    
+    <span class="c1"># Calculate metrics</span>
+    <span class="n">total_hours</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">merged</span><span class="p">)</span>
+    <span class="n">num_expensive_hours</span> <span class="o">=</span> <span class="n">merged</span><span class="p">[</span><span class="s1">&#39;is_expensive&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+    
+    <span class="c1"># Consumption metrics</span>
+    <span class="n">total_consumption</span> <span class="o">=</span> <span class="n">merged</span><span class="p">[</span><span class="s1">&#39;value&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+    <span class="n">consumption_expensive</span> <span class="o">=</span> <span class="n">merged</span><span class="p">[</span><span class="n">merged</span><span class="p">[</span><span class="s1">&#39;is_expensive&#39;</span><span class="p">]][</span><span class="s1">&#39;value&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+    <span class="n">consumption_cheap</span> <span class="o">=</span> <span class="n">merged</span><span class="p">[</span><span class="o">~</span><span class="n">merged</span><span class="p">[</span><span class="s1">&#39;is_expensive&#39;</span><span class="p">]][</span><span class="s1">&#39;value&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+    <span class="n">consumption_coincidence_pct</span> <span class="o">=</span> <span class="p">(</span><span class="n">consumption_expensive</span> <span class="o">/</span> <span class="n">total_consumption</span> <span class="o">*</span> <span class="mi">100</span><span class="p">)</span> <span class="k">if</span> <span class="n">total_consumption</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">else</span> <span class="mi">0</span>
+    
+    <span class="c1"># Cost metrics</span>
+    <span class="n">merged</span><span class="p">[</span><span class="s1">&#39;cost&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">merged</span><span class="p">[</span><span class="s1">&#39;value&#39;</span><span class="p">]</span> <span class="o">*</span> <span class="n">merged</span><span class="p">[</span><span class="s1">&#39;price_eur_per_kwh&#39;</span><span class="p">]</span>
+    <span class="n">total_cost</span> <span class="o">=</span> <span class="n">merged</span><span class="p">[</span><span class="s1">&#39;cost&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+    <span class="n">cost_expensive</span> <span class="o">=</span> <span class="n">merged</span><span class="p">[</span><span class="n">merged</span><span class="p">[</span><span class="s1">&#39;is_expensive&#39;</span><span class="p">]][</span><span class="s1">&#39;cost&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+    <span class="n">cost_cheap</span> <span class="o">=</span> <span class="n">merged</span><span class="p">[</span><span class="o">~</span><span class="n">merged</span><span class="p">[</span><span class="s1">&#39;is_expensive&#39;</span><span class="p">]][</span><span class="s1">&#39;cost&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+    <span class="n">cost_coincidence_pct</span> <span class="o">=</span> <span class="p">(</span><span class="n">cost_expensive</span> <span class="o">/</span> <span class="n">total_cost</span> <span class="o">*</span> <span class="mi">100</span><span class="p">)</span> <span class="k">if</span> <span class="n">total_cost</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">else</span> <span class="mi">0</span>
+    
+    <span class="c1"># Price metrics</span>
+    <span class="n">avg_price_expensive</span> <span class="o">=</span> <span class="n">merged</span><span class="p">[</span><span class="n">merged</span><span class="p">[</span><span class="s1">&#39;is_expensive&#39;</span><span class="p">]][</span><span class="s1">&#39;price_eur_per_kwh&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+    <span class="n">avg_price_cheap</span> <span class="o">=</span> <span class="n">merged</span><span class="p">[</span><span class="o">~</span><span class="n">merged</span><span class="p">[</span><span class="s1">&#39;is_expensive&#39;</span><span class="p">]][</span><span class="s1">&#39;price_eur_per_kwh&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+    
+    <span class="c1"># Handle NaN values (can occur if all hours are in one category)</span>
+    <span class="k">if</span> <span class="n">pd</span><span class="o">.</span><span class="n">isna</span><span class="p">(</span><span class="n">avg_price_expensive</span><span class="p">):</span>
+        <span class="n">avg_price_expensive</span> <span class="o">=</span> <span class="mf">0.0</span>
+    <span class="k">if</span> <span class="n">pd</span><span class="o">.</span><span class="n">isna</span><span class="p">(</span><span class="n">avg_price_cheap</span><span class="p">):</span>
+        <span class="n">avg_price_cheap</span> <span class="o">=</span> <span class="mf">0.0</span>
+    
+    <span class="c1"># Calculate correlation coefficient</span>
+    <span class="n">correlation</span> <span class="o">=</span> <span class="n">merged</span><span class="p">[</span><span class="s1">&#39;value&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">corr</span><span class="p">(</span><span class="n">merged</span><span class="p">[</span><span class="s1">&#39;price_eur_per_kwh&#39;</span><span class="p">])</span>
+    <span class="c1"># Handle NaN correlation (can occur with insufficient variance)</span>
+    <span class="k">if</span> <span class="n">pd</span><span class="o">.</span><span class="n">isna</span><span class="p">(</span><span class="n">correlation</span><span class="p">):</span>
+        <span class="n">correlation</span> <span class="o">=</span> <span class="mf">0.0</span>
+    
+    <span class="c1"># Determine coincidence rating</span>
+    <span class="k">if</span> <span class="n">consumption_coincidence_pct</span> <span class="o">&gt;</span> <span class="n">expensive_hours_pct</span> <span class="o">+</span> <span class="mi">10</span><span class="p">:</span>
+        <span class="n">coincidence_rating</span> <span class="o">=</span> <span class="s1">&#39;high&#39;</span>
+        <span class="n">rating_message</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;High coincidence: </span><span class="si">{</span><span class="n">consumption_coincidence_pct</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">% of consumption during </span><span class="si">{</span><span class="n">expensive_hours_pct</span><span class="si">:</span><span class="s2">.0f</span><span class="si">}</span><span class="s2">% most expensive hours (unfavorable)&quot;</span>
+    <span class="k">elif</span> <span class="n">consumption_coincidence_pct</span> <span class="o">&gt;</span> <span class="n">expensive_hours_pct</span> <span class="o">-</span> <span class="mi">5</span><span class="p">:</span>
+        <span class="n">coincidence_rating</span> <span class="o">=</span> <span class="s1">&#39;medium&#39;</span>
+        <span class="n">rating_message</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;Medium coincidence: </span><span class="si">{</span><span class="n">consumption_coincidence_pct</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">% of consumption during </span><span class="si">{</span><span class="n">expensive_hours_pct</span><span class="si">:</span><span class="s2">.0f</span><span class="si">}</span><span class="s2">% most expensive hours (neutral)&quot;</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">coincidence_rating</span> <span class="o">=</span> <span class="s1">&#39;low&#39;</span>
+        <span class="n">rating_message</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;Low coincidence: </span><span class="si">{</span><span class="n">consumption_coincidence_pct</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">% of consumption during </span><span class="si">{</span><span class="n">expensive_hours_pct</span><span class="si">:</span><span class="s2">.0f</span><span class="si">}</span><span class="s2">% most expensive hours (favorable)&quot;</span>
+    
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="s1">&#39;expensive_hours_pct&#39;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">expensive_hours_pct</span><span class="p">),</span>
+        <span class="s1">&#39;num_expensive_hours&#39;</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="n">num_expensive_hours</span><span class="p">),</span>
+        <span class="s1">&#39;total_hours&#39;</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="n">total_hours</span><span class="p">),</span>
+        <span class="s1">&#39;consumption_during_expensive_hours&#39;</span><span class="p">:</span> <span class="nb">round</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">consumption_expensive</span><span class="p">),</span> <span class="mi">2</span><span class="p">),</span>
+        <span class="s1">&#39;consumption_during_cheap_hours&#39;</span><span class="p">:</span> <span class="nb">round</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">consumption_cheap</span><span class="p">),</span> <span class="mi">2</span><span class="p">),</span>
+        <span class="s1">&#39;total_consumption&#39;</span><span class="p">:</span> <span class="nb">round</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">total_consumption</span><span class="p">),</span> <span class="mi">2</span><span class="p">),</span>
+        <span class="s1">&#39;consumption_coincidence_pct&#39;</span><span class="p">:</span> <span class="nb">round</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">consumption_coincidence_pct</span><span class="p">),</span> <span class="mi">2</span><span class="p">),</span>
+        <span class="s1">&#39;cost_during_expensive_hours&#39;</span><span class="p">:</span> <span class="nb">round</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">cost_expensive</span><span class="p">),</span> <span class="mi">2</span><span class="p">),</span>
+        <span class="s1">&#39;cost_during_cheap_hours&#39;</span><span class="p">:</span> <span class="nb">round</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">cost_cheap</span><span class="p">),</span> <span class="mi">2</span><span class="p">),</span>
+        <span class="s1">&#39;total_cost&#39;</span><span class="p">:</span> <span class="nb">round</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">total_cost</span><span class="p">),</span> <span class="mi">2</span><span class="p">),</span>
+        <span class="s1">&#39;cost_coincidence_pct&#39;</span><span class="p">:</span> <span class="nb">round</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">cost_coincidence_pct</span><span class="p">),</span> <span class="mi">2</span><span class="p">),</span>
+        <span class="s1">&#39;avg_price_expensive_hours&#39;</span><span class="p">:</span> <span class="nb">round</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">avg_price_expensive</span><span class="p">),</span> <span class="mi">4</span><span class="p">),</span>
+        <span class="s1">&#39;avg_price_cheap_hours&#39;</span><span class="p">:</span> <span class="nb">round</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">avg_price_cheap</span><span class="p">),</span> <span class="mi">4</span><span class="p">),</span>
+        <span class="s1">&#39;price_threshold&#39;</span><span class="p">:</span> <span class="nb">round</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">price_threshold</span><span class="p">),</span> <span class="mi">4</span><span class="p">),</span>
+        <span class="s1">&#39;correlation&#39;</span><span class="p">:</span> <span class="nb">round</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">correlation</span><span class="p">),</span> <span class="mi">4</span><span class="p">),</span>
+        <span class="s1">&#39;coincidence_rating&#39;</span><span class="p">:</span> <span class="n">coincidence_rating</span><span class="p">,</span>
+        <span class="s1">&#39;rating_message&#39;</span><span class="p">:</span> <span class="n">rating_message</span><span class="p">,</span>
+        <span class="s1">&#39;days_analyzed&#39;</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="n">days</span><span class="p">),</span>
+        <span class="s1">&#39;analysis_period&#39;</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s1">&#39;start&#39;</span><span class="p">:</span> <span class="n">price_start</span><span class="o">.</span><span class="n">strftime</span><span class="p">(</span><span class="s1">&#39;%Y-%m-</span><span class="si">%d</span><span class="s1">&#39;</span><span class="p">),</span>
+            <span class="s1">&#39;end&#39;</span><span class="p">:</span> <span class="n">price_end</span><span class="o">.</span><span class="n">strftime</span><span class="p">(</span><span class="s1">&#39;%Y-%m-</span><span class="si">%d</span><span class="s1">&#39;</span><span class="p">)</span>
+        <span class="p">}</span>
+    <span class="p">}</span></div>
+
+
+<div class="viewcode-block" id="get_user_load_profile">
+<a class="viewcode-back" href="../../backend.html#backend.risk_analysis.get_user_load_profile">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_user_load_profile</span><span class="p">(</span><span class="n">consumption_data</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">days</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">30</span><span class="p">,</span> <span class="n">app_data_dir</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Analyze the user&#39;s load profile by calculating average consumption and price patterns per hour of day.</span>
+<span class="sd">    </span>
+<span class="sd">    This function calculates the average energy usage for each hour of the day (0-23) over the past n days,</span>
+<span class="sd">    along with the corresponding average energy prices at those hours. This allows visualization of how</span>
+<span class="sd">    the user&#39;s consumption pattern correlates with price patterns throughout the day.</span>
+<span class="sd">    </span>
+<span class="sd">    Parameters:</span>
+<span class="sd">    consumption_data (pd.DataFrame): DataFrame with user consumption data, must have &#39;datetime&#39; and &#39;value&#39; columns</span>
+<span class="sd">    days (int): Number of days to analyze (default: 30)</span>
+<span class="sd">    app_data_dir (str): Path to app_data directory. If None, uses default path</span>
+<span class="sd">    </span>
+<span class="sd">    Returns:</span>
+<span class="sd">    dict: A dictionary containing:</span>
+<span class="sd">        - hourly_data: List of 24 objects (one per hour), each containing:</span>
+<span class="sd">            - hour: Hour of day (0-23)</span>
+<span class="sd">            - avg_consumption_kwh: Average consumption during this hour (kWh)</span>
+<span class="sd">            - avg_price_eur_per_kwh: Average price during this hour (€/kWh)</span>
+<span class="sd">            - num_data_points: Number of data points used for this hour</span>
+<span class="sd">        - summary: Dictionary with overall statistics:</span>
+<span class="sd">            - total_days_analyzed: Actual number of days in the analysis</span>
+<span class="sd">            - peak_consumption_hour: Hour with highest average consumption</span>
+<span class="sd">            - lowest_consumption_hour: Hour with lowest average consumption</span>
+<span class="sd">            - peak_price_hour: Hour with highest average price</span>
+<span class="sd">            - lowest_price_hour: Hour with lowest average price</span>
+<span class="sd">            - correlation: Correlation coefficient between hourly consumption and prices</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Determine app_data directory</span>
+    <span class="k">if</span> <span class="n">app_data_dir</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">project_root</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="vm">__file__</span><span class="p">))))</span>
+        <span class="n">app_data_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">project_root</span><span class="p">,</span> <span class="s2">&quot;app_data&quot;</span><span class="p">)</span>
+    
+    <span class="c1"># Find and load the most recent price file</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">price_file</span> <span class="o">=</span> <span class="n">_get_most_recent_price_file</span><span class="p">(</span><span class="n">app_data_dir</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">FileNotFoundError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">FileNotFoundError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Cannot analyze load profile: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    
+    <span class="c1"># Prepare consumption data</span>
+    <span class="n">consumption_data</span> <span class="o">=</span> <span class="n">consumption_data</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="n">consumption_data</span><span class="p">[</span><span class="s1">&#39;datetime&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">to_datetime</span><span class="p">(</span><span class="n">consumption_data</span><span class="p">[</span><span class="s1">&#39;datetime&#39;</span><span class="p">])</span>
+    
+    <span class="c1"># Determine the analysis period based on consumption data availability</span>
+    <span class="n">consumption_end</span> <span class="o">=</span> <span class="n">consumption_data</span><span class="p">[</span><span class="s1">&#39;datetime&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">max</span><span class="p">()</span>
+    <span class="n">consumption_start</span> <span class="o">=</span> <span class="n">consumption_end</span> <span class="o">-</span> <span class="n">timedelta</span><span class="p">(</span><span class="n">days</span><span class="o">=</span><span class="n">days</span><span class="p">)</span>
+    
+    <span class="c1"># Filter consumption data to the last n days</span>
+    <span class="n">consumption_filtered</span> <span class="o">=</span> <span class="n">consumption_data</span><span class="p">[</span>
+        <span class="n">consumption_data</span><span class="p">[</span><span class="s1">&#39;datetime&#39;</span><span class="p">]</span> <span class="o">&gt;=</span> <span class="n">consumption_start</span>
+    <span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">consumption_filtered</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;No consumption data available for the last </span><span class="si">{</span><span class="n">days</span><span class="si">}</span><span class="s2"> days&quot;</span><span class="p">)</span>
+    
+    <span class="c1"># Load historic prices matching the consumption timeframe</span>
+    <span class="n">prices</span> <span class="o">=</span> <span class="n">_load_historic_prices</span><span class="p">(</span><span class="n">price_file</span><span class="p">,</span> <span class="n">days</span><span class="p">,</span> <span class="n">end_date</span><span class="o">=</span><span class="n">consumption_end</span><span class="p">)</span>
+    
+    <span class="c1"># Prepare price data</span>
+    <span class="n">prices</span> <span class="o">=</span> <span class="n">prices</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="n">prices</span><span class="p">[</span><span class="s1">&#39;datetime&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">to_datetime</span><span class="p">(</span><span class="n">prices</span><span class="p">[</span><span class="s1">&#39;ds&#39;</span><span class="p">])</span>
+    
+    <span class="c1"># Resample consumption to hourly if needed</span>
+    <span class="n">time_diff</span> <span class="o">=</span> <span class="n">consumption_filtered</span><span class="p">[</span><span class="s1">&#39;datetime&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">diff</span><span class="p">()</span><span class="o">.</span><span class="n">mode</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">consumption_filtered</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span> <span class="k">else</span> <span class="n">pd</span><span class="o">.</span><span class="n">Timedelta</span><span class="p">(</span><span class="n">hours</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+    
+    <span class="k">if</span> <span class="n">time_diff</span> <span class="o">==</span> <span class="n">pd</span><span class="o">.</span><span class="n">Timedelta</span><span class="p">(</span><span class="n">minutes</span><span class="o">=</span><span class="mi">15</span><span class="p">):</span>
+        <span class="c1"># Convert 15-minute kW readings to kWh (multiply by 0.25 hours)</span>
+        <span class="n">consumption_filtered</span><span class="p">[</span><span class="s1">&#39;value&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">consumption_filtered</span><span class="p">[</span><span class="s1">&#39;value&#39;</span><span class="p">]</span> <span class="o">*</span> <span class="mf">0.25</span>
+        <span class="n">consumption_filtered</span> <span class="o">=</span> <span class="n">consumption_filtered</span><span class="o">.</span><span class="n">set_index</span><span class="p">(</span><span class="s1">&#39;datetime&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">resample</span><span class="p">(</span><span class="s1">&#39;h&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span><span class="o">.</span><span class="n">reset_index</span><span class="p">()</span>
+    
+    <span class="c1"># Extract hour of day for consumption data</span>
+    <span class="n">consumption_filtered</span><span class="p">[</span><span class="s1">&#39;hour&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">consumption_filtered</span><span class="p">[</span><span class="s1">&#39;datetime&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">dt</span><span class="o">.</span><span class="n">hour</span>
+    
+    <span class="c1"># Extract hour of day for price data</span>
+    <span class="n">prices</span><span class="p">[</span><span class="s1">&#39;hour&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">prices</span><span class="p">[</span><span class="s1">&#39;datetime&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">dt</span><span class="o">.</span><span class="n">hour</span>
+    
+    <span class="c1"># Calculate average consumption by hour of day</span>
+    <span class="n">avg_consumption_by_hour</span> <span class="o">=</span> <span class="n">consumption_filtered</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="s1">&#39;hour&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">agg</span><span class="p">({</span>
+        <span class="s1">&#39;value&#39;</span><span class="p">:</span> <span class="p">[</span><span class="s1">&#39;mean&#39;</span><span class="p">,</span> <span class="s1">&#39;count&#39;</span><span class="p">]</span>
+    <span class="p">})</span><span class="o">.</span><span class="n">reset_index</span><span class="p">()</span>
+    <span class="n">avg_consumption_by_hour</span><span class="o">.</span><span class="n">columns</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;hour&#39;</span><span class="p">,</span> <span class="s1">&#39;avg_consumption&#39;</span><span class="p">,</span> <span class="s1">&#39;count&#39;</span><span class="p">]</span>
+    
+    <span class="c1"># Calculate average price by hour of day</span>
+    <span class="n">avg_price_by_hour</span> <span class="o">=</span> <span class="n">prices</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="s1">&#39;hour&#39;</span><span class="p">)[</span><span class="s1">&#39;price_eur_per_kwh&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="o">.</span><span class="n">reset_index</span><span class="p">()</span>
+    <span class="n">avg_price_by_hour</span><span class="o">.</span><span class="n">columns</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;hour&#39;</span><span class="p">,</span> <span class="s1">&#39;avg_price&#39;</span><span class="p">]</span>
+    
+    <span class="c1"># Merge consumption and price data</span>
+    <span class="n">hourly_combined</span> <span class="o">=</span> <span class="n">avg_consumption_by_hour</span><span class="o">.</span><span class="n">merge</span><span class="p">(</span><span class="n">avg_price_by_hour</span><span class="p">,</span> <span class="n">on</span><span class="o">=</span><span class="s1">&#39;hour&#39;</span><span class="p">,</span> <span class="n">how</span><span class="o">=</span><span class="s1">&#39;outer&#39;</span><span class="p">)</span>
+    
+    <span class="c1"># Fill missing hours with 0 for consumption (prices should be complete)</span>
+    <span class="n">hourly_combined</span> <span class="o">=</span> <span class="n">hourly_combined</span><span class="o">.</span><span class="n">set_index</span><span class="p">(</span><span class="s1">&#39;hour&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">reindex</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="mi">24</span><span class="p">),</span> <span class="n">fill_value</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">reset_index</span><span class="p">()</span>
+    <span class="n">hourly_combined</span><span class="p">[</span><span class="s1">&#39;avg_consumption&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">hourly_combined</span><span class="p">[</span><span class="s1">&#39;avg_consumption&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">fillna</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+    <span class="n">hourly_combined</span><span class="p">[</span><span class="s1">&#39;avg_price&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">hourly_combined</span><span class="p">[</span><span class="s1">&#39;avg_price&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">fillna</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+    <span class="n">hourly_combined</span><span class="p">[</span><span class="s1">&#39;count&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">hourly_combined</span><span class="p">[</span><span class="s1">&#39;count&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">fillna</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
+    
+    <span class="c1"># Build hourly data list for response</span>
+    <span class="n">hourly_data</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">hourly_combined</span><span class="o">.</span><span class="n">iterrows</span><span class="p">():</span>
+        <span class="n">hourly_data</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+            <span class="s1">&#39;hour&#39;</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="s1">&#39;hour&#39;</span><span class="p">]),</span>
+            <span class="s1">&#39;avg_consumption_kwh&#39;</span><span class="p">:</span> <span class="nb">round</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="s1">&#39;avg_consumption&#39;</span><span class="p">]),</span> <span class="mi">3</span><span class="p">),</span>
+            <span class="s1">&#39;avg_price_eur_per_kwh&#39;</span><span class="p">:</span> <span class="nb">round</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="s1">&#39;avg_price&#39;</span><span class="p">]),</span> <span class="mi">4</span><span class="p">),</span>
+            <span class="s1">&#39;num_data_points&#39;</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="s1">&#39;count&#39;</span><span class="p">])</span>
+        <span class="p">})</span>
+    
+    <span class="c1"># Calculate summary statistics</span>
+    <span class="c1"># Find peak and lowest consumption hours</span>
+    <span class="n">max_consumption_idx</span> <span class="o">=</span> <span class="n">hourly_combined</span><span class="p">[</span><span class="s1">&#39;avg_consumption&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">idxmax</span><span class="p">()</span>
+    <span class="n">min_consumption_idx</span> <span class="o">=</span> <span class="n">hourly_combined</span><span class="p">[</span><span class="s1">&#39;avg_consumption&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">idxmin</span><span class="p">()</span>
+    <span class="n">peak_consumption_hour</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">hourly_combined</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">max_consumption_idx</span><span class="p">,</span> <span class="s1">&#39;hour&#39;</span><span class="p">])</span>
+    <span class="n">lowest_consumption_hour</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">hourly_combined</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">min_consumption_idx</span><span class="p">,</span> <span class="s1">&#39;hour&#39;</span><span class="p">])</span>
+    
+    <span class="c1"># Find peak and lowest price hours</span>
+    <span class="n">max_price_idx</span> <span class="o">=</span> <span class="n">hourly_combined</span><span class="p">[</span><span class="s1">&#39;avg_price&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">idxmax</span><span class="p">()</span>
+    <span class="n">min_price_idx</span> <span class="o">=</span> <span class="n">hourly_combined</span><span class="p">[</span><span class="s1">&#39;avg_price&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">idxmin</span><span class="p">()</span>
+    <span class="n">peak_price_hour</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">hourly_combined</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">max_price_idx</span><span class="p">,</span> <span class="s1">&#39;hour&#39;</span><span class="p">])</span>
+    <span class="n">lowest_price_hour</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">hourly_combined</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">min_price_idx</span><span class="p">,</span> <span class="s1">&#39;hour&#39;</span><span class="p">])</span>
+    
+    <span class="c1"># Calculate correlation between hourly consumption and prices</span>
+    <span class="c1"># Filter out hours with no consumption data</span>
+    <span class="n">hourly_with_data</span> <span class="o">=</span> <span class="n">hourly_combined</span><span class="p">[</span><span class="n">hourly_combined</span><span class="p">[</span><span class="s1">&#39;avg_consumption&#39;</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">hourly_with_data</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="n">correlation</span> <span class="o">=</span> <span class="n">hourly_with_data</span><span class="p">[</span><span class="s1">&#39;avg_consumption&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">corr</span><span class="p">(</span><span class="n">hourly_with_data</span><span class="p">[</span><span class="s1">&#39;avg_price&#39;</span><span class="p">])</span>
+        <span class="c1"># Handle NaN correlation (can occur with insufficient variance)</span>
+        <span class="k">if</span> <span class="n">pd</span><span class="o">.</span><span class="n">isna</span><span class="p">(</span><span class="n">correlation</span><span class="p">):</span>
+            <span class="n">correlation</span> <span class="o">=</span> <span class="mf">0.0</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">correlation</span> <span class="o">=</span> <span class="mf">0.0</span>
+    
+    <span class="c1"># Calculate actual days analyzed</span>
+    <span class="n">actual_days</span> <span class="o">=</span> <span class="p">(</span><span class="n">consumption_filtered</span><span class="p">[</span><span class="s1">&#39;datetime&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">max</span><span class="p">()</span> <span class="o">-</span> <span class="n">consumption_filtered</span><span class="p">[</span><span class="s1">&#39;datetime&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">min</span><span class="p">())</span><span class="o">.</span><span class="n">days</span>
+    
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="s1">&#39;hourly_data&#39;</span><span class="p">:</span> <span class="n">hourly_data</span><span class="p">,</span>
+        <span class="s1">&#39;summary&#39;</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s1">&#39;total_days_analyzed&#39;</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="n">actual_days</span><span class="p">),</span>
+            <span class="s1">&#39;peak_consumption_hour&#39;</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="n">peak_consumption_hour</span><span class="p">),</span>
+            <span class="s1">&#39;lowest_consumption_hour&#39;</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="n">lowest_consumption_hour</span><span class="p">),</span>
+            <span class="s1">&#39;peak_price_hour&#39;</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="n">peak_price_hour</span><span class="p">),</span>
+            <span class="s1">&#39;lowest_price_hour&#39;</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="n">lowest_price_hour</span><span class="p">),</span>
+            <span class="s1">&#39;correlation&#39;</span><span class="p">:</span> <span class="nb">round</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">correlation</span><span class="p">),</span> <span class="mi">4</span><span class="p">),</span>
+            <span class="s1">&#39;analysis_period&#39;</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s1">&#39;start&#39;</span><span class="p">:</span> <span class="n">consumption_filtered</span><span class="p">[</span><span class="s1">&#39;datetime&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">min</span><span class="p">()</span><span class="o">.</span><span class="n">strftime</span><span class="p">(</span><span class="s1">&#39;%Y-%m-</span><span class="si">%d</span><span class="s1">&#39;</span><span class="p">),</span>
+                <span class="s1">&#39;end&#39;</span><span class="p">:</span> <span class="n">consumption_filtered</span><span class="p">[</span><span class="s1">&#39;datetime&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">max</span><span class="p">()</span><span class="o">.</span><span class="n">strftime</span><span class="p">(</span><span class="s1">&#39;%Y-%m-</span><span class="si">%d</span><span class="s1">&#39;</span><span class="p">)</span>
+            <span class="p">}</span>
+        <span class="p">}</span>
+    <span class="p">}</span></div>
+
+
+<div class="viewcode-block" id="get_price_forecast_volatility">
+<a class="viewcode-back" href="../../backend.html#backend.risk_analysis.get_price_forecast_volatility">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_price_forecast_volatility</span><span class="p">(</span><span class="n">app_data_dir</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Analyze price forecast volatility by reading the most recent forecast data.</span>
+<span class="sd">    </span>
+<span class="sd">    This function loads the most recent price forecast file from the app_data directory</span>
+<span class="sd">    and calculates two key volatility metrics.</span>
+<span class="sd">    </span>
+<span class="sd">    Parameters:</span>
+<span class="sd">    app_data_dir (str): Path to app_data directory. If None, uses default path</span>
+<span class="sd">    </span>
+<span class="sd">    Returns:</span>
+<span class="sd">    dict: Contains:</span>
+<span class="sd">        - forecast_std_dev: Standard deviation of forecasted prices (€/kWh)</span>
+<span class="sd">        - avg_confidence_interval_width: Average width of confidence intervals if available (€/kWh), None otherwise</span>
+<span class="sd">    </span>
+<span class="sd">    Raises:</span>
+<span class="sd">    FileNotFoundError: If no forecast files are found</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Determine app_data directory</span>
+    <span class="k">if</span> <span class="n">app_data_dir</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">project_root</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="vm">__file__</span><span class="p">))))</span>
+        <span class="n">app_data_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">project_root</span><span class="p">,</span> <span class="s2">&quot;app_data&quot;</span><span class="p">)</span>
+    
+    <span class="c1"># Find the price forecast file</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">forecast_file</span> <span class="o">=</span> <span class="n">_get_price_forecast_file</span><span class="p">(</span><span class="n">app_data_dir</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">FileNotFoundError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">FileNotFoundError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Cannot analyze price forecast volatility: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    
+    <span class="c1"># Load the forecast data</span>
+    <span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">forecast_file</span><span class="p">)</span>
+    
+    <span class="c1"># Check for required columns</span>
+    <span class="k">if</span> <span class="s1">&#39;ds&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Forecast file must have &#39;ds&#39; (datetime) column. Found columns: </span><span class="si">{</span><span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    
+    <span class="c1"># Convert datetime</span>
+    <span class="n">df</span><span class="p">[</span><span class="s1">&#39;ds&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">to_datetime</span><span class="p">(</span><span class="n">df</span><span class="p">[</span><span class="s1">&#39;ds&#39;</span><span class="p">])</span>
+    
+    <span class="c1"># Determine price column (could be different names)</span>
+    <span class="n">price_col</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;price_eur_per_mwh&#39;</span><span class="p">,</span> <span class="s1">&#39;yhat&#39;</span><span class="p">,</span> <span class="s1">&#39;forecast&#39;</span><span class="p">,</span> <span class="s1">&#39;price&#39;</span><span class="p">]:</span>
+        <span class="k">if</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+            <span class="n">price_col</span> <span class="o">=</span> <span class="n">col</span>
+            <span class="k">break</span>
+    
+    <span class="k">if</span> <span class="n">price_col</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;No price column found in forecast file. Available columns: </span><span class="si">{</span><span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    
+    <span class="c1"># Convert price to €/kWh if it&#39;s in €/MWh</span>
+    <span class="c1"># Check both column name and value range to determine if conversion is needed</span>
+    <span class="c1"># Prices in €/MWh are typically &gt; 10, while €/kWh are typically &lt; 1</span>
+    <span class="n">mean_price</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">price_col</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+    <span class="k">if</span> <span class="s1">&#39;mwh&#39;</span> <span class="ow">in</span> <span class="n">price_col</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="ow">or</span> <span class="n">mean_price</span> <span class="o">&gt;</span> <span class="mi">10</span><span class="p">:</span>
+        <span class="c1"># Prices are in €/MWh, convert to €/kWh</span>
+        <span class="n">df</span><span class="p">[</span><span class="s1">&#39;price_eur_per_kwh&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">price_col</span><span class="p">]</span> <span class="o">/</span> <span class="mi">1000</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="c1"># Already in €/kWh</span>
+        <span class="n">df</span><span class="p">[</span><span class="s1">&#39;price_eur_per_kwh&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">price_col</span><span class="p">]</span>
+    
+    <span class="c1"># Calculate standard deviation</span>
+    <span class="n">forecast_std</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="s1">&#39;price_eur_per_kwh&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">std</span><span class="p">()</span>
+    
+    <span class="c1"># Check for confidence interval columns</span>
+    <span class="n">avg_ci_width</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">lower_col</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">upper_col</span> <span class="o">=</span> <span class="kc">None</span>
+    
+    <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+        <span class="n">col_lower</span> <span class="o">=</span> <span class="n">col</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+        <span class="k">if</span> <span class="s1">&#39;lower&#39;</span> <span class="ow">in</span> <span class="n">col_lower</span> <span class="ow">or</span> <span class="s1">&#39;yhat_lower&#39;</span> <span class="ow">in</span> <span class="n">col_lower</span><span class="p">:</span>
+            <span class="n">lower_col</span> <span class="o">=</span> <span class="n">col</span>
+        <span class="k">if</span> <span class="s1">&#39;upper&#39;</span> <span class="ow">in</span> <span class="n">col_lower</span> <span class="ow">or</span> <span class="s1">&#39;yhat_upper&#39;</span> <span class="ow">in</span> <span class="n">col_lower</span><span class="p">:</span>
+            <span class="n">upper_col</span> <span class="o">=</span> <span class="n">col</span>
+    
+    <span class="k">if</span> <span class="n">lower_col</span> <span class="ow">and</span> <span class="n">upper_col</span><span class="p">:</span>
+        <span class="c1"># Convert confidence intervals from €/MWh to €/kWh</span>
+        <span class="n">df</span><span class="p">[</span><span class="s1">&#39;lower_kwh&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">lower_col</span><span class="p">]</span> <span class="o">/</span> <span class="mi">1000</span>
+        <span class="n">df</span><span class="p">[</span><span class="s1">&#39;upper_kwh&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">upper_col</span><span class="p">]</span> <span class="o">/</span> <span class="mi">1000</span>
+        
+        <span class="c1"># Calculate average confidence interval width</span>
+        <span class="n">df</span><span class="p">[</span><span class="s1">&#39;ci_width&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="s1">&#39;upper_kwh&#39;</span><span class="p">]</span> <span class="o">-</span> <span class="n">df</span><span class="p">[</span><span class="s1">&#39;lower_kwh&#39;</span><span class="p">]</span>
+        <span class="n">avg_ci_width</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="s1">&#39;ci_width&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+    
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="s1">&#39;forecast_std_dev&#39;</span><span class="p">:</span> <span class="nb">round</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">forecast_std</span><span class="p">),</span> <span class="mi">4</span><span class="p">),</span>
+        <span class="s1">&#39;avg_confidence_interval_width&#39;</span><span class="p">:</span> <span class="nb">round</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">avg_ci_width</span><span class="p">),</span> <span class="mi">4</span><span class="p">)</span> <span class="k">if</span> <span class="n">avg_ci_width</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span>
+    <span class="p">}</span></div>
+
+
+    
+
+
+<div class="viewcode-block" id="get_simplified_risk_score_for_yearly_usage">
+<a class="viewcode-back" href="../../backend.html#backend.risk_analysis.get_simplified_risk_score_for_yearly_usage">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_simplified_risk_score_for_yearly_usage</span><span class="p">(</span><span class="n">forecast_price_volatility</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">is_dynamic</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span> 
+                                                <span class="n">historic_price_volatility</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Calculate a simplified risk score when only yearly usage is provided (no CSV uploaded).</span>
+<span class="sd">    </span>
+<span class="sd">    Since we don&#39;t have actual consumption patterns, we can only assess risk based on:</span>
+<span class="sd">    - Price volatility (both historic and forecasted) for dynamic tariffs</span>
+<span class="sd">    - Fixed tariff advantage (inherently lower risk)</span>
+<span class="sd">    </span>
+<span class="sd">    Parameters:</span>
+<span class="sd">    forecast_price_volatility (dict): Output from price volatility analysis</span>
+<span class="sd">    is_dynamic (bool): Whether the tariff is dynamic</span>
+<span class="sd">    historic_price_volatility (float): Optional historic price volatility from market data</span>
+<span class="sd">    </span>
+<span class="sd">    Returns:</span>
+<span class="sd">    dict: Contains risk_level, risk_score, risk_message, risk_factors, simplified flag</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">score</span> <span class="o">=</span> <span class="mi">40</span>  <span class="c1"># Start with moderate baseline</span>
+    <span class="n">factors</span> <span class="o">=</span> <span class="p">[]</span>
+    
+    <span class="k">if</span> <span class="n">is_dynamic</span><span class="p">:</span>
+        <span class="c1"># For dynamic tariffs without consumption data, risk is primarily about price uncertainty</span>
+        <span class="n">price_std_dev</span> <span class="o">=</span> <span class="n">forecast_price_volatility</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;forecast_std_dev&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        
+        <span class="k">if</span> <span class="n">price_std_dev</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="c1"># Assess based on forecasted price volatility</span>
+            <span class="k">if</span> <span class="n">price_std_dev</span> <span class="o">&gt;</span> <span class="mf">0.05</span><span class="p">:</span>
+                <span class="n">score</span> <span class="o">+=</span> <span class="mi">15</span>
+                <span class="n">factors</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+                    <span class="s1">&#39;factor&#39;</span><span class="p">:</span> <span class="s1">&#39;Preisvolatilität (Prognose)&#39;</span><span class="p">,</span> 
+                    <span class="s1">&#39;impact&#39;</span><span class="p">:</span> <span class="s1">&#39;negative&#39;</span><span class="p">,</span> 
+                    <span class="s1">&#39;detail&#39;</span><span class="p">:</span> <span class="sa">f</span><span class="s1">&#39;Sehr hohe erwartete Preisschwankungen (σ: </span><span class="si">{</span><span class="n">price_std_dev</span><span class="si">:</span><span class="s1">.4f</span><span class="si">}</span><span class="s1"> €/kWh)&#39;</span>
+                <span class="p">})</span>
+            <span class="k">elif</span> <span class="n">price_std_dev</span> <span class="o">&gt;</span> <span class="mf">0.035</span><span class="p">:</span>
+                <span class="n">score</span> <span class="o">+=</span> <span class="mi">8</span>
+                <span class="n">factors</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+                    <span class="s1">&#39;factor&#39;</span><span class="p">:</span> <span class="s1">&#39;Preisvolatilität (Prognose)&#39;</span><span class="p">,</span> 
+                    <span class="s1">&#39;impact&#39;</span><span class="p">:</span> <span class="s1">&#39;negative&#39;</span><span class="p">,</span> 
+                    <span class="s1">&#39;detail&#39;</span><span class="p">:</span> <span class="sa">f</span><span class="s1">&#39;Hohe erwartete Preisschwankungen (σ: </span><span class="si">{</span><span class="n">price_std_dev</span><span class="si">:</span><span class="s1">.4f</span><span class="si">}</span><span class="s1"> €/kWh)&#39;</span>
+                <span class="p">})</span>
+            <span class="k">elif</span> <span class="n">price_std_dev</span> <span class="o">&gt;</span> <span class="mf">0.025</span><span class="p">:</span>
+                <span class="n">score</span> <span class="o">+=</span> <span class="mi">3</span>
+                <span class="n">factors</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+                    <span class="s1">&#39;factor&#39;</span><span class="p">:</span> <span class="s1">&#39;Preisvolatilität (Prognose)&#39;</span><span class="p">,</span> 
+                    <span class="s1">&#39;impact&#39;</span><span class="p">:</span> <span class="s1">&#39;neutral&#39;</span><span class="p">,</span> 
+                    <span class="s1">&#39;detail&#39;</span><span class="p">:</span> <span class="sa">f</span><span class="s1">&#39;Moderate erwartete Preisschwankungen (σ: </span><span class="si">{</span><span class="n">price_std_dev</span><span class="si">:</span><span class="s1">.4f</span><span class="si">}</span><span class="s1"> €/kWh)&#39;</span>
+                <span class="p">})</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">score</span> <span class="o">-=</span> <span class="mi">5</span>
+                <span class="n">factors</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+                    <span class="s1">&#39;factor&#39;</span><span class="p">:</span> <span class="s1">&#39;Preisvolatilität (Prognose)&#39;</span><span class="p">,</span> 
+                    <span class="s1">&#39;impact&#39;</span><span class="p">:</span> <span class="s1">&#39;positive&#39;</span><span class="p">,</span> 
+                    <span class="s1">&#39;detail&#39;</span><span class="p">:</span> <span class="sa">f</span><span class="s1">&#39;Niedrige erwartete Preisschwankungen (σ: </span><span class="si">{</span><span class="n">price_std_dev</span><span class="si">:</span><span class="s1">.4f</span><span class="si">}</span><span class="s1"> €/kWh)&#39;</span>
+                <span class="p">})</span>
+        
+        <span class="c1"># Add historic price volatility if available</span>
+        <span class="k">if</span> <span class="n">historic_price_volatility</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">historic_price_volatility</span> <span class="o">&gt;</span> <span class="mf">0.06</span><span class="p">:</span>
+                <span class="n">score</span> <span class="o">+=</span> <span class="mi">10</span>
+                <span class="n">factors</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+                    <span class="s1">&#39;factor&#39;</span><span class="p">:</span> <span class="s1">&#39;Historische Preisvolatilität&#39;</span><span class="p">,</span> 
+                    <span class="s1">&#39;impact&#39;</span><span class="p">:</span> <span class="s1">&#39;negative&#39;</span><span class="p">,</span> 
+                    <span class="s1">&#39;detail&#39;</span><span class="p">:</span> <span class="sa">f</span><span class="s1">&#39;Sehr hohe historische Preisschwankungen (σ: </span><span class="si">{</span><span class="n">historic_price_volatility</span><span class="si">:</span><span class="s1">.4f</span><span class="si">}</span><span class="s1"> €/kWh)&#39;</span>
+                <span class="p">})</span>
+            <span class="k">elif</span> <span class="n">historic_price_volatility</span> <span class="o">&gt;</span> <span class="mf">0.045</span><span class="p">:</span>
+                <span class="n">score</span> <span class="o">+=</span> <span class="mi">6</span>
+                <span class="n">factors</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+                    <span class="s1">&#39;factor&#39;</span><span class="p">:</span> <span class="s1">&#39;Historische Preisvolatilität&#39;</span><span class="p">,</span> 
+                    <span class="s1">&#39;impact&#39;</span><span class="p">:</span> <span class="s1">&#39;negative&#39;</span><span class="p">,</span> 
+                    <span class="s1">&#39;detail&#39;</span><span class="p">:</span> <span class="sa">f</span><span class="s1">&#39;Hohe historische Preisschwankungen (σ: </span><span class="si">{</span><span class="n">historic_price_volatility</span><span class="si">:</span><span class="s1">.4f</span><span class="si">}</span><span class="s1"> €/kWh)&#39;</span>
+                <span class="p">})</span>
+            <span class="k">elif</span> <span class="n">historic_price_volatility</span> <span class="o">&gt;</span> <span class="mf">0.03</span><span class="p">:</span>
+                <span class="n">score</span> <span class="o">+=</span> <span class="mi">2</span>
+                <span class="n">factors</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+                    <span class="s1">&#39;factor&#39;</span><span class="p">:</span> <span class="s1">&#39;Historische Preisvolatilität&#39;</span><span class="p">,</span> 
+                    <span class="s1">&#39;impact&#39;</span><span class="p">:</span> <span class="s1">&#39;neutral&#39;</span><span class="p">,</span> 
+                    <span class="s1">&#39;detail&#39;</span><span class="p">:</span> <span class="sa">f</span><span class="s1">&#39;Moderate historische Preisschwankungen (σ: </span><span class="si">{</span><span class="n">historic_price_volatility</span><span class="si">:</span><span class="s1">.4f</span><span class="si">}</span><span class="s1"> €/kWh)&#39;</span>
+                <span class="p">})</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">score</span> <span class="o">-=</span> <span class="mi">4</span>
+                <span class="n">factors</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+                    <span class="s1">&#39;factor&#39;</span><span class="p">:</span> <span class="s1">&#39;Historische Preisvolatilität&#39;</span><span class="p">,</span> 
+                    <span class="s1">&#39;impact&#39;</span><span class="p">:</span> <span class="s1">&#39;positive&#39;</span><span class="p">,</span> 
+                    <span class="s1">&#39;detail&#39;</span><span class="p">:</span> <span class="sa">f</span><span class="s1">&#39;Niedrige historische Preisschwankungen (σ: </span><span class="si">{</span><span class="n">historic_price_volatility</span><span class="si">:</span><span class="s1">.4f</span><span class="si">}</span><span class="s1"> €/kWh)&#39;</span>
+                <span class="p">})</span>
+        
+        <span class="n">factors</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+            <span class="s1">&#39;factor&#39;</span><span class="p">:</span> <span class="s1">&#39;Verbrauchsdaten&#39;</span><span class="p">,</span> 
+            <span class="s1">&#39;impact&#39;</span><span class="p">:</span> <span class="s1">&#39;neutral&#39;</span><span class="p">,</span> 
+            <span class="s1">&#39;detail&#39;</span><span class="p">:</span> <span class="s1">&#39;Keine individuellen Verbrauchsdaten - Bewertung basiert auf Standardlastprofil&#39;</span>
+        <span class="p">})</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="c1"># Fixed tariffs are inherently lower risk</span>
+        <span class="n">score</span> <span class="o">-=</span> <span class="mi">20</span>
+        <span class="n">factors</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+            <span class="s1">&#39;factor&#39;</span><span class="p">:</span> <span class="s1">&#39;Tariftyp&#39;</span><span class="p">,</span> 
+            <span class="s1">&#39;impact&#39;</span><span class="p">:</span> <span class="s1">&#39;positive&#39;</span><span class="p">,</span> 
+            <span class="s1">&#39;detail&#39;</span><span class="p">:</span> <span class="s1">&#39;Fester Tarif - Keine Preisschwankungen&#39;</span>
+        <span class="p">})</span>
+    
+    <span class="c1"># Ensure score is within bounds</span>
+    <span class="n">overall_risk_score</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">min</span><span class="p">(</span><span class="mi">100</span><span class="p">,</span> <span class="n">score</span><span class="p">))</span>
+    
+    <span class="c1"># Determine risk level and message</span>
+    <span class="k">if</span> <span class="n">overall_risk_score</span> <span class="o">&lt;=</span> <span class="mi">30</span><span class="p">:</span>
+        <span class="n">risk_level</span> <span class="o">=</span> <span class="s1">&#39;low&#39;</span>
+        <span class="k">if</span> <span class="n">is_dynamic</span><span class="p">:</span>
+            <span class="n">risk_message</span> <span class="o">=</span> <span class="s1">&#39;Niedriges Risiko: Geringe erwartete Preisvolatilität macht dynamische Tarife attraktiv&#39;</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">risk_message</span> <span class="o">=</span> <span class="s1">&#39;Niedriges Risiko: Fester Tarif bietet volle Preissicherheit&#39;</span>
+    <span class="k">elif</span> <span class="n">overall_risk_score</span> <span class="o">&lt;=</span> <span class="mi">50</span><span class="p">:</span>
+        <span class="n">risk_level</span> <span class="o">=</span> <span class="s1">&#39;moderate&#39;</span>
+        <span class="k">if</span> <span class="n">is_dynamic</span><span class="p">:</span>
+            <span class="n">risk_message</span> <span class="o">=</span> <span class="s1">&#39;Moderates Risiko: Moderate Preisschwankungen erwartet. Empfehlung: Verbrauchsdaten für genauere Analyse hochladen&#39;</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">risk_message</span> <span class="o">=</span> <span class="s1">&#39;Moderates Risiko: Fester Tarif bietet Preissicherheit&#39;</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">risk_level</span> <span class="o">=</span> <span class="s1">&#39;high&#39;</span>
+        <span class="k">if</span> <span class="n">is_dynamic</span><span class="p">:</span>
+            <span class="n">risk_message</span> <span class="o">=</span> <span class="s1">&#39;Höheres Risiko: Hohe Preisvolatilität erwartet. Bitte Verbrauchsdaten hochladen für detaillierte Analyse&#39;</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">risk_message</span> <span class="o">=</span> <span class="s1">&#39;Moderates Risiko: Fester Tarif bietet stabile Preise&#39;</span>
+    
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="s1">&#39;risk_level&#39;</span><span class="p">:</span> <span class="n">risk_level</span><span class="p">,</span>
+        <span class="s1">&#39;risk_score&#39;</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="n">overall_risk_score</span><span class="p">),</span>
+        <span class="s1">&#39;risk_message&#39;</span><span class="p">:</span> <span class="n">risk_message</span><span class="p">,</span>
+        <span class="s1">&#39;risk_factors&#39;</span><span class="p">:</span> <span class="n">factors</span><span class="p">,</span>
+        <span class="s1">&#39;forecast_quality_included&#39;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="s1">&#39;simplified&#39;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="s1">&#39;note&#39;</span><span class="p">:</span> <span class="s1">&#39;Vereinfachte Risikobewertung basierend auf Standardlastprofil. Für genauere Analyse bitte Verbrauchsdaten hochladen.&#39;</span>
+    <span class="p">}</span></div>
+
+    
+    
+<div class="viewcode-block" id="get_aggregated_risk_score">
+<a class="viewcode-back" href="../../backend.html#backend.risk_analysis.get_aggregated_risk_score">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_aggregated_risk_score</span><span class="p">(</span><span class="n">historic_risk_analysis</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">coincidence_factor</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">forecast_price_volatility</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span>
+                              <span class="n">is_dynamic</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span> <span class="n">usage_forecast_quality</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Aggregate the risk analysis results into a simple risk assessment.</span>
+<span class="sd">    </span>
+<span class="sd">    This function combines the outputs from historic risk analysis, coincidence factor</span>
+<span class="sd">    calculations, and forecast quality metrics to provide an overall risk assessment for the user.</span>
+<span class="sd">    </span>
+<span class="sd">    Parameters:</span>
+<span class="sd">    historic_risk_analysis (dict): Output from create_historic_risk_analysis function</span>
+<span class="sd">    coincidence_factor (dict): Output from calculate_coincidence_factor function</span>
+<span class="sd">    forecast_price_volatility (dict): Output from price volatility analysis</span>
+<span class="sd">    is_dynamic (bool): Whether the tariff is dynamic</span>
+<span class="sd">    usage_forecast_quality (dict): Optional. Quality metrics from backtest (includes avg_confidence_interval_width, </span>
+<span class="sd">                                    relative_confidence_interval_width, mae, forecast_error_percentage)</span>
+<span class="sd">    </span>
+<span class="sd">    Returns:</span>
+<span class="sd">    dict: Contains:</span>
+<span class="sd">        - risk_level: &#39;low&#39;, &#39;moderate&#39;, or &#39;high&#39;</span>
+<span class="sd">        - risk_score: numeric score (0-100, lower is better)</span>
+<span class="sd">        - risk_message: human-readable explanation</span>
+<span class="sd">        - risk_factors: breakdown of contributing factors</span>
+<span class="sd">        - forecast_quality_included: boolean indicating if forecast quality was factored in</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Initialize score (lower is better/less risky)</span>
+    <span class="c1"># Start with a lower baseline to allow for more differentiation</span>
+    <span class="n">score</span> <span class="o">=</span> <span class="mi">35</span>  <span class="c1"># Start at lower baseline for better differentiation</span>
+    <span class="n">factors</span> <span class="o">=</span> <span class="p">[]</span>
+    
+    <span class="c1"># For fixed tariffs, skip consumption-pattern-based risk factors</span>
+    <span class="c1"># since prices don&#39;t vary with market conditions</span>
+    <span class="k">if</span> <span class="n">is_dynamic</span><span class="p">:</span>
+        <span class="c1"># Adjust score based on historic risk analysis</span>
+        <span class="c1"># Using more granular thresholds to better differentiate user patterns</span>
+        <span class="n">price_diff_pct</span> <span class="o">=</span> <span class="n">historic_risk_analysis</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;price_differential_pct&#39;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">price_diff_pct</span> <span class="o">&lt;</span> <span class="o">-</span><span class="mi">10</span><span class="p">:</span>
+            <span class="n">score</span> <span class="o">-=</span> <span class="mi">12</span>  <span class="c1"># Very favorable - excellent consumption timing</span>
+            <span class="n">factors</span><span class="o">.</span><span class="n">append</span><span class="p">({</span><span class="s1">&#39;factor&#39;</span><span class="p">:</span> <span class="s1">&#39;Historischer Verbrauch&#39;</span><span class="p">,</span> <span class="s1">&#39;impact&#39;</span><span class="p">:</span> <span class="s1">&#39;positive&#39;</span><span class="p">,</span> <span class="s1">&#39;detail&#39;</span><span class="p">:</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="nb">abs</span><span class="p">(</span><span class="n">price_diff_pct</span><span class="p">)</span><span class="si">:</span><span class="s1">.1f</span><span class="si">}</span><span class="s1">% unter Marktdurchschnitt&#39;</span><span class="p">})</span>
+        <span class="k">elif</span> <span class="n">price_diff_pct</span> <span class="o">&lt;</span> <span class="o">-</span><span class="mi">5</span><span class="p">:</span>
+            <span class="n">score</span> <span class="o">-=</span> <span class="mi">8</span>  <span class="c1"># Favorable - good consumption timing</span>
+            <span class="n">factors</span><span class="o">.</span><span class="n">append</span><span class="p">({</span><span class="s1">&#39;factor&#39;</span><span class="p">:</span> <span class="s1">&#39;Historischer Verbrauch&#39;</span><span class="p">,</span> <span class="s1">&#39;impact&#39;</span><span class="p">:</span> <span class="s1">&#39;positive&#39;</span><span class="p">,</span> <span class="s1">&#39;detail&#39;</span><span class="p">:</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="nb">abs</span><span class="p">(</span><span class="n">price_diff_pct</span><span class="p">)</span><span class="si">:</span><span class="s1">.1f</span><span class="si">}</span><span class="s1">% unter Marktdurchschnitt&#39;</span><span class="p">})</span>
+        <span class="k">elif</span> <span class="o">-</span><span class="mi">5</span> <span class="o">&lt;=</span> <span class="n">price_diff_pct</span> <span class="o">&lt;=</span> <span class="mi">5</span><span class="p">:</span>
+            <span class="n">score</span> <span class="o">+=</span> <span class="mi">0</span>  <span class="c1"># Neutral - no adjustment</span>
+            <span class="n">factors</span><span class="o">.</span><span class="n">append</span><span class="p">({</span><span class="s1">&#39;factor&#39;</span><span class="p">:</span> <span class="s1">&#39;Historischer Verbrauch&#39;</span><span class="p">,</span> <span class="s1">&#39;impact&#39;</span><span class="p">:</span> <span class="s1">&#39;neutral&#39;</span><span class="p">,</span> <span class="s1">&#39;detail&#39;</span><span class="p">:</span> <span class="s1">&#39;Im Marktdurchschnitt&#39;</span><span class="p">})</span>
+        <span class="k">elif</span> <span class="n">price_diff_pct</span> <span class="o">&lt;=</span> <span class="mi">10</span><span class="p">:</span>
+            <span class="n">score</span> <span class="o">+=</span> <span class="mi">8</span>  <span class="c1"># Slightly unfavorable</span>
+            <span class="n">factors</span><span class="o">.</span><span class="n">append</span><span class="p">({</span><span class="s1">&#39;factor&#39;</span><span class="p">:</span> <span class="s1">&#39;Historischer Verbrauch&#39;</span><span class="p">,</span> <span class="s1">&#39;impact&#39;</span><span class="p">:</span> <span class="s1">&#39;negative&#39;</span><span class="p">,</span> <span class="s1">&#39;detail&#39;</span><span class="p">:</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">price_diff_pct</span><span class="si">:</span><span class="s1">.1f</span><span class="si">}</span><span class="s1">% über Marktdurchschnitt&#39;</span><span class="p">})</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">score</span> <span class="o">+=</span> <span class="mi">12</span>  <span class="c1"># Very unfavorable - poor consumption timing</span>
+            <span class="n">factors</span><span class="o">.</span><span class="n">append</span><span class="p">({</span><span class="s1">&#39;factor&#39;</span><span class="p">:</span> <span class="s1">&#39;Historischer Verbrauch&#39;</span><span class="p">,</span> <span class="s1">&#39;impact&#39;</span><span class="p">:</span> <span class="s1">&#39;negative&#39;</span><span class="p">,</span> <span class="s1">&#39;detail&#39;</span><span class="p">:</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">price_diff_pct</span><span class="si">:</span><span class="s1">.1f</span><span class="si">}</span><span class="s1">% über Marktdurchschnitt&#39;</span><span class="p">})</span>
+        
+        <span class="c1"># Adjust score based on coincidence factor</span>
+        <span class="c1"># More nuanced thresholds to capture different consumption patterns</span>
+        <span class="n">consumption_coincidence</span> <span class="o">=</span> <span class="n">coincidence_factor</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;consumption_coincidence_pct&#39;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="n">expensive_hours_pct</span> <span class="o">=</span> <span class="n">coincidence_factor</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;expensive_hours_pct&#39;</span><span class="p">,</span> <span class="mf">20.0</span><span class="p">)</span>
+        
+        <span class="c1"># Calculate how much the user deviates from the expensive hours percentage</span>
+        <span class="n">coincidence_deviation</span> <span class="o">=</span> <span class="n">consumption_coincidence</span> <span class="o">-</span> <span class="n">expensive_hours_pct</span>
+        
+        <span class="k">if</span> <span class="n">coincidence_deviation</span> <span class="o">&lt;</span> <span class="o">-</span><span class="mi">10</span><span class="p">:</span>
+            <span class="n">score</span> <span class="o">-=</span> <span class="mi">12</span>  <span class="c1"># Excellent - significantly avoids expensive hours</span>
+            <span class="n">factors</span><span class="o">.</span><span class="n">append</span><span class="p">({</span><span class="s1">&#39;factor&#39;</span><span class="p">:</span> <span class="s1">&#39;Verbrauchstiming&#39;</span><span class="p">,</span> <span class="s1">&#39;impact&#39;</span><span class="p">:</span> <span class="s1">&#39;positive&#39;</span><span class="p">,</span> <span class="s1">&#39;detail&#39;</span><span class="p">:</span> <span class="s1">&#39;Vermeidet teure Stunden deutlich&#39;</span><span class="p">})</span>
+        <span class="k">elif</span> <span class="n">coincidence_deviation</span> <span class="o">&lt;</span> <span class="o">-</span><span class="mi">5</span><span class="p">:</span>
+            <span class="n">score</span> <span class="o">-=</span> <span class="mi">8</span>  <span class="c1"># Good - avoids expensive hours</span>
+            <span class="n">factors</span><span class="o">.</span><span class="n">append</span><span class="p">({</span><span class="s1">&#39;factor&#39;</span><span class="p">:</span> <span class="s1">&#39;Verbrauchstiming&#39;</span><span class="p">,</span> <span class="s1">&#39;impact&#39;</span><span class="p">:</span> <span class="s1">&#39;positive&#39;</span><span class="p">,</span> <span class="s1">&#39;detail&#39;</span><span class="p">:</span> <span class="s1">&#39;Vermeidet teure Stunden&#39;</span><span class="p">})</span>
+        <span class="k">elif</span> <span class="o">-</span><span class="mi">5</span> <span class="o">&lt;=</span> <span class="n">coincidence_deviation</span> <span class="o">&lt;=</span> <span class="mi">5</span><span class="p">:</span>
+            <span class="n">score</span> <span class="o">+=</span> <span class="mi">0</span>  <span class="c1"># Neutral - typical pattern, no adjustment</span>
+            <span class="n">factors</span><span class="o">.</span><span class="n">append</span><span class="p">({</span><span class="s1">&#39;factor&#39;</span><span class="p">:</span> <span class="s1">&#39;Verbrauchstiming&#39;</span><span class="p">,</span> <span class="s1">&#39;impact&#39;</span><span class="p">:</span> <span class="s1">&#39;neutral&#39;</span><span class="p">,</span> <span class="s1">&#39;detail&#39;</span><span class="p">:</span> <span class="s1">&#39;Typisches Verbrauchsmuster&#39;</span><span class="p">})</span>
+        <span class="k">elif</span> <span class="n">coincidence_deviation</span> <span class="o">&lt;=</span> <span class="mi">15</span><span class="p">:</span>
+            <span class="n">score</span> <span class="o">+=</span> <span class="mi">8</span>  <span class="c1"># Slightly unfavorable</span>
+            <span class="n">factors</span><span class="o">.</span><span class="n">append</span><span class="p">({</span><span class="s1">&#39;factor&#39;</span><span class="p">:</span> <span class="s1">&#39;Verbrauchstiming&#39;</span><span class="p">,</span> <span class="s1">&#39;impact&#39;</span><span class="p">:</span> <span class="s1">&#39;negative&#39;</span><span class="p">,</span> <span class="s1">&#39;detail&#39;</span><span class="p">:</span> <span class="s1">&#39;Erhöhter Verbrauch zu teuren Zeiten&#39;</span><span class="p">})</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">score</span> <span class="o">+=</span> <span class="mi">12</span>  <span class="c1"># Very unfavorable - high consumption during expensive hours</span>
+            <span class="n">factors</span><span class="o">.</span><span class="n">append</span><span class="p">({</span><span class="s1">&#39;factor&#39;</span><span class="p">:</span> <span class="s1">&#39;Verbrauchstiming&#39;</span><span class="p">,</span> <span class="s1">&#39;impact&#39;</span><span class="p">:</span> <span class="s1">&#39;negative&#39;</span><span class="p">,</span> <span class="s1">&#39;detail&#39;</span><span class="p">:</span> <span class="s1">&#39;Hoher Verbrauch zu teuren Zeiten&#39;</span><span class="p">})</span>
+        
+        <span class="c1"># Check price volatility with adjusted thresholds</span>
+        <span class="n">volatility</span> <span class="o">=</span> <span class="n">historic_risk_analysis</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;price_volatility&#39;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">volatility</span> <span class="o">&gt;</span> <span class="mf">0.06</span><span class="p">:</span>  <span class="c1"># Very high volatility (&gt;6 ct/kWh std dev)</span>
+            <span class="n">score</span> <span class="o">+=</span> <span class="mi">8</span>
+            <span class="n">factors</span><span class="o">.</span><span class="n">append</span><span class="p">({</span><span class="s1">&#39;factor&#39;</span><span class="p">:</span> <span class="s1">&#39;Preisvolatilität&#39;</span><span class="p">,</span> <span class="s1">&#39;impact&#39;</span><span class="p">:</span> <span class="s1">&#39;negative&#39;</span><span class="p">,</span> <span class="s1">&#39;detail&#39;</span><span class="p">:</span> <span class="s1">&#39;Sehr hohe Preisschwankungen&#39;</span><span class="p">})</span>
+        <span class="k">elif</span> <span class="n">volatility</span> <span class="o">&gt;</span> <span class="mf">0.045</span><span class="p">:</span>  <span class="c1"># High volatility</span>
+            <span class="n">score</span> <span class="o">+=</span> <span class="mi">5</span>
+            <span class="n">factors</span><span class="o">.</span><span class="n">append</span><span class="p">({</span><span class="s1">&#39;factor&#39;</span><span class="p">:</span> <span class="s1">&#39;Preisvolatilität&#39;</span><span class="p">,</span> <span class="s1">&#39;impact&#39;</span><span class="p">:</span> <span class="s1">&#39;negative&#39;</span><span class="p">,</span> <span class="s1">&#39;detail&#39;</span><span class="p">:</span> <span class="s1">&#39;Hohe Preisschwankungen&#39;</span><span class="p">})</span>
+        <span class="k">elif</span> <span class="n">volatility</span> <span class="o">&gt;</span> <span class="mf">0.03</span><span class="p">:</span>  <span class="c1"># Medium volatility</span>
+            <span class="n">score</span> <span class="o">+=</span> <span class="mi">2</span>
+            <span class="n">factors</span><span class="o">.</span><span class="n">append</span><span class="p">({</span><span class="s1">&#39;factor&#39;</span><span class="p">:</span> <span class="s1">&#39;Preisvolatilität&#39;</span><span class="p">,</span> <span class="s1">&#39;impact&#39;</span><span class="p">:</span> <span class="s1">&#39;neutral&#39;</span><span class="p">,</span> <span class="s1">&#39;detail&#39;</span><span class="p">:</span> <span class="s1">&#39;Moderate Preisschwankungen&#39;</span><span class="p">})</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">score</span> <span class="o">-=</span> <span class="mi">3</span>  <span class="c1"># Low volatility is favorable</span>
+            <span class="n">factors</span><span class="o">.</span><span class="n">append</span><span class="p">({</span><span class="s1">&#39;factor&#39;</span><span class="p">:</span> <span class="s1">&#39;Preisvolatilität&#39;</span><span class="p">,</span> <span class="s1">&#39;impact&#39;</span><span class="p">:</span> <span class="s1">&#39;positive&#39;</span><span class="p">,</span> <span class="s1">&#39;detail&#39;</span><span class="p">:</span> <span class="s1">&#39;Niedrige Preisschwankungen&#39;</span><span class="p">})</span>
+    
+    <span class="c1"># Adjust score based on forecast quality (if provided)</span>
+    <span class="n">forecast_quality_included</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="k">if</span> <span class="n">usage_forecast_quality</span><span class="p">:</span>
+        <span class="n">forecast_quality_included</span> <span class="o">=</span> <span class="kc">True</span>
+        
+        <span class="c1"># Prioritize forecast_error_percentage as it&#39;s more reliable than relative CI width</span>
+        <span class="c1"># (relative CI width can be misleading for low-consumption households)</span>
+        <span class="n">forecast_error_pct</span> <span class="o">=</span> <span class="n">usage_forecast_quality</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;forecast_error_percentage&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="n">relative_ci_width</span> <span class="o">=</span> <span class="n">usage_forecast_quality</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;relative_confidence_interval_width&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        
+        <span class="k">if</span> <span class="n">forecast_error_pct</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="c1"># Use forecast error percentage as primary metric (most reliable)</span>
+            <span class="c1"># Lower error = better predictions = lower risk</span>
+            
+            <span class="k">if</span> <span class="n">forecast_error_pct</span> <span class="o">&lt;</span> <span class="mi">10</span><span class="p">:</span>
+                <span class="c1"># Excellent forecast quality - significantly reduces risk</span>
+                <span class="n">score</span> <span class="o">-=</span> <span class="mi">8</span>
+                <span class="n">factors</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+                    <span class="s1">&#39;factor&#39;</span><span class="p">:</span> <span class="s1">&#39;Prognosequalität&#39;</span><span class="p">,</span> 
+                    <span class="s1">&#39;impact&#39;</span><span class="p">:</span> <span class="s1">&#39;positive&#39;</span><span class="p">,</span> 
+                    <span class="s1">&#39;detail&#39;</span><span class="p">:</span> <span class="sa">f</span><span class="s1">&#39;Sehr hohe Vorhersagegenauigkeit (Fehler: </span><span class="si">{</span><span class="n">forecast_error_pct</span><span class="si">:</span><span class="s1">.1f</span><span class="si">}</span><span class="s1">%)&#39;</span>
+                <span class="p">})</span>
+            <span class="k">elif</span> <span class="n">forecast_error_pct</span> <span class="o">&lt;</span> <span class="mi">20</span><span class="p">:</span>
+                <span class="c1"># Good forecast quality - reduces risk</span>
+                <span class="n">score</span> <span class="o">-=</span> <span class="mi">4</span>
+                <span class="n">factors</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+                    <span class="s1">&#39;factor&#39;</span><span class="p">:</span> <span class="s1">&#39;Prognosequalität&#39;</span><span class="p">,</span> 
+                    <span class="s1">&#39;impact&#39;</span><span class="p">:</span> <span class="s1">&#39;positive&#39;</span><span class="p">,</span> 
+                    <span class="s1">&#39;detail&#39;</span><span class="p">:</span> <span class="sa">f</span><span class="s1">&#39;Gute Vorhersagegenauigkeit (Fehler: </span><span class="si">{</span><span class="n">forecast_error_pct</span><span class="si">:</span><span class="s1">.1f</span><span class="si">}</span><span class="s1">%)&#39;</span>
+                <span class="p">})</span>
+            <span class="k">elif</span> <span class="n">forecast_error_pct</span> <span class="o">&lt;</span> <span class="mi">30</span><span class="p">:</span>
+                <span class="c1"># Fair forecast quality - slight risk increase</span>
+                <span class="n">score</span> <span class="o">+=</span> <span class="mi">3</span>
+                <span class="n">factors</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+                    <span class="s1">&#39;factor&#39;</span><span class="p">:</span> <span class="s1">&#39;Prognosequalität&#39;</span><span class="p">,</span> 
+                    <span class="s1">&#39;impact&#39;</span><span class="p">:</span> <span class="s1">&#39;neutral&#39;</span><span class="p">,</span> 
+                    <span class="s1">&#39;detail&#39;</span><span class="p">:</span> <span class="sa">f</span><span class="s1">&#39;Moderate Vorhersageunsicherheit (Fehler: </span><span class="si">{</span><span class="n">forecast_error_pct</span><span class="si">:</span><span class="s1">.1f</span><span class="si">}</span><span class="s1">%)&#39;</span>
+                <span class="p">})</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="c1"># Poor forecast quality - increases risk</span>
+                <span class="n">score</span> <span class="o">+=</span> <span class="mi">10</span>
+                <span class="n">factors</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+                    <span class="s1">&#39;factor&#39;</span><span class="p">:</span> <span class="s1">&#39;Prognosequalität&#39;</span><span class="p">,</span> 
+                    <span class="s1">&#39;impact&#39;</span><span class="p">:</span> <span class="s1">&#39;negative&#39;</span><span class="p">,</span> 
+                    <span class="s1">&#39;detail&#39;</span><span class="p">:</span> <span class="sa">f</span><span class="s1">&#39;Hohe Vorhersageunsicherheit (Fehler: </span><span class="si">{</span><span class="n">forecast_error_pct</span><span class="si">:</span><span class="s1">.1f</span><span class="si">}</span><span class="s1">%)&#39;</span>
+                <span class="p">})</span>
+        
+        <span class="k">elif</span> <span class="n">relative_ci_width</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="c1"># Fallback to relative confidence interval width if forecast error not available</span>
+            <span class="c1"># Note: This can be misleading for low-consumption households</span>
+            <span class="c1"># Adjusted ranges to be more lenient</span>
+            
+            <span class="k">if</span> <span class="n">relative_ci_width</span> <span class="o">&lt;</span> <span class="mi">40</span><span class="p">:</span>
+                <span class="c1"># Excellent forecast quality - reduces risk for dynamic tariffs</span>
+                <span class="n">score</span> <span class="o">-=</span> <span class="mi">8</span>
+                <span class="n">factors</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+                    <span class="s1">&#39;factor&#39;</span><span class="p">:</span> <span class="s1">&#39;Prognosequalität&#39;</span><span class="p">,</span> 
+                    <span class="s1">&#39;impact&#39;</span><span class="p">:</span> <span class="s1">&#39;positive&#39;</span><span class="p">,</span> 
+                    <span class="s1">&#39;detail&#39;</span><span class="p">:</span> <span class="sa">f</span><span class="s1">&#39;Sehr hohe Vorhersagegenauigkeit (CI: </span><span class="si">{</span><span class="n">relative_ci_width</span><span class="si">:</span><span class="s1">.1f</span><span class="si">}</span><span class="s1">%)&#39;</span>
+                <span class="p">})</span>
+            <span class="k">elif</span> <span class="n">relative_ci_width</span> <span class="o">&lt;</span> <span class="mi">80</span><span class="p">:</span>
+                <span class="c1"># Good forecast quality - slight risk reduction</span>
+                <span class="n">score</span> <span class="o">-=</span> <span class="mi">4</span>
+                <span class="n">factors</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+                    <span class="s1">&#39;factor&#39;</span><span class="p">:</span> <span class="s1">&#39;Prognosequalität&#39;</span><span class="p">,</span> 
+                    <span class="s1">&#39;impact&#39;</span><span class="p">:</span> <span class="s1">&#39;positive&#39;</span><span class="p">,</span> 
+                    <span class="s1">&#39;detail&#39;</span><span class="p">:</span> <span class="sa">f</span><span class="s1">&#39;Gute Vorhersagegenauigkeit (CI: </span><span class="si">{</span><span class="n">relative_ci_width</span><span class="si">:</span><span class="s1">.1f</span><span class="si">}</span><span class="s1">%)&#39;</span>
+                <span class="p">})</span>
+            <span class="k">elif</span> <span class="n">relative_ci_width</span> <span class="o">&lt;</span> <span class="mi">120</span><span class="p">:</span>
+                <span class="c1"># Fair forecast quality - neutral to slight risk increase</span>
+                <span class="n">score</span> <span class="o">+=</span> <span class="mi">3</span>
+                <span class="n">factors</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+                    <span class="s1">&#39;factor&#39;</span><span class="p">:</span> <span class="s1">&#39;Prognosequalität&#39;</span><span class="p">,</span> 
+                    <span class="s1">&#39;impact&#39;</span><span class="p">:</span> <span class="s1">&#39;neutral&#39;</span><span class="p">,</span> 
+                    <span class="s1">&#39;detail&#39;</span><span class="p">:</span> <span class="sa">f</span><span class="s1">&#39;Moderate Vorhersageunsicherheit (CI: </span><span class="si">{</span><span class="n">relative_ci_width</span><span class="si">:</span><span class="s1">.1f</span><span class="si">}</span><span class="s1">%)&#39;</span>
+                <span class="p">})</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="c1"># Poor forecast quality - increases risk</span>
+                <span class="n">score</span> <span class="o">+=</span> <span class="mi">10</span>
+                <span class="n">factors</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+                    <span class="s1">&#39;factor&#39;</span><span class="p">:</span> <span class="s1">&#39;Prognosequalität&#39;</span><span class="p">,</span> 
+                    <span class="s1">&#39;impact&#39;</span><span class="p">:</span> <span class="s1">&#39;negative&#39;</span><span class="p">,</span> 
+                    <span class="s1">&#39;detail&#39;</span><span class="p">:</span> <span class="sa">f</span><span class="s1">&#39;Hohe Vorhersageunsicherheit (CI: </span><span class="si">{</span><span class="n">relative_ci_width</span><span class="si">:</span><span class="s1">.1f</span><span class="si">}</span><span class="s1">%)&#39;</span>
+                <span class="p">})</span>
+    
+    <span class="c1"># Adjust score based on price forecast volatility (ONLY for dynamic tariffs)</span>
+    <span class="c1"># Price volatility doesn&#39;t matter for fixed tariffs since they have fixed rates</span>
+    <span class="k">if</span> <span class="n">is_dynamic</span> <span class="ow">and</span> <span class="n">forecast_price_volatility</span><span class="p">:</span>
+        <span class="n">price_std_dev</span> <span class="o">=</span> <span class="n">forecast_price_volatility</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;forecast_std_dev&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="n">price_ci_width</span> <span class="o">=</span> <span class="n">forecast_price_volatility</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;avg_confidence_interval_width&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        
+        <span class="k">if</span> <span class="n">price_std_dev</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="c1"># Standard deviation thresholds (in €/kWh)</span>
+            <span class="c1"># Adjusted thresholds: Low: &lt;0.025, Medium: 0.025-0.045, High: &gt;0.045</span>
+            
+            <span class="k">if</span> <span class="n">price_std_dev</span> <span class="o">&gt;</span> <span class="mf">0.05</span><span class="p">:</span>
+                <span class="c1"># Very high price volatility increases risk significantly</span>
+                <span class="n">score</span> <span class="o">+=</span> <span class="mi">8</span>
+                <span class="n">factors</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+                    <span class="s1">&#39;factor&#39;</span><span class="p">:</span> <span class="s1">&#39;Preisvolatilität (Prognose)&#39;</span><span class="p">,</span> 
+                    <span class="s1">&#39;impact&#39;</span><span class="p">:</span> <span class="s1">&#39;negative&#39;</span><span class="p">,</span> 
+                    <span class="s1">&#39;detail&#39;</span><span class="p">:</span> <span class="sa">f</span><span class="s1">&#39;Sehr hohe erwartete Preisschwankungen (σ: </span><span class="si">{</span><span class="n">price_std_dev</span><span class="si">:</span><span class="s1">.4f</span><span class="si">}</span><span class="s1"> €/kWh)&#39;</span>
+                <span class="p">})</span>
+            <span class="k">elif</span> <span class="n">price_std_dev</span> <span class="o">&gt;</span> <span class="mf">0.035</span><span class="p">:</span>
+                <span class="c1"># High price volatility</span>
+                <span class="n">score</span> <span class="o">+=</span> <span class="mi">5</span>
+                <span class="n">factors</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+                    <span class="s1">&#39;factor&#39;</span><span class="p">:</span> <span class="s1">&#39;Preisvolatilität (Prognose)&#39;</span><span class="p">,</span> 
+                    <span class="s1">&#39;impact&#39;</span><span class="p">:</span> <span class="s1">&#39;negative&#39;</span><span class="p">,</span> 
+                    <span class="s1">&#39;detail&#39;</span><span class="p">:</span> <span class="sa">f</span><span class="s1">&#39;Hohe erwartete Preisschwankungen (σ: </span><span class="si">{</span><span class="n">price_std_dev</span><span class="si">:</span><span class="s1">.4f</span><span class="si">}</span><span class="s1"> €/kWh)&#39;</span>
+                <span class="p">})</span>
+            <span class="k">elif</span> <span class="n">price_std_dev</span> <span class="o">&gt;</span> <span class="mf">0.025</span><span class="p">:</span>
+                <span class="c1"># Medium price volatility</span>
+                <span class="n">score</span> <span class="o">+=</span> <span class="mi">2</span>
+                <span class="n">factors</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+                    <span class="s1">&#39;factor&#39;</span><span class="p">:</span> <span class="s1">&#39;Preisvolatilität (Prognose)&#39;</span><span class="p">,</span> 
+                    <span class="s1">&#39;impact&#39;</span><span class="p">:</span> <span class="s1">&#39;neutral&#39;</span><span class="p">,</span> 
+                    <span class="s1">&#39;detail&#39;</span><span class="p">:</span> <span class="sa">f</span><span class="s1">&#39;Moderate erwartete Preisschwankungen (σ: </span><span class="si">{</span><span class="n">price_std_dev</span><span class="si">:</span><span class="s1">.4f</span><span class="si">}</span><span class="s1"> €/kWh)&#39;</span>
+                <span class="p">})</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="c1"># Low price volatility reduces risk</span>
+                <span class="n">score</span> <span class="o">-=</span> <span class="mi">3</span>
+                <span class="n">factors</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+                    <span class="s1">&#39;factor&#39;</span><span class="p">:</span> <span class="s1">&#39;Preisvolatilität (Prognose)&#39;</span><span class="p">,</span> 
+                    <span class="s1">&#39;impact&#39;</span><span class="p">:</span> <span class="s1">&#39;positive&#39;</span><span class="p">,</span> 
+                    <span class="s1">&#39;detail&#39;</span><span class="p">:</span> <span class="sa">f</span><span class="s1">&#39;Niedrige erwartete Preisschwankungen (σ: </span><span class="si">{</span><span class="n">price_std_dev</span><span class="si">:</span><span class="s1">.4f</span><span class="si">}</span><span class="s1"> €/kWh)&#39;</span>
+                <span class="p">})</span>
+        
+        <span class="c1"># Additional check for confidence interval width if available</span>
+        <span class="c1"># CI width reflects forecast uncertainty (±half the width from the mean)</span>
+        <span class="c1"># E.g., 0.15 €/kWh (150 €/MWh) means ±75 €/MWh uncertainty</span>
+        <span class="k">if</span> <span class="n">price_ci_width</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">price_ci_width</span> <span class="o">&gt;</span> <span class="mf">0.20</span><span class="p">:</span>
+                <span class="c1"># Very wide confidence intervals (&gt;200 €/MWh) indicate very high uncertainty</span>
+                <span class="n">score</span> <span class="o">+=</span> <span class="mi">10</span>
+                <span class="n">factors</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+                    <span class="s1">&#39;factor&#39;</span><span class="p">:</span> <span class="s1">&#39;Preisprognose-Unsicherheit&#39;</span><span class="p">,</span> 
+                    <span class="s1">&#39;impact&#39;</span><span class="p">:</span> <span class="s1">&#39;negative&#39;</span><span class="p">,</span> 
+                    <span class="s1">&#39;detail&#39;</span><span class="p">:</span> <span class="sa">f</span><span class="s1">&#39;Sehr hohe Unsicherheit in Preisprognose (Breite Konfidenzintervall: </span><span class="si">{</span><span class="n">price_ci_width</span><span class="si">:</span><span class="s1">.4f</span><span class="si">}</span><span class="s1"> €/kWh)&#39;</span>
+                <span class="p">})</span>
+            <span class="k">elif</span> <span class="n">price_ci_width</span> <span class="o">&gt;</span> <span class="mf">0.12</span><span class="p">:</span>
+                <span class="c1"># Wide confidence intervals (&gt;120 €/MWh) indicate high uncertainty</span>
+                <span class="c1"># This includes typical values around 150-180 €/MWh</span>
+                <span class="n">score</span> <span class="o">+=</span> <span class="mi">6</span>
+                <span class="n">factors</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+                    <span class="s1">&#39;factor&#39;</span><span class="p">:</span> <span class="s1">&#39;Preisprognose-Unsicherheit&#39;</span><span class="p">,</span> 
+                    <span class="s1">&#39;impact&#39;</span><span class="p">:</span> <span class="s1">&#39;negative&#39;</span><span class="p">,</span> 
+                    <span class="s1">&#39;detail&#39;</span><span class="p">:</span> <span class="sa">f</span><span class="s1">&#39;Hohe Prognoseunsicherheit (Breite Konfidenzintervall: </span><span class="si">{</span><span class="n">price_ci_width</span><span class="si">:</span><span class="s1">.4f</span><span class="si">}</span><span class="s1"> €/kWh)&#39;</span>
+                <span class="p">})</span>
+            <span class="k">elif</span> <span class="n">price_ci_width</span> <span class="o">&gt;</span> <span class="mf">0.08</span><span class="p">:</span>
+                <span class="c1"># Medium confidence intervals (80-120 €/MWh) - moderate uncertainty</span>
+                <span class="n">score</span> <span class="o">+=</span> <span class="mi">3</span>
+                <span class="n">factors</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+                    <span class="s1">&#39;factor&#39;</span><span class="p">:</span> <span class="s1">&#39;Preisprognose-Unsicherheit&#39;</span><span class="p">,</span> 
+                    <span class="s1">&#39;impact&#39;</span><span class="p">:</span> <span class="s1">&#39;neutral&#39;</span><span class="p">,</span> 
+                    <span class="s1">&#39;detail&#39;</span><span class="p">:</span> <span class="sa">f</span><span class="s1">&#39;Moderate Prognoseunsicherheit (Breite Konfidenzintervall: </span><span class="si">{</span><span class="n">price_ci_width</span><span class="si">:</span><span class="s1">.4f</span><span class="si">}</span><span class="s1"> €/kWh)&#39;</span>
+                <span class="p">})</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="c1"># Narrow confidence intervals (&lt;80 €/MWh) indicate good forecast quality</span>
+                <span class="n">score</span> <span class="o">-=</span> <span class="mi">3</span>
+                <span class="n">factors</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+                    <span class="s1">&#39;factor&#39;</span><span class="p">:</span> <span class="s1">&#39;Preisprognose-Qualität&#39;</span><span class="p">,</span> 
+                    <span class="s1">&#39;impact&#39;</span><span class="p">:</span> <span class="s1">&#39;positive&#39;</span><span class="p">,</span> 
+                    <span class="s1">&#39;detail&#39;</span><span class="p">:</span> <span class="sa">f</span><span class="s1">&#39;Gute Prognosequalität (Breite Konfidenzintervall: </span><span class="si">{</span><span class="n">price_ci_width</span><span class="si">:</span><span class="s1">.4f</span><span class="si">}</span><span class="s1"> €/kWh)&#39;</span>
+                <span class="p">})</span>
+            
+    <span class="c1"># Adjust score for fixed tariffs</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">is_dynamic</span><span class="p">:</span>
+        <span class="n">score</span> <span class="o">-=</span> <span class="mi">20</span>  <span class="c1"># Fixed tariffs are less risky (reduced from 25)</span>
+        <span class="n">factors</span><span class="o">.</span><span class="n">append</span><span class="p">({</span><span class="s1">&#39;factor&#39;</span><span class="p">:</span> <span class="s1">&#39;Tariftyp&#39;</span><span class="p">,</span> <span class="s1">&#39;impact&#39;</span><span class="p">:</span> <span class="s1">&#39;positive&#39;</span><span class="p">,</span> <span class="s1">&#39;detail&#39;</span><span class="p">:</span> <span class="s1">&#39;Fester Tarif&#39;</span><span class="p">})</span>
+    
+    <span class="c1"># Ensure score is within bounds (0-100, lower is better)</span>
+    <span class="n">overall_risk_score</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">min</span><span class="p">(</span><span class="mi">100</span><span class="p">,</span> <span class="n">score</span><span class="p">))</span>
+    
+    <span class="c1"># Determine risk level and message with adjusted thresholds</span>
+    <span class="c1"># Lower thresholds to account for lower starting baseline</span>
+    <span class="k">if</span> <span class="n">overall_risk_score</span> <span class="o">&lt;=</span> <span class="mi">30</span><span class="p">:</span>
+        <span class="n">risk_level</span> <span class="o">=</span> <span class="s1">&#39;low&#39;</span>
+        <span class="k">if</span> <span class="n">forecast_quality_included</span><span class="p">:</span>
+            <span class="n">risk_message</span> <span class="o">=</span> <span class="s1">&#39;Niedriges Risiko: Ihr Verbrauchsprofil und zuverlässige Prognosen eignen sich gut für dynamische Tarife&#39;</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">risk_message</span> <span class="o">=</span> <span class="s1">&#39;Niedriges Risiko: Ihr Verbrauchsprofil eignet sich gut für dynamische Tarife&#39;</span>
+    <span class="k">elif</span> <span class="n">overall_risk_score</span> <span class="o">&lt;=</span> <span class="mi">50</span><span class="p">:</span>
+        <span class="n">risk_level</span> <span class="o">=</span> <span class="s1">&#39;moderate&#39;</span>
+        <span class="k">if</span> <span class="n">forecast_quality_included</span><span class="p">:</span>
+            <span class="n">risk_message</span> <span class="o">=</span> <span class="s1">&#39;Moderates Risiko: Dynamische Tarife können vorteilhaft sein. Berücksichtigen Sie die Prognosequalität&#39;</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">risk_message</span> <span class="o">=</span> <span class="s1">&#39;Moderates Risiko: Dynamische Tarife können für Sie vorteilhaft sein, aber Optimierung empfohlen&#39;</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">risk_level</span> <span class="o">=</span> <span class="s1">&#39;high&#39;</span>
+        <span class="k">if</span> <span class="n">forecast_quality_included</span><span class="p">:</span>
+            <span class="n">risk_message</span> <span class="o">=</span> <span class="s1">&#39;Höheres Risiko: Unsichere Prognosen und ungünstiges Verbrauchsmuster erhöhen das Risiko&#39;</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">risk_message</span> <span class="o">=</span> <span class="s1">&#39;Höheres Risiko: Überprüfen Sie, ob Sie Ihren Verbrauch zu günstigeren Zeiten verschieben können&#39;</span>
+    
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="s1">&#39;risk_level&#39;</span><span class="p">:</span> <span class="n">risk_level</span><span class="p">,</span>
+        <span class="s1">&#39;risk_score&#39;</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="n">overall_risk_score</span><span class="p">),</span>
+        <span class="s1">&#39;risk_message&#39;</span><span class="p">:</span> <span class="n">risk_message</span><span class="p">,</span>
+        <span class="s1">&#39;risk_factors&#39;</span><span class="p">:</span> <span class="n">factors</span><span class="p">,</span>
+        <span class="s1">&#39;forecast_quality_included&#39;</span><span class="p">:</span> <span class="n">forecast_quality_included</span>
+    <span class="p">}</span></div>
+
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../../index.html">Project Energy Tariffs</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API Reference</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../index.html">Documentation overview</a><ul>
+  <li><a href="../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2025, Julius Becker.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.2.3</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 0.7.16</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

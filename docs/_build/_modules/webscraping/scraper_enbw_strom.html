@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>webscraping.scraper_enbw_strom &#8212; Project Energy Tariffs  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="../../_static/alabaster.css?v=12dfc556" />
+    <script src="../../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+   
+  <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for webscraping.scraper_enbw_strom</h1><div class="highlight"><pre>
+<span></span><span class="ch">#!/usr/bin/env python3</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">EnBW Strom Tariff Scraper (Playwright Async)</span>
+<span class="sd">=============================================</span>
+<span class="sd">Scraper für https://www.enbw.com/strom/ausgezeichneter-stromanbieter</span>
+
+<span class="sd">Extrahiert:</span>
+<span class="sd">- Grundpreis (€/Monat)</span>
+<span class="sd">- Arbeitspreis (ct/kWh)</span>
+<span class="sd">- Verfügbare Tarife (Standard, Öko, etc.)</span>
+<span class="sd">- Vertragslaufzeit</span>
+<span class="sd">- Preisgarantie</span>
+
+<span class="sd">Input: PLZ, Jahresverbrauch (kWh)</span>
+<span class="sd">Output: Dict mit Tarifinformationen</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">re</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">asyncio</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">datetime</span><span class="w"> </span><span class="kn">import</span> <span class="n">datetime</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Any</span><span class="p">,</span> <span class="n">List</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">playwright.async_api</span><span class="w"> </span><span class="kn">import</span> <span class="n">async_playwright</span><span class="p">,</span> <span class="ne">TimeoutError</span> <span class="k">as</span> <span class="n">PlaywrightTimeout</span>
+
+<span class="n">logging</span><span class="o">.</span><span class="n">basicConfig</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">)</span>
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="EnbwStromScraper">
+<a class="viewcode-back" href="../../webscraping.html#webscraping.scraper_enbw_strom.EnbwStromScraper">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">EnbwStromScraper</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Scraper für EnBW Standard Strom-Tarife mit Playwright&quot;&quot;&quot;</span>
+    
+    <span class="n">BASE_URL</span> <span class="o">=</span> <span class="s2">&quot;https://www.enbw.com/strom/ausgezeichneter-stromanbieter&quot;</span>
+    
+    <span class="c1"># Fallback-Daten basierend auf realistischen EnBW Standard-Tarifen nach PLZ</span>
+    <span class="n">BASE_PRICE_BY_REGION</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s1">&#39;68&#39;</span><span class="p">:</span> <span class="mf">12.90</span><span class="p">,</span>  <span class="c1"># Mannheim</span>
+        <span class="s1">&#39;69&#39;</span><span class="p">:</span> <span class="mf">12.90</span><span class="p">,</span>  <span class="c1"># Heidelberg</span>
+        <span class="s1">&#39;70&#39;</span><span class="p">:</span> <span class="mf">12.90</span><span class="p">,</span>  <span class="c1"># Stuttgart</span>
+        <span class="s1">&#39;71&#39;</span><span class="p">:</span> <span class="mf">12.90</span><span class="p">,</span>  <span class="c1"># Ludwigsburg</span>
+        <span class="s1">&#39;72&#39;</span><span class="p">:</span> <span class="mf">12.90</span><span class="p">,</span>  <span class="c1"># Tübingen</span>
+        <span class="s1">&#39;73&#39;</span><span class="p">:</span> <span class="mf">12.90</span><span class="p">,</span>  <span class="c1"># Esslingen</span>
+        <span class="s1">&#39;74&#39;</span><span class="p">:</span> <span class="mf">12.90</span><span class="p">,</span>  <span class="c1"># Heilbronn</span>
+        <span class="s1">&#39;75&#39;</span><span class="p">:</span> <span class="mf">12.90</span><span class="p">,</span>  <span class="c1"># Karlsruhe</span>
+        <span class="s1">&#39;76&#39;</span><span class="p">:</span> <span class="mf">12.90</span><span class="p">,</span>  <span class="c1"># Pforzheim</span>
+        <span class="s1">&#39;77&#39;</span><span class="p">:</span> <span class="mf">12.90</span><span class="p">,</span>  <span class="c1"># Offenburg</span>
+        <span class="s1">&#39;78&#39;</span><span class="p">:</span> <span class="mf">12.90</span><span class="p">,</span>  <span class="c1"># Freiburg</span>
+        <span class="s1">&#39;79&#39;</span><span class="p">:</span> <span class="mf">12.90</span><span class="p">,</span>  <span class="c1"># Freiburg</span>
+        <span class="s1">&#39;80&#39;</span><span class="p">:</span> <span class="mf">12.90</span><span class="p">,</span>  <span class="c1"># München</span>
+        <span class="s1">&#39;81&#39;</span><span class="p">:</span> <span class="mf">12.90</span><span class="p">,</span>  <span class="c1"># München</span>
+        <span class="s1">&#39;10&#39;</span><span class="p">:</span> <span class="mf">12.90</span><span class="p">,</span>  <span class="c1"># Berlin</span>
+        <span class="s1">&#39;20&#39;</span><span class="p">:</span> <span class="mf">12.90</span><span class="p">,</span>  <span class="c1"># Hamburg</span>
+        <span class="s1">&#39;30&#39;</span><span class="p">:</span> <span class="mf">12.90</span><span class="p">,</span>  <span class="c1"># Hannover</span>
+        <span class="s1">&#39;40&#39;</span><span class="p">:</span> <span class="mf">12.90</span><span class="p">,</span>  <span class="c1"># Düsseldorf</span>
+        <span class="s1">&#39;50&#39;</span><span class="p">:</span> <span class="mf">12.90</span><span class="p">,</span>  <span class="c1"># Köln</span>
+        <span class="s1">&#39;60&#39;</span><span class="p">:</span> <span class="mf">12.90</span><span class="p">,</span>  <span class="c1"># Frankfurt</span>
+    <span class="p">}</span>
+    
+    <span class="n">WORK_PRICE_BY_REGION</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s1">&#39;68&#39;</span><span class="p">:</span> <span class="mf">32.50</span><span class="p">,</span>  <span class="c1"># Mannheim</span>
+        <span class="s1">&#39;69&#39;</span><span class="p">:</span> <span class="mf">32.50</span><span class="p">,</span>  <span class="c1"># Heidelberg</span>
+        <span class="s1">&#39;70&#39;</span><span class="p">:</span> <span class="mf">32.50</span><span class="p">,</span>  <span class="c1"># Stuttgart</span>
+        <span class="s1">&#39;71&#39;</span><span class="p">:</span> <span class="mf">32.50</span><span class="p">,</span>  <span class="c1"># Ludwigsburg</span>
+        <span class="s1">&#39;72&#39;</span><span class="p">:</span> <span class="mf">32.50</span><span class="p">,</span>  <span class="c1"># Tübingen</span>
+        <span class="s1">&#39;73&#39;</span><span class="p">:</span> <span class="mf">32.50</span><span class="p">,</span>  <span class="c1"># Esslingen</span>
+        <span class="s1">&#39;74&#39;</span><span class="p">:</span> <span class="mf">32.50</span><span class="p">,</span>  <span class="c1"># Heilbronn</span>
+        <span class="s1">&#39;75&#39;</span><span class="p">:</span> <span class="mf">32.50</span><span class="p">,</span>  <span class="c1"># Karlsruhe</span>
+        <span class="s1">&#39;76&#39;</span><span class="p">:</span> <span class="mf">32.50</span><span class="p">,</span>  <span class="c1"># Pforzheim</span>
+        <span class="s1">&#39;77&#39;</span><span class="p">:</span> <span class="mf">32.50</span><span class="p">,</span>  <span class="c1"># Offenburg</span>
+        <span class="s1">&#39;78&#39;</span><span class="p">:</span> <span class="mf">32.50</span><span class="p">,</span>  <span class="c1"># Freiburg</span>
+        <span class="s1">&#39;79&#39;</span><span class="p">:</span> <span class="mf">32.50</span><span class="p">,</span>  <span class="c1"># Freiburg</span>
+        <span class="s1">&#39;80&#39;</span><span class="p">:</span> <span class="mf">33.20</span><span class="p">,</span>  <span class="c1"># München</span>
+        <span class="s1">&#39;81&#39;</span><span class="p">:</span> <span class="mf">33.20</span><span class="p">,</span>  <span class="c1"># München</span>
+        <span class="s1">&#39;10&#39;</span><span class="p">:</span> <span class="mf">34.10</span><span class="p">,</span>  <span class="c1"># Berlin</span>
+        <span class="s1">&#39;20&#39;</span><span class="p">:</span> <span class="mf">33.80</span><span class="p">,</span>  <span class="c1"># Hamburg</span>
+        <span class="s1">&#39;30&#39;</span><span class="p">:</span> <span class="mf">33.50</span><span class="p">,</span>  <span class="c1"># Hannover</span>
+        <span class="s1">&#39;40&#39;</span><span class="p">:</span> <span class="mf">33.20</span><span class="p">,</span>  <span class="c1"># Düsseldorf</span>
+        <span class="s1">&#39;50&#39;</span><span class="p">:</span> <span class="mf">32.90</span><span class="p">,</span>  <span class="c1"># Köln</span>
+        <span class="s1">&#39;60&#39;</span><span class="p">:</span> <span class="mf">32.70</span><span class="p">,</span>  <span class="c1"># Frankfurt</span>
+    <span class="p">}</span>
+    
+<div class="viewcode-block" id="EnbwStromScraper.__init__">
+<a class="viewcode-back" href="../../webscraping.html#webscraping.scraper_enbw_strom.EnbwStromScraper.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">browser</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">context</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">page</span> <span class="o">=</span> <span class="kc">None</span></div>
+
+    
+<div class="viewcode-block" id="EnbwStromScraper.init_browser">
+<a class="viewcode-back" href="../../webscraping.html#webscraping.scraper_enbw_strom.EnbwStromScraper.init_browser">[docs]</a>
+    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">init_browser</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialisiert Playwright Browser&quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">playwright</span> <span class="o">=</span> <span class="k">await</span> <span class="n">async_playwright</span><span class="p">()</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">browser</span> <span class="o">=</span> <span class="k">await</span> <span class="n">playwright</span><span class="o">.</span><span class="n">chromium</span><span class="o">.</span><span class="n">launch</span><span class="p">(</span>
+                <span class="n">headless</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                <span class="n">args</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;--no-sandbox&#39;</span><span class="p">,</span> <span class="s1">&#39;--disable-setuid-sandbox&#39;</span><span class="p">]</span>
+            <span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">context</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">browser</span><span class="o">.</span><span class="n">new_context</span><span class="p">(</span>
+                <span class="n">viewport</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;width&#39;</span><span class="p">:</span> <span class="mi">1920</span><span class="p">,</span> <span class="s1">&#39;height&#39;</span><span class="p">:</span> <span class="mi">1080</span><span class="p">},</span>
+                <span class="n">user_agent</span><span class="o">=</span><span class="s1">&#39;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36&#39;</span>
+            <span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">page</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">new_page</span><span class="p">()</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;✅ Browser initialisiert&quot;</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;❌ Browser-Initialisierung fehlgeschlagen: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">raise</span></div>
+
+    
+<div class="viewcode-block" id="EnbwStromScraper.close_browser">
+<a class="viewcode-back" href="../../webscraping.html#webscraping.scraper_enbw_strom.EnbwStromScraper.close_browser">[docs]</a>
+    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">close_browser</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Schließt Browser&quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">page</span><span class="p">:</span>
+                <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">page</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="p">:</span>
+                <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">browser</span><span class="p">:</span>
+                <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">browser</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;✅ Browser geschlossen&quot;</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;⚠️ Fehler beim Schließen: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
+
+    
+<div class="viewcode-block" id="EnbwStromScraper.get_fallback_data">
+<a class="viewcode-back" href="../../webscraping.html#webscraping.scraper_enbw_strom.EnbwStromScraper.get_fallback_data">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_fallback_data</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">postal_code</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">annual_consumption_kwh</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Gibt Fallback-Daten basierend auf PLZ zurück&quot;&quot;&quot;</span>
+        <span class="n">region_prefix</span> <span class="o">=</span> <span class="n">postal_code</span><span class="p">[:</span><span class="mi">2</span><span class="p">]</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">postal_code</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="mi">2</span> <span class="k">else</span> <span class="s1">&#39;70&#39;</span>
+        
+        <span class="n">base_price</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">BASE_PRICE_BY_REGION</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">region_prefix</span><span class="p">,</span> <span class="mf">12.90</span><span class="p">)</span>
+        <span class="n">work_price</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">WORK_PRICE_BY_REGION</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">region_prefix</span><span class="p">,</span> <span class="mf">32.50</span><span class="p">)</span>
+        
+        <span class="c1"># Berechne Gesamtkosten</span>
+        <span class="n">monthly_base</span> <span class="o">=</span> <span class="n">base_price</span>
+        <span class="n">annual_work</span> <span class="o">=</span> <span class="p">(</span><span class="n">work_price</span> <span class="o">*</span> <span class="n">annual_consumption_kwh</span><span class="p">)</span> <span class="o">/</span> <span class="mi">100</span>
+        <span class="n">total_annual</span> <span class="o">=</span> <span class="p">(</span><span class="n">monthly_base</span> <span class="o">*</span> <span class="mi">12</span><span class="p">)</span> <span class="o">+</span> <span class="n">annual_work</span>
+        <span class="n">total_per_kwh</span> <span class="o">=</span> <span class="p">(</span><span class="n">total_annual</span> <span class="o">/</span> <span class="n">annual_consumption_kwh</span><span class="p">)</span> <span class="o">*</span> <span class="mi">100</span>
+        
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="s2">&quot;provider&quot;</span><span class="p">:</span> <span class="s2">&quot;EnBW&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;tariff_name&quot;</span><span class="p">:</span> <span class="s2">&quot;EnBW Komfort&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;tariff_type&quot;</span><span class="p">:</span> <span class="s2">&quot;Festpreis&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;base_price_monthly&quot;</span><span class="p">:</span> <span class="nb">round</span><span class="p">(</span><span class="n">base_price</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span>
+            <span class="s2">&quot;work_price_ct_per_kwh&quot;</span><span class="p">:</span> <span class="nb">round</span><span class="p">(</span><span class="n">work_price</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span>
+            <span class="s2">&quot;total_price_ct_per_kwh&quot;</span><span class="p">:</span> <span class="nb">round</span><span class="p">(</span><span class="n">total_per_kwh</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span>
+            <span class="s2">&quot;annual_consumption_kwh&quot;</span><span class="p">:</span> <span class="n">annual_consumption_kwh</span><span class="p">,</span>
+            <span class="s2">&quot;total_annual_cost&quot;</span><span class="p">:</span> <span class="nb">round</span><span class="p">(</span><span class="n">total_annual</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span>
+            <span class="s2">&quot;contract_duration_months&quot;</span><span class="p">:</span> <span class="mi">12</span><span class="p">,</span>
+            <span class="s2">&quot;price_guarantee_months&quot;</span><span class="p">:</span> <span class="mi">12</span><span class="p">,</span>
+            <span class="s2">&quot;renewable_energy&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+            <span class="s2">&quot;cancellation_period_weeks&quot;</span><span class="p">:</span> <span class="mi">6</span><span class="p">,</span>
+            <span class="s2">&quot;postal_code&quot;</span><span class="p">:</span> <span class="n">postal_code</span><span class="p">,</span>
+            <span class="s2">&quot;timestamp&quot;</span><span class="p">:</span> <span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()</span><span class="o">.</span><span class="n">isoformat</span><span class="p">(),</span>
+            <span class="s2">&quot;data_source&quot;</span><span class="p">:</span> <span class="s2">&quot;fallback&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;notes&quot;</span><span class="p">:</span> <span class="s2">&quot;Standard EnBW Ökostrom-Tarif&quot;</span>
+        <span class="p">}</span></div>
+
+    
+<div class="viewcode-block" id="EnbwStromScraper.scrape_tariff">
+<a class="viewcode-back" href="../../webscraping.html#webscraping.scraper_enbw_strom.EnbwStromScraper.scrape_tariff">[docs]</a>
+    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">scrape_tariff</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">postal_code</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">annual_consumption_kwh</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">3500</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Scrapt EnBW Strom-Tarife für gegebene PLZ und Verbrauch</span>
+<span class="sd">        </span>
+<span class="sd">        Args:</span>
+<span class="sd">            postal_code: Postleitzahl (5-stellig)</span>
+<span class="sd">            annual_consumption_kwh: Jahresverbrauch in kWh</span>
+<span class="sd">            </span>
+<span class="sd">        Returns:</span>
+<span class="sd">            List[Dict]: Liste mit allen verfügbaren Tarifen</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;🔧 Starting EnBW Strom scraping for PLZ </span><span class="si">{</span><span class="n">postal_code</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">annual_consumption_kwh</span><span class="si">}</span><span class="s2"> kWh&quot;</span><span class="p">)</span>
+        
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">init_browser</span><span class="p">()</span>
+            
+            <span class="c1"># Navigiere zur Seite</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;📍 Navigiere zu </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">BASE_URL</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">page</span><span class="o">.</span><span class="n">goto</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">BASE_URL</span><span class="p">,</span> <span class="n">wait_until</span><span class="o">=</span><span class="s1">&#39;networkidle&#39;</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="mi">30000</span><span class="p">)</span>
+            
+            <span class="c1"># Cookie-Banner akzeptieren</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;🍪 Akzeptiere Cookies...&quot;</span><span class="p">)</span>
+                <span class="n">cookie_button</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">page</span><span class="o">.</span><span class="n">wait_for_selector</span><span class="p">(</span>
+                    <span class="s1">&#39;button#onetrust-accept-btn-handler, button[aria-label*=&quot;Accept&quot;], button:has-text(&quot;Alle akzeptieren&quot;)&#39;</span><span class="p">,</span>
+                    <span class="n">timeout</span><span class="o">=</span><span class="mi">5000</span>
+                <span class="p">)</span>
+                <span class="k">if</span> <span class="n">cookie_button</span><span class="p">:</span>
+                    <span class="k">await</span> <span class="n">cookie_button</span><span class="o">.</span><span class="n">click</span><span class="p">()</span>
+                    <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">page</span><span class="o">.</span><span class="n">wait_for_timeout</span><span class="p">(</span><span class="mi">1000</span><span class="p">)</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;✅ Cookies akzeptiert&quot;</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;⚠️ Cookie-Banner nicht gefunden oder bereits akzeptiert: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            
+            <span class="c1"># Warte auf Tarif-Finder</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;⏳ Warte auf Tarif-Finder Formular...&quot;</span><span class="p">)</span>
+            <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">page</span><span class="o">.</span><span class="n">wait_for_selector</span><span class="p">(</span><span class="s1">&#39;input[name=&quot;Postleitzahl&quot;]&#39;</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="mi">15000</span><span class="p">)</span>
+            
+            <span class="c1"># PLZ eingeben</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;📝 Gebe PLZ ein: </span><span class="si">{</span><span class="n">postal_code</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">plz_input</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">page</span><span class="o">.</span><span class="n">query_selector</span><span class="p">(</span><span class="s1">&#39;input[name=&quot;Postleitzahl&quot;]&#39;</span><span class="p">)</span>
+            <span class="k">await</span> <span class="n">plz_input</span><span class="o">.</span><span class="n">fill</span><span class="p">(</span><span class="n">postal_code</span><span class="p">)</span>
+            <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">page</span><span class="o">.</span><span class="n">wait_for_timeout</span><span class="p">(</span><span class="mi">1500</span><span class="p">)</span>
+            
+            <span class="c1"># Prüfe ob Ort automatisch ausgefüllt wurde</span>
+            <span class="n">ort_input</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">page</span><span class="o">.</span><span class="n">query_selector</span><span class="p">(</span><span class="s1">&#39;input[name=&quot;Ort&quot;]&#39;</span><span class="p">)</span>
+            <span class="n">city_name</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="k">if</span> <span class="n">ort_input</span><span class="p">:</span>
+                <span class="n">city_name</span> <span class="o">=</span> <span class="k">await</span> <span class="n">ort_input</span><span class="o">.</span><span class="n">get_attribute</span><span class="p">(</span><span class="s1">&#39;value&#39;</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">city_name</span><span class="p">:</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;✅ Ort erkannt: </span><span class="si">{</span><span class="n">city_name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            
+            <span class="c1"># Klicke auf &quot;Jetzt Tarif finden&quot; Button</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;🔘 Klicke auf &#39;Jetzt Tarif finden&#39;&quot;</span><span class="p">)</span>
+            <span class="n">submit_button</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">page</span><span class="o">.</span><span class="n">query_selector</span><span class="p">(</span><span class="s1">&#39;button[type=&quot;submit&quot;]&#39;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">submit_button</span><span class="p">:</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="c1"># Warte auf Navigation nach dem Click</span>
+                    <span class="k">async</span> <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">page</span><span class="o">.</span><span class="n">expect_navigation</span><span class="p">(</span><span class="n">timeout</span><span class="o">=</span><span class="mi">15000</span><span class="p">):</span>
+                        <span class="k">await</span> <span class="n">submit_button</span><span class="o">.</span><span class="n">click</span><span class="p">()</span>
+                    
+                    <span class="c1"># Warte auf neue Seite</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;✅ Tarifseite geladen, extrahiere Tarife...&quot;</span><span class="p">)</span>
+                    <span class="n">current_url</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">page</span><span class="o">.</span><span class="n">url</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;📍 Aktuelle URL: </span><span class="si">{</span><span class="n">current_url</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                    
+                    <span class="c1"># Warte darauf, dass Tarife geladen sind</span>
+                    <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">page</span><span class="o">.</span><span class="n">wait_for_timeout</span><span class="p">(</span><span class="mi">3000</span><span class="p">)</span>
+                    
+                    <span class="c1"># Screenshot für Debugging (optional)</span>
+                    <span class="c1"># await self.page.screenshot(path=f&quot;/tmp/enbw_tariffs_{postal_code}.png&quot;)</span>
+                    
+                    <span class="c1"># Extrahiere alle Tarife von der Seite</span>
+                    <span class="n">tariffs</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">extract_tariffs_from_page</span><span class="p">(</span><span class="n">postal_code</span><span class="p">,</span> <span class="n">annual_consumption_kwh</span><span class="p">,</span> <span class="n">city_name</span><span class="p">)</span>
+                    
+                    <span class="k">if</span> <span class="n">tariffs</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">tariffs</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;✅ </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">tariffs</span><span class="p">)</span><span class="si">}</span><span class="s2"> Tarife gefunden&quot;</span><span class="p">)</span>
+                        <span class="k">return</span> <span class="n">tariffs</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;⚠️ Keine Tarife auf der Seite gefunden, verwende Fallback&quot;</span><span class="p">)</span>
+                        <span class="k">return</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">get_fallback_data</span><span class="p">(</span><span class="n">postal_code</span><span class="p">,</span> <span class="n">annual_consumption_kwh</span><span class="p">)]</span>
+                        
+                <span class="k">except</span> <span class="n">PlaywrightTimeout</span><span class="p">:</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;⏱️ Timeout beim Warten auf Tarifseite, verwende Fallback&quot;</span><span class="p">)</span>
+                    <span class="k">return</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">get_fallback_data</span><span class="p">(</span><span class="n">postal_code</span><span class="p">,</span> <span class="n">annual_consumption_kwh</span><span class="p">)]</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;⚠️ Submit-Button nicht gefunden, verwende Fallback&quot;</span><span class="p">)</span>
+                <span class="k">return</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">get_fallback_data</span><span class="p">(</span><span class="n">postal_code</span><span class="p">,</span> <span class="n">annual_consumption_kwh</span><span class="p">)]</span>
+                
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;❌ Fehler beim Scraping: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="kn">import</span><span class="w"> </span><span class="nn">traceback</span>
+            <span class="n">traceback</span><span class="o">.</span><span class="n">print_exc</span><span class="p">()</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;🔄 Verwende Fallback-Daten&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">get_fallback_data</span><span class="p">(</span><span class="n">postal_code</span><span class="p">,</span> <span class="n">annual_consumption_kwh</span><span class="p">)]</span>
+            
+        <span class="k">finally</span><span class="p">:</span>
+            <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">close_browser</span><span class="p">()</span></div>
+
+    
+<div class="viewcode-block" id="EnbwStromScraper.extract_tariffs_from_page">
+<a class="viewcode-back" href="../../webscraping.html#webscraping.scraper_enbw_strom.EnbwStromScraper.extract_tariffs_from_page">[docs]</a>
+    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">extract_tariffs_from_page</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">postal_code</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">annual_consumption_kwh</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">city_name</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Extrahiert alle Tarife von der EnBW Tarifseite</span>
+<span class="sd">        </span>
+<span class="sd">        Returns:</span>
+<span class="sd">            List[Dict]: Liste mit Tarifinformationen</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">tariffs</span> <span class="o">=</span> <span class="p">[]</span>
+        
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;🔍 Suche nach Tarif-Karten auf der Seite...&quot;</span><span class="p">)</span>
+            
+            <span class="c1"># Finde alle Tarif-Karten (product-card)</span>
+            <span class="n">product_cards</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">page</span><span class="o">.</span><span class="n">query_selector_all</span><span class="p">(</span><span class="s1">&#39;[data-testid=&quot;product-overview-slider-item&quot;]&#39;</span><span class="p">)</span>
+            
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;📊 Gefunden: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">product_cards</span><span class="p">)</span><span class="si">}</span><span class="s2"> Tarif-Karten&quot;</span><span class="p">)</span>
+            
+            <span class="k">for</span> <span class="n">card</span> <span class="ow">in</span> <span class="n">product_cards</span><span class="p">:</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="c1"># Extrahiere Tarifname</span>
+                    <span class="n">name_element</span> <span class="o">=</span> <span class="k">await</span> <span class="n">card</span><span class="o">.</span><span class="n">query_selector</span><span class="p">(</span><span class="s1">&#39;[data-testid=&quot;product-header-headline&quot;]&#39;</span><span class="p">)</span>
+                    <span class="n">tariff_name</span> <span class="o">=</span> <span class="k">await</span> <span class="n">name_element</span><span class="o">.</span><span class="n">inner_text</span><span class="p">()</span> <span class="k">if</span> <span class="n">name_element</span> <span class="k">else</span> <span class="s2">&quot;Unbekannter Tarif&quot;</span>
+                    
+                    <span class="c1"># Extrahiere Grundpreis (erstes product-contract-data-value)</span>
+                    <span class="n">grundpreis_elements</span> <span class="o">=</span> <span class="k">await</span> <span class="n">card</span><span class="o">.</span><span class="n">query_selector_all</span><span class="p">(</span><span class="s1">&#39;[data-testid=&quot;product-contract-data-value&quot;]&#39;</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">grundpreis_elements</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="mi">2</span><span class="p">:</span>
+                        <span class="n">grundpreis_text</span> <span class="o">=</span> <span class="k">await</span> <span class="n">grundpreis_elements</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">inner_text</span><span class="p">()</span>
+                        <span class="n">arbeitspreis_text</span> <span class="o">=</span> <span class="k">await</span> <span class="n">grundpreis_elements</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">inner_text</span><span class="p">()</span>
+                        
+                        <span class="c1"># Parse Grundpreis (z.B. &quot;15,47 €&quot;)</span>
+                        <span class="n">grundpreis_match</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;(\d+[,\.]\d+)&#39;</span><span class="p">,</span> <span class="n">grundpreis_text</span><span class="p">)</span>
+                        <span class="n">grundpreis</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">grundpreis_match</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;,&#39;</span><span class="p">,</span> <span class="s1">&#39;.&#39;</span><span class="p">))</span> <span class="k">if</span> <span class="n">grundpreis_match</span> <span class="k">else</span> <span class="mi">0</span>
+                        
+                        <span class="c1"># Parse Arbeitspreis (z.B. &quot;26,92 Cent&quot;)</span>
+                        <span class="n">arbeitspreis_match</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;(\d+[,\.]\d+)&#39;</span><span class="p">,</span> <span class="n">arbeitspreis_text</span><span class="p">)</span>
+                        <span class="n">arbeitspreis</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">arbeitspreis_match</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;,&#39;</span><span class="p">,</span> <span class="s1">&#39;.&#39;</span><span class="p">))</span> <span class="k">if</span> <span class="n">arbeitspreis_match</span> <span class="k">else</span> <span class="mi">0</span>
+                        
+                        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;✅ Tarif gefunden: </span><span class="si">{</span><span class="n">tariff_name</span><span class="si">}</span><span class="s2"> - </span><span class="si">{</span><span class="n">grundpreis</span><span class="si">}</span><span class="s2">€/Monat, </span><span class="si">{</span><span class="n">arbeitspreis</span><span class="si">}</span><span class="s2">ct/kWh&quot;</span><span class="p">)</span>
+                        
+                        <span class="c1"># Berechne Jahreskosten</span>
+                        <span class="n">monthly_base</span> <span class="o">=</span> <span class="n">grundpreis</span>
+                        <span class="n">annual_work</span> <span class="o">=</span> <span class="p">(</span><span class="n">arbeitspreis</span> <span class="o">*</span> <span class="n">annual_consumption_kwh</span><span class="p">)</span> <span class="o">/</span> <span class="mi">100</span>
+                        <span class="n">total_annual</span> <span class="o">=</span> <span class="p">(</span><span class="n">monthly_base</span> <span class="o">*</span> <span class="mi">12</span><span class="p">)</span> <span class="o">+</span> <span class="n">annual_work</span>
+                        <span class="n">total_per_kwh</span> <span class="o">=</span> <span class="p">(</span><span class="n">total_annual</span> <span class="o">/</span> <span class="n">annual_consumption_kwh</span><span class="p">)</span> <span class="o">*</span> <span class="mi">100</span>
+                        
+                        <span class="n">tariff_data</span> <span class="o">=</span> <span class="p">{</span>
+                            <span class="s2">&quot;provider&quot;</span><span class="p">:</span> <span class="s2">&quot;EnBW&quot;</span><span class="p">,</span>
+                            <span class="s2">&quot;tariff_name&quot;</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;EnBW </span><span class="si">{</span><span class="n">tariff_name</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+                            <span class="s2">&quot;tariff_type&quot;</span><span class="p">:</span> <span class="s2">&quot;Festpreis&quot;</span><span class="p">,</span>
+                            <span class="s2">&quot;base_price_monthly&quot;</span><span class="p">:</span> <span class="nb">round</span><span class="p">(</span><span class="n">grundpreis</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span>
+                            <span class="s2">&quot;work_price_ct_per_kwh&quot;</span><span class="p">:</span> <span class="nb">round</span><span class="p">(</span><span class="n">arbeitspreis</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span>
+                            <span class="s2">&quot;total_price_ct_per_kwh&quot;</span><span class="p">:</span> <span class="nb">round</span><span class="p">(</span><span class="n">total_per_kwh</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span>
+                            <span class="s2">&quot;annual_consumption_kwh&quot;</span><span class="p">:</span> <span class="n">annual_consumption_kwh</span><span class="p">,</span>
+                            <span class="s2">&quot;total_annual_cost&quot;</span><span class="p">:</span> <span class="nb">round</span><span class="p">(</span><span class="n">total_annual</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span>
+                            <span class="s2">&quot;contract_duration_months&quot;</span><span class="p">:</span> <span class="mi">12</span><span class="p">,</span>
+                            <span class="s2">&quot;price_guarantee_months&quot;</span><span class="p">:</span> <span class="mi">12</span><span class="p">,</span>
+                            <span class="s2">&quot;renewable_energy&quot;</span><span class="p">:</span> <span class="s2">&quot;öko&quot;</span> <span class="ow">in</span> <span class="n">tariff_name</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="ow">or</span> <span class="s2">&quot;grün&quot;</span> <span class="ow">in</span> <span class="n">tariff_name</span><span class="o">.</span><span class="n">lower</span><span class="p">(),</span>
+                            <span class="s2">&quot;cancellation_period_weeks&quot;</span><span class="p">:</span> <span class="mi">4</span><span class="p">,</span>
+                            <span class="s2">&quot;postal_code&quot;</span><span class="p">:</span> <span class="n">postal_code</span><span class="p">,</span>
+                            <span class="s2">&quot;city&quot;</span><span class="p">:</span> <span class="n">city_name</span><span class="p">,</span>
+                            <span class="s2">&quot;timestamp&quot;</span><span class="p">:</span> <span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()</span><span class="o">.</span><span class="n">isoformat</span><span class="p">(),</span>
+                            <span class="s2">&quot;data_source&quot;</span><span class="p">:</span> <span class="s2">&quot;scraped&quot;</span>
+                        <span class="p">}</span>
+                        
+                        <span class="n">tariffs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">tariff_data</span><span class="p">)</span>
+                        
+                <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;⚠️ Fehler beim Parsen einer Tarif-Karte: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                    <span class="k">continue</span>
+                    
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;❌ Fehler beim Extrahieren der Tarife: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="kn">import</span><span class="w"> </span><span class="nn">traceback</span>
+            <span class="n">traceback</span><span class="o">.</span><span class="n">print_exc</span><span class="p">()</span>
+        
+        <span class="k">return</span> <span class="n">tariffs</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="scrape_enbw_strom_tariff">
+<a class="viewcode-back" href="../../webscraping.html#webscraping.scraper_enbw_strom.scrape_enbw_strom_tariff">[docs]</a>
+<span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">scrape_enbw_strom_tariff</span><span class="p">(</span><span class="n">postal_code</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">annual_consumption_kwh</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">3500</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Async Wrapper-Funktion für EnBW Strom Scraping</span>
+<span class="sd">    </span>
+<span class="sd">    Args:</span>
+<span class="sd">        postal_code: 5-stellige Postleitzahl</span>
+<span class="sd">        annual_consumption_kwh: Jahresverbrauch in kWh (default: 3500)</span>
+<span class="sd">        </span>
+<span class="sd">    Returns:</span>
+<span class="sd">        List[Dict]: Liste mit Tarifinformationen (normalerweise 3 Tarife)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">scraper</span> <span class="o">=</span> <span class="n">EnbwStromScraper</span><span class="p">()</span>
+    <span class="k">return</span> <span class="k">await</span> <span class="n">scraper</span><span class="o">.</span><span class="n">scrape_tariff</span><span class="p">(</span><span class="n">postal_code</span><span class="p">,</span> <span class="n">annual_consumption_kwh</span><span class="p">)</span></div>
+
+
+
+<span class="c1"># Sync wrapper for compatibility</span>
+<div class="viewcode-block" id="scrape_enbw_strom_tariff_sync">
+<a class="viewcode-back" href="../../webscraping.html#webscraping.scraper_enbw_strom.scrape_enbw_strom_tariff_sync">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">scrape_enbw_strom_tariff_sync</span><span class="p">(</span><span class="n">postal_code</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">annual_consumption_kwh</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">3500</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Synchroner Wrapper für EnBW Strom Scraping&quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">scrape_enbw_strom_tariff</span><span class="p">(</span><span class="n">postal_code</span><span class="p">,</span> <span class="n">annual_consumption_kwh</span><span class="p">))</span></div>
+
+
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+    <span class="c1"># Test mit verschiedenen PLZs</span>
+    <span class="n">test_plzs</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;68167&quot;</span><span class="p">,</span> <span class="s2">&quot;70173&quot;</span><span class="p">,</span> <span class="s2">&quot;80331&quot;</span><span class="p">]</span>
+    
+    <span class="k">for</span> <span class="n">plz</span> <span class="ow">in</span> <span class="n">test_plzs</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="si">{</span><span class="s1">&#39;=&#39;</span><span class="o">*</span><span class="mi">60</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Teste EnBW Strom für PLZ </span><span class="si">{</span><span class="n">plz</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;=&#39;</span><span class="o">*</span><span class="mi">60</span><span class="p">)</span>
+        
+        <span class="n">results</span> <span class="o">=</span> <span class="n">scrape_enbw_strom_tariff_sync</span><span class="p">(</span><span class="n">plz</span><span class="p">,</span> <span class="mi">3500</span><span class="p">)</span>
+        
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">✅ </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">results</span><span class="p">)</span><span class="si">}</span><span class="s2"> Tarife gefunden:&quot;</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">result</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">results</span><span class="p">,</span> <span class="mi">1</span><span class="p">):</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">  Tarif </span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">:&quot;</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;     Anbieter: </span><span class="si">{</span><span class="n">result</span><span class="p">[</span><span class="s1">&#39;provider&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;     Tarif: </span><span class="si">{</span><span class="n">result</span><span class="p">[</span><span class="s1">&#39;tariff_name&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;     Grundpreis: </span><span class="si">{</span><span class="n">result</span><span class="p">[</span><span class="s1">&#39;base_price_monthly&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2"> €/Monat&quot;</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;     Arbeitspreis: </span><span class="si">{</span><span class="n">result</span><span class="p">[</span><span class="s1">&#39;work_price_ct_per_kwh&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2"> ct/kWh&quot;</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;     Gesamtpreis: </span><span class="si">{</span><span class="n">result</span><span class="p">[</span><span class="s1">&#39;total_price_ct_per_kwh&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2"> ct/kWh&quot;</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;     Jahreskosten: </span><span class="si">{</span><span class="n">result</span><span class="p">[</span><span class="s1">&#39;total_annual_cost&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2"> €&quot;</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;     Ökostrom: </span><span class="si">{</span><span class="s1">&#39;Ja&#39;</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="n">result</span><span class="p">[</span><span class="s1">&#39;renewable_energy&#39;</span><span class="p">]</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="s1">&#39;Nein&#39;</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;     Datenquelle: </span><span class="si">{</span><span class="n">result</span><span class="p">[</span><span class="s1">&#39;data_source&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../../index.html">Project Energy Tariffs</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API Reference</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../index.html">Documentation overview</a><ul>
+  <li><a href="../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2025, Julius Becker.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.2.3</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 0.7.16</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

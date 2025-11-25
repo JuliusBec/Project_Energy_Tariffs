@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>backend.forecasting.energy_usage_forecast &#8212; Project Energy Tariffs  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/alabaster.css?v=12dfc556" />
+    <script src="../../../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+   
+  <link rel="stylesheet" href="../../../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for backend.forecasting.energy_usage_forecast</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span> 
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">datetime</span><span class="w"> </span><span class="kn">import</span> <span class="n">datetime</span><span class="p">,</span> <span class="n">timedelta</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">prophet</span><span class="w"> </span><span class="kn">import</span> <span class="n">Prophet</span>
+
+
+
+<div class="viewcode-block" id="calculate_total_weekly_usage">
+<a class="viewcode-back" href="../../../forecasting.html#backend.forecasting.energy_usage_forecast.calculate_total_weekly_usage">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">calculate_total_weekly_usage</span><span class="p">(</span><span class="n">forecast_df</span><span class="p">):</span>
+    <span class="c1"># Resample to hourly frequency</span>
+    <span class="n">forecast_df</span> <span class="o">=</span> <span class="n">forecast_df</span><span class="o">.</span><span class="n">resample</span><span class="p">(</span><span class="s2">&quot;H&quot;</span><span class="p">,</span> <span class="n">on</span><span class="o">=</span><span class="s2">&quot;datetime&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span><span class="o">.</span><span class="n">reset_index</span><span class="p">()</span>
+    <span class="c1"># Sum the usage for each week</span>
+    <span class="n">weekly_usage</span> <span class="o">=</span> <span class="n">forecast_df</span><span class="o">.</span><span class="n">set_index</span><span class="p">(</span><span class="s2">&quot;datetime&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">resample</span><span class="p">(</span><span class="s2">&quot;W&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">weekly_usage</span></div>
+
+
+<div class="viewcode-block" id="forecast_prophet">
+<a class="viewcode-back" href="../../../forecasting.html#backend.forecasting.energy_usage_forecast.forecast_prophet">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">forecast_prophet</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">days</span><span class="o">=</span><span class="mi">30</span><span class="p">):</span>
+    <span class="c1"># Explicitly create a copy to avoid SettingWithCopyWarning</span>
+    <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="n">df</span><span class="p">[</span><span class="s2">&quot;datetime&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">to_datetime</span><span class="p">(</span><span class="n">df</span><span class="p">[</span><span class="s2">&quot;datetime&quot;</span><span class="p">],</span> <span class="nb">format</span><span class="o">=</span><span class="s1">&#39;%m/</span><span class="si">%d</span><span class="s1">/%y %H:%M&#39;</span><span class="p">)</span>
+
+    <span class="c1"># Resample to hourly frequency for consistent modeling (sum for energy consumption)</span>
+    <span class="c1"># Only drop status column if it exists</span>
+    <span class="k">if</span> <span class="s1">&#39;status&#39;</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+        <span class="n">df</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;status&#39;</span><span class="p">],</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">set_index</span><span class="p">(</span><span class="s2">&quot;datetime&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">resample</span><span class="p">(</span><span class="s2">&quot;h&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span><span class="o">.</span><span class="n">reset_index</span><span class="p">()</span>
+
+    <span class="n">prophet_df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="n">prophet_df</span><span class="o">.</span><span class="n">rename</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;datetime&#39;</span><span class="p">:</span> <span class="s1">&#39;ds&#39;</span><span class="p">,</span> <span class="s1">&#39;value&#39;</span><span class="p">:</span> <span class="s1">&#39;y&#39;</span><span class="p">},</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    
+    <span class="n">prophet_model</span> <span class="o">=</span> <span class="n">Prophet</span><span class="p">(</span>
+        <span class="n">daily_seasonality</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">yearly_seasonality</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="n">weekly_seasonality</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">changepoint_prior_scale</span><span class="o">=</span><span class="mf">0.25</span><span class="p">,</span>
+        <span class="n">seasonality_prior_scale</span><span class="o">=</span><span class="mf">2.0</span><span class="p">,</span>
+        <span class="n">interval_width</span><span class="o">=</span><span class="mf">0.9</span><span class="p">,</span>
+        <span class="n">growth</span><span class="o">=</span><span class="s2">&quot;linear&quot;</span><span class="p">,</span>
+        <span class="n">seasonality_mode</span><span class="o">=</span><span class="s1">&#39;additive&#39;</span>    <span class="c1"># Additive seasonality (typical for energy consumption)</span>
+    <span class="p">)</span>
+
+    <span class="n">prophet_model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">prophet_df</span><span class="p">)</span>
+
+    <span class="n">future</span> <span class="o">=</span> <span class="n">prophet_model</span><span class="o">.</span><span class="n">make_future_dataframe</span><span class="p">(</span><span class="n">periods</span><span class="o">=</span><span class="mi">24</span><span class="o">*</span><span class="n">days</span><span class="p">,</span> <span class="n">freq</span><span class="o">=</span><span class="s1">&#39;h&#39;</span><span class="p">)</span>
+
+    <span class="n">forecast</span> <span class="o">=</span> <span class="n">prophet_model</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">future</span><span class="p">)</span>
+    
+    <span class="c1"># IMPORTANT: Only return the future forecast, not the historical period</span>
+    <span class="c1"># Get the last timestamp from the training data</span>
+    <span class="n">last_train_date</span> <span class="o">=</span> <span class="n">prophet_df</span><span class="p">[</span><span class="s1">&#39;ds&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">max</span><span class="p">()</span>
+    
+    <span class="c1"># Filter to only future dates (after the last training date)</span>
+    <span class="n">future_forecast</span> <span class="o">=</span> <span class="n">forecast</span><span class="p">[</span><span class="n">forecast</span><span class="p">[</span><span class="s1">&#39;ds&#39;</span><span class="p">]</span> <span class="o">&gt;</span> <span class="n">last_train_date</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Prophet forecast: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">future_forecast</span><span class="p">)</span><span class="si">}</span><span class="s2"> hours (</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">future_forecast</span><span class="p">)</span><span class="o">/</span><span class="mi">24</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2"> days) of future data&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Forecast range: </span><span class="si">{</span><span class="n">future_forecast</span><span class="p">[</span><span class="s1">&#39;ds&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">min</span><span class="p">()</span><span class="si">}</span><span class="s2"> to </span><span class="si">{</span><span class="n">future_forecast</span><span class="p">[</span><span class="s1">&#39;ds&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">max</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Forecast total consumption: </span><span class="si">{</span><span class="n">future_forecast</span><span class="p">[</span><span class="s1">&#39;yhat&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> kWh&quot;</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">future_forecast</span></div>
+
+
+<div class="viewcode-block" id="create_backtest">
+<a class="viewcode-back" href="../../../forecasting.html#backend.forecasting.energy_usage_forecast.create_backtest">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">create_backtest</span><span class="p">(</span><span class="n">usage_df</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Create backtest data for API response comparing actual vs forecasted energy usage.</span>
+<span class="sd">    </span>
+<span class="sd">    Parameters:</span>
+<span class="sd">    - usage_df: DataFrame with energy usage data (must have &#39;datetime&#39; and &#39;value&#39; columns)</span>
+<span class="sd">    </span>
+<span class="sd">    Returns:</span>
+<span class="sd">    - Dictionary with hourly_data, daily_data, and metrics for visualization</span>
+<span class="sd">    </span>
+<span class="sd">    Note:</span>
+<span class="sd">    - For local plotting and testing, use test_backtest_visualization.py in the analysis folder</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    
+    <span class="n">usage_df</span> <span class="o">=</span> <span class="n">usage_df</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="n">usage_df</span><span class="p">[</span><span class="s1">&#39;datetime&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">to_datetime</span><span class="p">(</span><span class="n">usage_df</span><span class="p">[</span><span class="s1">&#39;datetime&#39;</span><span class="p">])</span>
+    
+    <span class="c1"># Resample to hourly frequency for consistent comparison (sum for energy consumption)</span>
+    <span class="k">if</span> <span class="s1">&#39;status&#39;</span> <span class="ow">in</span> <span class="n">usage_df</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+        <span class="n">usage_df</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;status&quot;</span><span class="p">],</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">usage_df</span> <span class="o">=</span> <span class="n">usage_df</span><span class="o">.</span><span class="n">set_index</span><span class="p">(</span><span class="s2">&quot;datetime&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">resample</span><span class="p">(</span><span class="s2">&quot;H&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span><span class="o">.</span><span class="n">reset_index</span><span class="p">()</span>
+    
+    <span class="c1"># Split the usage_df into train and test sets</span>
+    <span class="c1"># Get exactly the last 720 hours (30 days × 24 hours) for backtest</span>
+    <span class="n">backtest_df</span> <span class="o">=</span> <span class="n">usage_df</span><span class="o">.</span><span class="n">tail</span><span class="p">(</span><span class="mi">24</span> <span class="o">*</span> <span class="mi">30</span><span class="p">)</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    
+    <span class="c1"># Check if the last day is incomplete (less than 24 hours)</span>
+    <span class="n">last_day</span> <span class="o">=</span> <span class="n">backtest_df</span><span class="p">[</span><span class="s1">&#39;datetime&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">dt</span><span class="o">.</span><span class="n">date</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+    <span class="n">hours_in_last_day</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">backtest_df</span><span class="p">[</span><span class="n">backtest_df</span><span class="p">[</span><span class="s1">&#39;datetime&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">dt</span><span class="o">.</span><span class="n">date</span> <span class="o">==</span> <span class="n">last_day</span><span class="p">])</span>
+    
+    <span class="k">if</span> <span class="n">hours_in_last_day</span> <span class="o">&lt;</span> <span class="mi">24</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Removing incomplete last day (</span><span class="si">{</span><span class="n">last_day</span><span class="si">}</span><span class="s2">) with only </span><span class="si">{</span><span class="n">hours_in_last_day</span><span class="si">}</span><span class="s2"> hours&quot;</span><span class="p">)</span>
+        <span class="c1"># Remove the incomplete day to get exactly 29 complete days</span>
+        <span class="n">backtest_df</span> <span class="o">=</span> <span class="n">backtest_df</span><span class="p">[</span><span class="n">backtest_df</span><span class="p">[</span><span class="s1">&#39;datetime&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">dt</span><span class="o">.</span><span class="n">date</span> <span class="o">!=</span> <span class="n">last_day</span><span class="p">]</span>
+        <span class="n">complete_days</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">backtest_df</span><span class="p">)</span> <span class="o">//</span> <span class="mi">24</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Using </span><span class="si">{</span><span class="n">complete_days</span><span class="si">}</span><span class="s2"> complete days (</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">backtest_df</span><span class="p">)</span><span class="si">}</span><span class="s2"> hours) for backtest&quot;</span><span class="p">)</span>
+    
+    <span class="c1"># Train on everything before the backtest period</span>
+    <span class="n">train_end_datetime</span> <span class="o">=</span> <span class="n">backtest_df</span><span class="p">[</span><span class="s1">&#39;datetime&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">min</span><span class="p">()</span> <span class="o">-</span> <span class="n">pd</span><span class="o">.</span><span class="n">Timedelta</span><span class="p">(</span><span class="n">hours</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">train_df</span> <span class="o">=</span> <span class="n">usage_df</span><span class="p">[</span><span class="n">usage_df</span><span class="p">[</span><span class="s1">&#39;datetime&#39;</span><span class="p">]</span> <span class="o">&lt;=</span> <span class="n">train_end_datetime</span><span class="p">]</span>
+
+    <span class="c1"># Calculate forecast hours to exactly match backtest period</span>
+    <span class="n">forecast_hours</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">backtest_df</span><span class="p">)</span>
+    <span class="n">backtest_forecast</span> <span class="o">=</span> <span class="n">forecast_prophet</span><span class="p">(</span><span class="n">train_df</span><span class="p">,</span> <span class="n">days</span><span class="o">=</span><span class="mi">30</span><span class="p">)</span>  <span class="c1"># Generate more than needed</span>
+    
+    <span class="c1"># Extract only the forecast period that exactly matches backtest_df</span>
+    <span class="n">forecast_start_time</span> <span class="o">=</span> <span class="n">backtest_df</span><span class="p">[</span><span class="s1">&#39;datetime&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">min</span><span class="p">()</span>
+    <span class="n">forecast_end_time</span> <span class="o">=</span> <span class="n">backtest_df</span><span class="p">[</span><span class="s1">&#39;datetime&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">max</span><span class="p">()</span>
+    <span class="n">forecast_only</span> <span class="o">=</span> <span class="n">backtest_forecast</span><span class="p">[</span>
+        <span class="p">(</span><span class="n">backtest_forecast</span><span class="p">[</span><span class="s1">&#39;ds&#39;</span><span class="p">]</span> <span class="o">&gt;=</span> <span class="n">forecast_start_time</span><span class="p">)</span> <span class="o">&amp;</span> 
+        <span class="p">(</span><span class="n">backtest_forecast</span><span class="p">[</span><span class="s1">&#39;ds&#39;</span><span class="p">]</span> <span class="o">&lt;=</span> <span class="n">forecast_end_time</span><span class="p">)</span>
+    <span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    
+    <span class="c1"># Ensure we have exactly the same number of data points</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">forecast_only</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="n">backtest_df</span><span class="p">):</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Warning: Forecast has </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">forecast_only</span><span class="p">)</span><span class="si">}</span><span class="s2"> hours, backtest has </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">backtest_df</span><span class="p">)</span><span class="si">}</span><span class="s2"> hours&quot;</span><span class="p">)</span>
+        <span class="c1"># If forecast is shorter, extend it by taking more from the full forecast</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">forecast_only</span><span class="p">)</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">backtest_df</span><span class="p">):</span>
+            <span class="n">needed_hours</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">backtest_df</span><span class="p">)</span> <span class="o">-</span> <span class="nb">len</span><span class="p">(</span><span class="n">forecast_only</span><span class="p">)</span>
+            <span class="c1"># Get additional hours from the end of the full forecast</span>
+            <span class="n">additional_forecast</span> <span class="o">=</span> <span class="n">backtest_forecast</span><span class="p">[</span>
+                <span class="n">backtest_forecast</span><span class="p">[</span><span class="s1">&#39;ds&#39;</span><span class="p">]</span> <span class="o">&gt;</span> <span class="n">forecast_end_time</span>
+            <span class="p">]</span><span class="o">.</span><span class="n">head</span><span class="p">(</span><span class="n">needed_hours</span><span class="p">)</span>
+            <span class="n">forecast_only</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">([</span><span class="n">forecast_only</span><span class="p">,</span> <span class="n">additional_forecast</span><span class="p">],</span> <span class="n">ignore_index</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Extended forecast to </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">forecast_only</span><span class="p">)</span><span class="si">}</span><span class="s2"> hours to match backtest period&quot;</span><span class="p">)</span>
+    
+    <span class="c1"># Clip negative values to 0</span>
+    <span class="n">forecast_only</span><span class="p">[</span><span class="s1">&#39;yhat&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">forecast_only</span><span class="p">[</span><span class="s1">&#39;yhat&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">clip</span><span class="p">(</span><span class="n">lower</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+    <span class="n">forecast_only</span><span class="p">[</span><span class="s1">&#39;yhat_lower&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">forecast_only</span><span class="p">[</span><span class="s1">&#39;yhat_lower&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">clip</span><span class="p">(</span><span class="n">lower</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+    <span class="n">forecast_only</span><span class="p">[</span><span class="s1">&#39;yhat_upper&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">forecast_only</span><span class="p">[</span><span class="s1">&#39;yhat_upper&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">clip</span><span class="p">(</span><span class="n">lower</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+    
+    <span class="c1"># Calculate and print the total usage in the backtest period</span>
+    <span class="n">total_forecast_usage</span> <span class="o">=</span> <span class="n">forecast_only</span><span class="p">[</span><span class="s1">&#39;yhat&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+    <span class="n">total_actual_usage</span> <span class="o">=</span> <span class="n">backtest_df</span><span class="p">[</span><span class="s1">&#39;value&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Total forecasted usage over backtest period: </span><span class="si">{</span><span class="n">total_forecast_usage</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Total actual usage over backtest period: </span><span class="si">{</span><span class="n">total_actual_usage</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Forecast error (absolute): </span><span class="si">{</span><span class="nb">abs</span><span class="p">(</span><span class="n">total_forecast_usage</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">total_actual_usage</span><span class="p">)</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Forecast error (percentage): </span><span class="si">{</span><span class="nb">abs</span><span class="p">(</span><span class="n">total_forecast_usage</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">total_actual_usage</span><span class="p">)</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">total_actual_usage</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">100</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">%&quot;</span><span class="p">)</span>
+    
+    <span class="c1"># Calculate and print the MAE and MSE between the forecast and the backtest data</span>
+    <span class="n">merged_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">merge</span><span class="p">(</span><span class="n">forecast_only</span><span class="p">[[</span><span class="s1">&#39;ds&#39;</span><span class="p">,</span> <span class="s1">&#39;yhat&#39;</span><span class="p">]],</span> <span class="n">backtest_df</span><span class="p">[[</span><span class="s1">&#39;datetime&#39;</span><span class="p">,</span> <span class="s1">&#39;value&#39;</span><span class="p">]],</span> 
+                        <span class="n">left_on</span><span class="o">=</span><span class="s1">&#39;ds&#39;</span><span class="p">,</span> <span class="n">right_on</span><span class="o">=</span><span class="s1">&#39;datetime&#39;</span><span class="p">,</span> <span class="n">how</span><span class="o">=</span><span class="s1">&#39;inner&#39;</span><span class="p">)</span>
+    <span class="n">mae</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">merged_df</span><span class="p">[</span><span class="s1">&#39;yhat&#39;</span><span class="p">]</span> <span class="o">-</span> <span class="n">merged_df</span><span class="p">[</span><span class="s1">&#39;value&#39;</span><span class="p">]))</span>
+    <span class="n">mse</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">((</span><span class="n">merged_df</span><span class="p">[</span><span class="s1">&#39;yhat&#39;</span><span class="p">]</span> <span class="o">-</span> <span class="n">merged_df</span><span class="p">[</span><span class="s1">&#39;value&#39;</span><span class="p">])</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Backtest MAE: </span><span class="si">{</span><span class="n">mae</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Backtest MSE: </span><span class="si">{</span><span class="n">mse</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    
+    <span class="c1"># Calculate confidence interval metrics</span>
+    <span class="n">confidence_interval_width</span> <span class="o">=</span> <span class="n">forecast_only</span><span class="p">[</span><span class="s1">&#39;yhat_upper&#39;</span><span class="p">]</span> <span class="o">-</span> <span class="n">forecast_only</span><span class="p">[</span><span class="s1">&#39;yhat_lower&#39;</span><span class="p">]</span>
+    <span class="n">avg_confidence_interval_width</span> <span class="o">=</span> <span class="n">confidence_interval_width</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+    <span class="n">relative_confidence_interval_width</span> <span class="o">=</span> <span class="p">(</span><span class="n">avg_confidence_interval_width</span> <span class="o">/</span> <span class="n">forecast_only</span><span class="p">[</span><span class="s1">&#39;yhat&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">())</span> <span class="o">*</span> <span class="mi">100</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Average confidence interval width: </span><span class="si">{</span><span class="n">avg_confidence_interval_width</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2"> kWh&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Relative confidence interval width: </span><span class="si">{</span><span class="n">relative_confidence_interval_width</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">% of mean forecast&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Aggregate to daily totals</span>
+    <span class="n">forecast_daily</span> <span class="o">=</span> <span class="n">forecast_only</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="n">forecast_daily</span> <span class="o">=</span> <span class="n">forecast_daily</span><span class="o">.</span><span class="n">set_index</span><span class="p">(</span><span class="s1">&#39;ds&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">resample</span><span class="p">(</span><span class="s1">&#39;D&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span><span class="o">.</span><span class="n">reset_index</span><span class="p">()</span>
+    
+    <span class="n">backtest_daily</span> <span class="o">=</span> <span class="n">backtest_df</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="n">backtest_daily</span> <span class="o">=</span> <span class="n">backtest_daily</span><span class="o">.</span><span class="n">set_index</span><span class="p">(</span><span class="s1">&#39;datetime&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">resample</span><span class="p">(</span><span class="s1">&#39;D&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span><span class="o">.</span><span class="n">reset_index</span><span class="p">()</span>
+    
+    <span class="c1"># Prepare hourly data</span>
+    <span class="n">hourly_data</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s1">&#39;timestamps&#39;</span><span class="p">:</span> <span class="n">forecast_only</span><span class="p">[</span><span class="s1">&#39;ds&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">dt</span><span class="o">.</span><span class="n">strftime</span><span class="p">(</span><span class="s1">&#39;%Y-%m-</span><span class="si">%d</span><span class="s1"> %H:%M:%S&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">tolist</span><span class="p">(),</span>
+        <span class="s1">&#39;forecast&#39;</span><span class="p">:</span> <span class="n">forecast_only</span><span class="p">[</span><span class="s1">&#39;yhat&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">tolist</span><span class="p">(),</span>
+        <span class="s1">&#39;forecast_lower&#39;</span><span class="p">:</span> <span class="n">forecast_only</span><span class="p">[</span><span class="s1">&#39;yhat_lower&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">tolist</span><span class="p">(),</span>
+        <span class="s1">&#39;forecast_upper&#39;</span><span class="p">:</span> <span class="n">forecast_only</span><span class="p">[</span><span class="s1">&#39;yhat_upper&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">tolist</span><span class="p">(),</span>
+        <span class="s1">&#39;actual&#39;</span><span class="p">:</span> <span class="n">backtest_df</span><span class="p">[</span><span class="s1">&#39;value&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
+    <span class="p">}</span>
+    
+    <span class="c1"># Prepare daily data</span>
+    <span class="n">daily_data</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s1">&#39;timestamps&#39;</span><span class="p">:</span> <span class="n">forecast_daily</span><span class="p">[</span><span class="s1">&#39;ds&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">dt</span><span class="o">.</span><span class="n">strftime</span><span class="p">(</span><span class="s1">&#39;%Y-%m-</span><span class="si">%d</span><span class="s1">&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">tolist</span><span class="p">(),</span>
+        <span class="s1">&#39;forecast&#39;</span><span class="p">:</span> <span class="n">forecast_daily</span><span class="p">[</span><span class="s1">&#39;yhat&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">tolist</span><span class="p">(),</span>
+        <span class="s1">&#39;actual&#39;</span><span class="p">:</span> <span class="n">backtest_daily</span><span class="p">[</span><span class="s1">&#39;value&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
+    <span class="p">}</span>
+    
+    <span class="c1"># Metrics</span>
+    <span class="n">metrics</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s1">&#39;total_forecast_usage&#39;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">total_forecast_usage</span><span class="p">),</span>
+        <span class="s1">&#39;total_actual_usage&#39;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">total_actual_usage</span><span class="p">),</span>
+        <span class="s1">&#39;forecast_error_absolute&#39;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">total_forecast_usage</span> <span class="o">-</span> <span class="n">total_actual_usage</span><span class="p">)),</span>
+        <span class="s1">&#39;forecast_error_percentage&#39;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">total_forecast_usage</span> <span class="o">-</span> <span class="n">total_actual_usage</span><span class="p">)</span> <span class="o">/</span> <span class="n">total_actual_usage</span> <span class="o">*</span> <span class="mi">100</span><span class="p">),</span>
+        <span class="s1">&#39;mae&#39;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">mae</span><span class="p">),</span>
+        <span class="s1">&#39;mse&#39;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">mse</span><span class="p">),</span>
+        <span class="s1">&#39;forecast_period_days&#39;</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">forecast_daily</span><span class="p">),</span>
+        <span class="s1">&#39;avg_confidence_interval_width&#39;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">avg_confidence_interval_width</span><span class="p">),</span>
+        <span class="s1">&#39;relative_confidence_interval_width&#39;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">relative_confidence_interval_width</span><span class="p">)</span>
+    <span class="p">}</span>
+    
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="s1">&#39;hourly_data&#39;</span><span class="p">:</span> <span class="n">hourly_data</span><span class="p">,</span>
+        <span class="s1">&#39;daily_data&#39;</span><span class="p">:</span> <span class="n">daily_data</span><span class="p">,</span>
+        <span class="s1">&#39;metrics&#39;</span><span class="p">:</span> <span class="n">metrics</span>
+    <span class="p">}</span></div>
+
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../../../index.html">Project Energy Tariffs</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../api.html">API Reference</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../../index.html">Documentation overview</a><ul>
+  <li><a href="../../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2025, Julius Becker.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.2.3</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 0.7.16</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>
