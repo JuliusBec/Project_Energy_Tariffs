@@ -1,21 +1,12 @@
 API Reference
 =============
 
-Backend Modules
----------------
+This section contains the complete API documentation for all modules in the project.
 
-RiskAnalysis
-~~~~~~~~~~~~
+.. toctree::
+   :maxdepth: 2
+   :caption: API Documentation:
 
-.. automodule:: backend.RiskAnalysis
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-StandardLoadProfile
-~~~~~~~~~~~~~~~~~~~
-
-.. automodule:: backend.StandardLoadProfile
-   :members:
-   :undoc-members:
-   :show-inheritance:
+   backend
+   forecasting
+   webscraping
