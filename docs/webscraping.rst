@@ -1,11 +1,34 @@
 Web Scraping
 ============
 
-Web Scraping Modules
---------------------
+Tibber Scraper
+--------------
 
-.. automodule:: webscraping
+.. automodule:: webscraping.scraper_tibber
    :members:
    :undoc-members:
    :show-inheritance:
-   :recursive:
+
+EnbW Scraper
+------------
+
+.. automodule:: webscraping.scraper_enbw
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+EnbW Strom Scraper
+------------------
+
+.. automodule:: webscraping.scraper_enbw_strom
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Tado Scraper
+------------
+
+.. automodule:: webscraping.scraper_tado
+   :members:
+   :undoc-members:
+   :show-inheritance:

@@ -4,8 +4,15 @@ Forecasting
 Forecasting Modules
 -------------------
 
-.. automodule:: backend.forecasting
+.. automodule:: backend.forecasting.energy_usage_forecast
    :members:
    :undoc-members:
    :show-inheritance:
-   :recursive:
+
+Energy Price Forecast
+---------------------
+
+.. automodule:: backend.forecasting.energy_price_forecast
+   :members:
+   :undoc-members:
+   :show-inheritance:

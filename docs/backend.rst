@@ -1,14 +1,6 @@
 Backend API
 ===========
 
-App Module
-----------
-
-.. automodule:: backend.app
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 Energy Tariff
 -------------
 
