@@ -1,4 +1,9 @@
-from chronos import ChronosPipeline
+try:
+    from chronos import ChronosPipeline
+    CHRONOS_AVAILABLE = True
+except ImportError:
+    CHRONOS_AVAILABLE = False
+    ChronosPipeline = None
 
 import numpy as np 
 import pandas as pd
