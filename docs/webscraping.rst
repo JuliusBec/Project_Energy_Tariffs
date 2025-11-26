@@ -20,6 +20,46 @@ All scrapers deliver structured tariff data including:
 - Energy price (ct/kWh)
 - Regional price differences (postal code-based)
 - Additional tariff features
+- Provider-specific information
+- Contract details and minimum duration
+- Green energy status
+
+Architecture
+------------
+
+The scrapers follow a consistent architecture:
+
+1. **Input Validation**: Postal code and consumption validation
+2. **Browser Automation**: Playwright-based navigation and JavaScript execution
+3. **Data Extraction**: CSS selectors and XPath queries
+4. **Fallback Strategy**: Regional averages when live scraping fails
+5. **Data Normalization**: Consistent output format across all scrapers
+
+.. code-block:: text
+
+   ┌─────────────┐
+   │   Input     │ → Postal Code, Consumption
+   └──────┬──────┘
+          ↓
+   ┌─────────────┐
+   │ Validation  │ → Check format and ranges
+   └──────┬──────┘
+          ↓
+   ┌─────────────┐
+   │  Playwright │ → Launch browser, navigate
+   └──────┬──────┘
+          ↓
+   ┌─────────────┐
+   │  Scraping   │ → Extract price data
+   └──────┬──────┘
+          ↓
+   ┌─────────────┐
+   │  Fallback?  │ → Use regional data if needed
+   └──────┬──────┘
+          ↓
+   ┌─────────────┐
+   │   Output    │ → Normalized tariff dict
+   └─────────────┘
 
 Tibber Scraper
 --------------
@@ -288,6 +328,62 @@ Check postal code validation and use fallback data:
        logger.warning("No live prices, using fallback")
        prices = scraper.get_fallback_prices(postal_code)
 
+**Problem: Website structure changed**
+
+Websites change frequently. Update selectors:
+
+.. code-block:: python
+
+   # Check current selectors
+   await page.screenshot(path='debug.png')
+   html = await page.content()
+   with open('debug.html', 'w') as f:
+       f.write(html)
+   
+   # Find new selectors using browser DevTools
+
+**Problem: Rate limiting / IP blocked**
+
+Implement delays and rotate user agents:
+
+.. code-block:: python
+
+   import random
+   import asyncio
+   
+   user_agents = [
+       'Mozilla/5.0 (Windows NT 10.0; Win64; x64)...',
+       'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)...'
+   ]
+   
+   async def scrape_with_delay(postal_codes):
+       for plz in postal_codes:
+           await asyncio.sleep(random.uniform(2, 5))  # Random delay
+           scraper = TibberScraper()
+           scraper.user_agent = random.choice(user_agents)
+           prices = await scraper.get_prices(postal_code=plz)
+
+**Problem: Memory leaks with long-running scrapers**
+
+.. code-block:: python
+
+   # Properly close browser contexts
+   async def scrape_batch(postal_codes):
+       async with async_playwright() as p:
+           browser = await p.chromium.launch()
+           
+           for plz in postal_codes:
+               context = await browser.new_context()
+               page = await context.new_page()
+               
+               try:
+                   # Scraping logic
+                   pass
+               finally:
+                   await context.close()  # Important!
+           
+           await browser.close()
+
 Performance Optimization
 ------------------------
 
@@ -295,15 +391,165 @@ Performance Optimization
 2. **Parallel Scraping**: Use asyncio.gather for multiple postal codes
 3. **Selective Scraping**: Scrape only required fields
 4. **Headless Mode**: Enable headless for better performance
+5. **Connection Pooling**: Reuse network connections
+6. **Resource Blocking**: Block unnecessary resources (images, fonts)
 
 .. code-block:: python
 
-   # Browser reuse
+   # Browser reuse with resource blocking
    async with async_playwright() as p:
-       browser = await p.chromium.launch(headless=True)
+       browser = await p.chromium.launch(
+           headless=True,
+           args=['--disable-gpu', '--no-sandbox']
+       )
+       
+       context = await browser.new_context(
+           user_agent='Mozilla/5.0...',
+           viewport={'width': 1920, 'height': 1080}
+       )
+       
+       # Block images and fonts for faster loading
+       await context.route('**/*.{png,jpg,jpeg,gif,svg,woff,woff2}', 
+                          lambda route: route.abort())
        
        # Multiple pages in parallel
-       tasks = [scrape_page(browser, plz) for plz in postal_codes]
+       tasks = [scrape_page(context, plz) for plz in postal_codes]
        results = await asyncio.gather(*tasks)
        
        await browser.close()
+
+Testing & Monitoring
+--------------------
+
+Unit Tests
+^^^^^^^^^^
+
+.. code-block:: python
+
+   import pytest
+   from src.webscraping.scraper_tibber import TibberScraper
+   
+   @pytest.mark.asyncio
+   async def test_tibber_scraper():
+       scraper = TibberScraper()
+       prices = await scraper.get_prices(postal_code="69117")
+       
+       assert prices is not None
+       assert 'base_price_monthly' in prices
+       assert prices['base_price_monthly'] > 0
+       assert prices['kwh_price_additional'] > 0
+   
+   @pytest.mark.asyncio
+   async def test_invalid_postal_code():
+       scraper = TibberScraper()
+       with pytest.raises(ValueError):
+           await scraper.get_prices(postal_code="99999")
+
+Integration Tests
+^^^^^^^^^^^^^^^^^
+
+.. code-block:: python
+
+   @pytest.mark.asyncio
+   @pytest.mark.integration
+   async def test_all_scrapers():
+       postal_code = "69117"
+       
+       tibber = TibberScraper()
+       enbw = EnbwScraper()
+       
+       results = await asyncio.gather(
+           tibber.get_prices(postal_code=postal_code),
+           enbw.get_prices(postal_code=postal_code, annual_consumption=3500),
+           return_exceptions=True
+       )
+       
+       # At least one scraper should succeed
+       successful = [r for r in results if not isinstance(r, Exception)]
+       assert len(successful) > 0
+
+Monitoring
+^^^^^^^^^^
+
+.. code-block:: python
+
+   import time
+   from datetime import datetime
+   
+   class MonitoredScraper:
+       def __init__(self):
+           self.metrics = {
+               'requests': 0,
+               'successes': 0,
+               'failures': 0,
+               'avg_duration': 0
+           }
+       
+       async def scrape_with_monitoring(self, postal_code):
+           start = time.time()
+           self.metrics['requests'] += 1
+           
+           try:
+               scraper = TibberScraper()
+               prices = await scraper.get_prices(postal_code=postal_code)
+               self.metrics['successes'] += 1
+               return prices
+           except Exception as e:
+               self.metrics['failures'] += 1
+               logger.error(f"Scraping failed: {e}")
+               raise
+           finally:
+               duration = time.time() - start
+               self.metrics['avg_duration'] = (
+                   (self.metrics['avg_duration'] * (self.metrics['requests'] - 1) + duration) 
+                   / self.metrics['requests']
+               )
+               
+               logger.info(f"Scraping metrics: {self.metrics}")
+
+Data Validation
+---------------
+
+Validate Scraped Data
+^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: python
+
+   from typing import Dict, Any
+   
+   def validate_tariff_data(data: Dict[str, Any]) -> bool:
+       """Validate scraped tariff data for consistency"""
+       required_fields = [
+           'base_price_monthly',
+           'kwh_price_additional',
+           'provider',
+           'postal_code'
+       ]
+       
+       # Check required fields
+       if not all(field in data for field in required_fields):
+           return False
+       
+       # Validate price ranges (reasonable bounds)
+       if not (0 < data['base_price_monthly'] < 50):
+           logger.warning(f"Unusual base price: {data['base_price_monthly']}")
+           return False
+       
+       if not (5 < data['kwh_price_additional'] < 50):
+           logger.warning(f"Unusual kWh price: {data['kwh_price_additional']}")
+           return False
+       
+       # Validate postal code format
+       if not (isinstance(data['postal_code'], str) and len(data['postal_code']) == 5):
+           return False
+       
+       return True
+   
+   # Usage
+   prices = await scraper.get_prices(postal_code="69117")
+   if validate_tariff_data(prices):
+       # Process valid data
+       pass
+   else:
+       # Use fallback or retry
+       logger.error("Invalid tariff data received")

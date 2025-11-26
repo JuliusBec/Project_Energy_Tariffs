@@ -1,0 +1,955 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="./">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>System Concept &amp; Architecture &#8212; Project Energy Tariffs  documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="_static/alabaster.css?v=27fed22d" />
+    <script src="_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="_static/doctools.js?v=9bcbadda"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="API Reference" href="api.html" />
+    <link rel="prev" title="Project Energy Tariffs" href="index.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="system-concept-architecture">
+<h1>System Concept &amp; Architecture<a class="headerlink" href="#system-concept-architecture" title="Link to this heading">¶</a></h1>
+<p>This document explains the complete concept and workflow of the Energy Tariff Analysis System,
+from data collection to tariff recommendations.</p>
+<section id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Link to this heading">¶</a></h2>
+<p>The Energy Tariff Analysis System is a comprehensive platform that helps households make informed
+decisions about electricity contracts by analyzing their consumption patterns, forecasting future
+prices and usage, and comparing different tariff structures.</p>
+</section>
+<section id="system-architecture">
+<h2>System Architecture<a class="headerlink" href="#system-architecture" title="Link to this heading">¶</a></h2>
+<p>The system consists of four main components that work together in a coordinated pipeline:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>┌─────────────────┐
+│  Web Scraping   │  ← Collect current tariff data
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│  Forecasting    │  ← Predict prices &amp; consumption
+│  - Prices       │
+│  - Consumption  │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│ Risk Analysis   │  ← Calculate volatility &amp; exposure
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│ Tariff Compare  │  ← Generate recommendations
+└─────────────────┘
+</pre></div>
+</div>
+</section>
+<section id="complete-workflow">
+<h2>Complete Workflow<a class="headerlink" href="#complete-workflow" title="Link to this heading">¶</a></h2>
+<section id="phase-1-data-collection-web-scraping">
+<h3>Phase 1: Data Collection (Web Scraping)<a class="headerlink" href="#phase-1-data-collection-web-scraping" title="Link to this heading">¶</a></h3>
+<p>The first phase involves collecting real-time tariff data from German energy providers.</p>
+<p><strong>What happens:</strong></p>
+<ol class="arabic simple">
+<li><p>User provides their postal code (PLZ) and annual consumption</p></li>
+<li><p>System launches automated scrapers for multiple providers:</p>
+<ul class="simple">
+<li><p>Tibber (dynamic tariff)</p></li>
+<li><p>EnBW (dynamic tariff)</p></li>
+<li><p>Tado (smart home integration)</p></li>
+</ul>
+</li>
+<li><p>Each scraper extracts:</p>
+<ul class="simple">
+<li><p>Base price (€/month)</p></li>
+<li><p>Energy price (ct/kWh)</p></li>
+<li><p>Additional fees</p></li>
+<li><p>Contract conditions</p></li>
+</ul>
+</li>
+</ol>
+<p><strong>Technology:</strong></p>
+<ul class="simple">
+<li><p>Playwright for browser automation</p></li>
+<li><p>Async/await for parallel scraping</p></li>
+<li><p>Fallback mechanisms for reliability</p></li>
+</ul>
+<p><strong>Example:</strong></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">src.webscraping.scraper_tibber</span><span class="w"> </span><span class="kn">import</span> <span class="n">TibberScraper</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">src.webscraping.scraper_enbw</span><span class="w"> </span><span class="kn">import</span> <span class="n">EnbwScraper</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">asyncio</span>
+
+<span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">collect_tariffs</span><span class="p">(</span><span class="n">postal_code</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">annual_kwh</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Collect all available tariffs for a location&quot;&quot;&quot;</span>
+
+    <span class="c1"># Initialize scrapers</span>
+    <span class="n">tibber</span> <span class="o">=</span> <span class="n">TibberScraper</span><span class="p">()</span>
+    <span class="n">enbw</span> <span class="o">=</span> <span class="n">EnbwScraper</span><span class="p">()</span>
+
+    <span class="c1"># Parallel scraping for efficiency</span>
+    <span class="n">results</span> <span class="o">=</span> <span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">gather</span><span class="p">(</span>
+        <span class="n">tibber</span><span class="o">.</span><span class="n">get_prices</span><span class="p">(</span><span class="n">postal_code</span><span class="o">=</span><span class="n">postal_code</span><span class="p">),</span>
+        <span class="n">enbw</span><span class="o">.</span><span class="n">get_prices</span><span class="p">(</span>
+            <span class="n">postal_code</span><span class="o">=</span><span class="n">postal_code</span><span class="p">,</span>
+            <span class="n">annual_consumption</span><span class="o">=</span><span class="n">annual_kwh</span>
+        <span class="p">)</span>
+    <span class="p">)</span>
+
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="s1">&#39;tibber&#39;</span><span class="p">:</span> <span class="n">results</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+        <span class="s1">&#39;enbw&#39;</span><span class="p">:</span> <span class="n">results</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+    <span class="p">}</span>
+</pre></div>
+</div>
+<p><strong>Output:</strong></p>
+<p>Structured tariff data ready for further processing:</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;tibber&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;base_price_monthly&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">14.99</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;kwh_price_additional&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">15.50</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;is_dynamic&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;enbw&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;base_price_monthly&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">18.21</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;markup_ct_kwh&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">15.36</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;is_dynamic&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="phase-2-consumption-calculation">
+<h3>Phase 2: Consumption Calculation<a class="headerlink" href="#phase-2-consumption-calculation" title="Link to this heading">¶</a></h3>
+<p>The system determines the household’s energy consumption pattern.</p>
+<p><strong>Two approaches:</strong></p>
+<ol class="arabic simple">
+<li><p><strong>Upload Smart Meter Data (Preferred)</strong></p>
+<ul class="simple">
+<li><p>User uploads CSV with hourly consumption</p></li>
+<li><p>System analyzes actual usage patterns</p></li>
+<li><p>Identifies peak times and consumption habits</p></li>
+</ul>
+</li>
+<li><p><strong>Standard Load Profile (Fallback)</strong></p>
+<ul class="simple">
+<li><p>Based on household size</p></li>
+<li><p>Uses German standard load profiles (H0)</p></li>
+<li><p>Applies typical consumption patterns</p></li>
+</ul>
+</li>
+</ol>
+<p><strong>Example with Smart Meter Data:</strong></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+
+<span class="c1"># Load user&#39;s smart meter data</span>
+<span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="s1">&#39;smart_meter_data.csv&#39;</span><span class="p">)</span>
+<span class="c1"># Format: datetime, value (kWh)</span>
+
+<span class="c1"># Analyze patterns</span>
+<span class="n">hourly_avg</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="n">df</span><span class="p">[</span><span class="s1">&#39;datetime&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">dt</span><span class="o">.</span><span class="n">hour</span><span class="p">)[</span><span class="s1">&#39;value&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+<span class="n">daily_total</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="n">df</span><span class="p">[</span><span class="s1">&#39;datetime&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">dt</span><span class="o">.</span><span class="n">date</span><span class="p">)[</span><span class="s1">&#39;value&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+
+<span class="c1"># Identify consumption characteristics</span>
+<span class="n">peak_hours</span> <span class="o">=</span> <span class="n">hourly_avg</span><span class="o">.</span><span class="n">nlargest</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
+<span class="n">avg_daily</span> <span class="o">=</span> <span class="n">daily_total</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Peak consumption hours: </span><span class="si">{</span><span class="n">peak_hours</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Average daily consumption: </span><span class="si">{</span><span class="n">avg_daily</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> kWh&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><strong>Example with Standard Profile:</strong></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">src.backend.energy_tariff</span><span class="w"> </span><span class="kn">import</span> <span class="n">StandardLoadProfile</span>
+
+<span class="c1"># Create profile for 2-person household</span>
+<span class="n">profile</span> <span class="o">=</span> <span class="n">StandardLoadProfile</span><span class="p">(</span>
+    <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Household Standard&quot;</span><span class="p">,</span>
+    <span class="n">base_price</span><span class="o">=</span><span class="mf">9.99</span><span class="p">,</span>
+    <span class="n">is_dynamic</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">start_date</span><span class="o">=</span><span class="n">datetime</span><span class="p">(</span><span class="mi">2024</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>
+    <span class="n">household_size</span><span class="o">=</span><span class="mi">2</span>
+<span class="p">)</span>
+
+<span class="c1"># Generate typical consumption pattern</span>
+<span class="n">annual_kwh</span> <span class="o">=</span> <span class="mi">2500</span>  <span class="c1"># Typical for 2 persons</span>
+<span class="n">hourly_distribution</span> <span class="o">=</span> <span class="n">profile</span><span class="o">.</span><span class="n">get_hourly_distribution</span><span class="p">()</span>
+</pre></div>
+</div>
+<p><strong>Output:</strong></p>
+<p>Detailed consumption profile:</p>
+<ul class="simple">
+<li><p>Hourly consumption patterns</p></li>
+<li><p>Peak vs. off-peak usage</p></li>
+<li><p>Seasonal variations</p></li>
+<li><p>Total annual consumption</p></li>
+</ul>
+</section>
+<section id="phase-3-price-forecasting">
+<h3>Phase 3: Price Forecasting<a class="headerlink" href="#phase-3-price-forecasting" title="Link to this heading">¶</a></h3>
+<p>The system predicts future electricity prices using machine learning.</p>
+<p><strong>What happens:</strong></p>
+<ol class="arabic simple">
+<li><p><strong>Load Historical Data</strong></p>
+<ul class="simple">
+<li><p>Downloads day-ahead prices from SMARD (Bundesnetzagentur)</p></li>
+<li><p>Covers at least 1 year of historical data</p></li>
+<li><p>Includes hourly spot market prices</p></li>
+</ul>
+</li>
+<li><p><strong>Train Prophet Model</strong></p>
+<ul class="simple">
+<li><p>Facebook Prophet for time series forecasting</p></li>
+<li><p>Detects daily, weekly, and seasonal patterns</p></li>
+<li><p>Accounts for trend changes</p></li>
+</ul>
+</li>
+<li><p><strong>Generate Forecast</strong></p>
+<ul class="simple">
+<li><p>Predicts prices for next 30 days (720 hours)</p></li>
+<li><p>Provides confidence intervals</p></li>
+<li><p>Accounts for market volatility</p></li>
+</ul>
+</li>
+</ol>
+<p><strong>Example:</strong></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">src.backend.forecasting.energy_price_forecast</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">load_and_prepare_data</span><span class="p">,</span>
+    <span class="n">create_prophet_model</span><span class="p">,</span>
+    <span class="n">forecast_prices</span>
+<span class="p">)</span>
+
+<span class="c1"># Load historical SMARD data</span>
+<span class="n">df</span> <span class="o">=</span> <span class="n">load_and_prepare_data</span><span class="p">(</span><span class="s1">&#39;app_data/germany_dayahead_prices.csv&#39;</span><span class="p">)</span>
+
+<span class="c1"># Create and train model</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">create_prophet_model</span><span class="p">(</span>
+    <span class="n">changepoint_prior_scale</span><span class="o">=</span><span class="mf">0.15</span><span class="p">,</span>  <span class="c1"># Flexibility for trends</span>
+    <span class="n">seasonality_prior_scale</span><span class="o">=</span><span class="mf">10.0</span>   <span class="c1"># Strength of patterns</span>
+<span class="p">)</span>
+<span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">df</span><span class="p">)</span>
+
+<span class="c1"># Forecast next 30 days</span>
+<span class="n">forecast</span> <span class="o">=</span> <span class="n">forecast_prices</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">periods</span><span class="o">=</span><span class="mi">720</span><span class="p">)</span>
+
+<span class="c1"># Analyze results</span>
+<span class="n">avg_price</span> <span class="o">=</span> <span class="n">forecast</span><span class="p">[</span><span class="s1">&#39;yhat&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+<span class="n">min_price</span> <span class="o">=</span> <span class="n">forecast</span><span class="p">[</span><span class="s1">&#39;yhat&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">min</span><span class="p">()</span>
+<span class="n">max_price</span> <span class="o">=</span> <span class="n">forecast</span><span class="p">[</span><span class="s1">&#39;yhat&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">max</span><span class="p">()</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Average predicted price: </span><span class="si">{</span><span class="n">avg_price</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> €/MWh&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Price range: </span><span class="si">{</span><span class="n">min_price</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> - </span><span class="si">{</span><span class="n">max_price</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> €/MWh&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><strong>Key Features:</strong></p>
+<ul class="simple">
+<li><p><strong>Seasonality Detection</strong>: Identifies daily and weekly patterns</p></li>
+<li><p><strong>Trend Analysis</strong>: Recognizes long-term market trends</p></li>
+<li><p><strong>Uncertainty Quantification</strong>: Provides 90% confidence intervals</p></li>
+<li><p><strong>Market Integration</strong>: Uses official German market data</p></li>
+</ul>
+<p><strong>Output:</strong></p>
+<p>Hourly price predictions for the next 30 days:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>Date/Time           Predicted Price (€/MWh)   Lower CI   Upper CI
+2024-12-01 00:00    85.32                     75.21      95.43
+2024-12-01 01:00    78.45                     68.34      88.56
+2024-12-01 02:00    72.18                     62.07      82.29
+...
+</pre></div>
+</div>
+</section>
+<section id="phase-4-usage-forecasting">
+<h3>Phase 4: Usage Forecasting<a class="headerlink" href="#phase-4-usage-forecasting" title="Link to this heading">¶</a></h3>
+<p>The system predicts the household’s future energy consumption.</p>
+<p><strong>What happens:</strong></p>
+<ol class="arabic simple">
+<li><p><strong>Analyze Historical Pattern</strong></p>
+<ul class="simple">
+<li><p>Uses smart meter data or standard profile</p></li>
+<li><p>Identifies consumption habits</p></li>
+<li><p>Detects weekly and daily patterns</p></li>
+</ul>
+</li>
+<li><p><strong>Train Forecast Model</strong></p>
+<ul class="simple">
+<li><p>Prophet for traditional time series</p></li>
+<li><p>Optional: Chronos for deep learning approach</p></li>
+<li><p>Captures seasonality and trends</p></li>
+</ul>
+</li>
+<li><p><strong>Generate Consumption Forecast</strong></p>
+<ul class="simple">
+<li><p>Predicts hourly consumption for 30 days</p></li>
+<li><p>Aligns with price forecast period</p></li>
+<li><p>Provides confidence intervals</p></li>
+</ul>
+</li>
+</ol>
+<p><strong>Example:</strong></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">src.backend.forecasting.energy_usage_forecast</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">forecast_prophet</span><span class="p">,</span>
+    <span class="n">calculate_total_weekly_usage</span>
+<span class="p">)</span>
+
+<span class="c1"># Load smart meter data</span>
+<span class="n">consumption_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="s1">&#39;smart_meter_data.csv&#39;</span><span class="p">)</span>
+
+<span class="c1"># Forecast next 30 days</span>
+<span class="n">usage_forecast</span> <span class="o">=</span> <span class="n">forecast_prophet</span><span class="p">(</span><span class="n">consumption_df</span><span class="p">,</span> <span class="n">days</span><span class="o">=</span><span class="mi">30</span><span class="p">)</span>
+
+<span class="c1"># Analyze weekly patterns</span>
+<span class="n">weekly_totals</span> <span class="o">=</span> <span class="n">calculate_total_weekly_usage</span><span class="p">(</span><span class="n">usage_forecast</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Predicted weekly consumption:&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">weekly_totals</span><span class="p">[</span><span class="s1">&#39;yhat&#39;</span><span class="p">])</span>
+
+<span class="c1"># Total consumption for period</span>
+<span class="n">total_30_days</span> <span class="o">=</span> <span class="n">usage_forecast</span><span class="p">[</span><span class="s1">&#39;yhat&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Total 30-day consumption: </span><span class="si">{</span><span class="n">total_30_days</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> kWh&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><strong>Output:</strong></p>
+<p>Hourly consumption predictions:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>Date/Time           Predicted Usage (kWh)   Lower CI   Upper CI
+2024-12-01 00:00    0.45                    0.35       0.55
+2024-12-01 01:00    0.38                    0.28       0.48
+2024-12-01 06:00    1.25                    1.05       1.45
+...
+</pre></div>
+</div>
+</section>
+<section id="phase-5-risk-analysis">
+<h3>Phase 5: Risk Analysis<a class="headerlink" href="#phase-5-risk-analysis" title="Link to this heading">¶</a></h3>
+<p>The system calculates the financial risk associated with each tariff type.</p>
+<p><strong>What is analyzed:</strong></p>
+<ol class="arabic simple">
+<li><p><strong>Price Volatility</strong></p>
+<ul class="simple">
+<li><p>Standard deviation of predicted prices</p></li>
+<li><p>Worst-case vs. best-case scenarios</p></li>
+<li><p>Exposure to market fluctuations</p></li>
+</ul>
+</li>
+<li><p><strong>Cost Distribution</strong></p>
+<ul class="simple">
+<li><p>Percentile analysis (10th, 50th, 90th)</p></li>
+<li><p>Maximum potential monthly cost</p></li>
+<li><p>Probability of exceeding budget</p></li>
+</ul>
+</li>
+<li><p><strong>Risk Metrics</strong></p>
+<ul class="simple">
+<li><p>Value at Risk (VaR)</p></li>
+<li><p>Expected shortfall</p></li>
+<li><p>Risk score (0-100)</p></li>
+</ul>
+</li>
+</ol>
+<p><strong>Example:</strong></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">src.backend.risk_analysis</span><span class="w"> </span><span class="kn">import</span> <span class="n">calculate_risk_metrics</span>
+
+<span class="c1"># Combine price and usage forecasts</span>
+<span class="n">combined_forecast</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">merge</span><span class="p">(</span>
+    <span class="n">usage_forecast</span><span class="p">[[</span><span class="s1">&#39;datetime&#39;</span><span class="p">,</span> <span class="s1">&#39;yhat&#39;</span><span class="p">]],</span>
+    <span class="n">price_forecast</span><span class="p">[[</span><span class="s1">&#39;ds&#39;</span><span class="p">,</span> <span class="s1">&#39;yhat&#39;</span><span class="p">]],</span>
+    <span class="n">left_on</span><span class="o">=</span><span class="s1">&#39;datetime&#39;</span><span class="p">,</span>
+    <span class="n">right_on</span><span class="o">=</span><span class="s1">&#39;ds&#39;</span>
+<span class="p">)</span>
+
+<span class="c1"># Calculate hourly costs (price in €/MWh -&gt; €/kWh)</span>
+<span class="n">combined_forecast</span><span class="p">[</span><span class="s1">&#39;cost&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="n">combined_forecast</span><span class="p">[</span><span class="s1">&#39;yhat_usage&#39;</span><span class="p">]</span> <span class="o">*</span>
+    <span class="n">combined_forecast</span><span class="p">[</span><span class="s1">&#39;yhat_price&#39;</span><span class="p">]</span> <span class="o">/</span> <span class="mi">1000</span>
+<span class="p">)</span>
+
+<span class="c1"># Risk analysis</span>
+<span class="n">risk_metrics</span> <span class="o">=</span> <span class="n">calculate_risk_metrics</span><span class="p">(</span><span class="n">combined_forecast</span><span class="p">[</span><span class="s1">&#39;cost&#39;</span><span class="p">])</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Average monthly cost: </span><span class="si">{</span><span class="n">risk_metrics</span><span class="p">[</span><span class="s1">&#39;mean&#39;</span><span class="p">]</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">€&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Standard deviation: </span><span class="si">{</span><span class="n">risk_metrics</span><span class="p">[</span><span class="s1">&#39;std&#39;</span><span class="p">]</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">€&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;90th percentile: </span><span class="si">{</span><span class="n">risk_metrics</span><span class="p">[</span><span class="s1">&#39;p90&#39;</span><span class="p">]</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">€&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Risk score: </span><span class="si">{</span><span class="n">risk_metrics</span><span class="p">[</span><span class="s1">&#39;risk_score&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">/100&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><strong>Risk Score Interpretation:</strong></p>
+<ul class="simple">
+<li><p><strong>0-30</strong>: Low risk - Stable, predictable costs</p></li>
+<li><p><strong>31-60</strong>: Medium risk - Moderate price fluctuations</p></li>
+<li><p><strong>61-100</strong>: High risk - Significant volatility, budget uncertainty</p></li>
+</ul>
+<p><strong>Output for Dynamic Tariff:</strong></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;mean_monthly_cost&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">89.45</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;std_deviation&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">15.32</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;percentile_10&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">68.20</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;percentile_50&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">87.15</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;percentile_90&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">112.80</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;max_expected_cost&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">125.50</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;risk_score&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">42</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;volatility_index&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">17.1</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p><strong>Output for Fixed Tariff:</strong></p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;mean_monthly_cost&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">95.00</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;std_deviation&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">2.15</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;percentile_10&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">92.50</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;percentile_50&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">95.00</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;percentile_90&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">97.50</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;max_expected_cost&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">98.00</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;risk_score&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">8</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;volatility_index&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">2.3</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="phase-6-tariff-comparison-recommendation">
+<h3>Phase 6: Tariff Comparison &amp; Recommendation<a class="headerlink" href="#phase-6-tariff-comparison-recommendation" title="Link to this heading">¶</a></h3>
+<p>The final phase combines all data to generate personalized recommendations.</p>
+<p><strong>Comparison Criteria:</strong></p>
+<ol class="arabic simple">
+<li><p><strong>Total Cost</strong></p>
+<ul class="simple">
+<li><p>Base price + energy costs</p></li>
+<li><p>Projected 30-day total</p></li>
+<li><p>Annual cost estimate</p></li>
+</ul>
+</li>
+<li><p><strong>Risk Profile</strong></p>
+<ul class="simple">
+<li><p>Price volatility</p></li>
+<li><p>Cost predictability</p></li>
+<li><p>Worst-case scenarios</p></li>
+</ul>
+</li>
+<li><p><strong>Savings Potential</strong></p>
+<ul class="simple">
+<li><p>Comparison with current tariff</p></li>
+<li><p>Best vs. worst case scenarios</p></li>
+<li><p>Time-of-use optimization</p></li>
+</ul>
+</li>
+<li><p><strong>User Preferences</strong></p>
+<ul class="simple">
+<li><p>Risk tolerance</p></li>
+<li><p>Budget constraints</p></li>
+<li><p>Green energy preference</p></li>
+</ul>
+</li>
+</ol>
+<p><strong>Example:</strong></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">src.backend.energy_tariff</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">FixedPriceTariff</span><span class="p">,</span>
+    <span class="n">DynamicPriceTariff</span><span class="p">,</span>
+    <span class="n">compare_tariffs</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">datetime</span><span class="w"> </span><span class="kn">import</span> <span class="n">datetime</span>
+
+<span class="c1"># Create tariff objects</span>
+<span class="n">fixed_tariff</span> <span class="o">=</span> <span class="n">FixedPriceTariff</span><span class="p">(</span>
+    <span class="n">name</span><span class="o">=</span><span class="s2">&quot;EWE Strom Fix&quot;</span><span class="p">,</span>
+    <span class="n">base_price</span><span class="o">=</span><span class="mf">9.99</span><span class="p">,</span>
+    <span class="n">is_dynamic</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">start_date</span><span class="o">=</span><span class="n">datetime</span><span class="p">(</span><span class="mi">2024</span><span class="p">,</span> <span class="mi">12</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>
+    <span class="n">kwh_rate</span><span class="o">=</span><span class="mf">0.32</span><span class="p">,</span>
+    <span class="n">provider</span><span class="o">=</span><span class="s2">&quot;EWE&quot;</span><span class="p">,</span>
+    <span class="n">features</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;fixed&quot;</span><span class="p">,</span> <span class="s2">&quot;12-month guarantee&quot;</span><span class="p">]</span>
+<span class="p">)</span>
+
+<span class="n">dynamic_tariff</span> <span class="o">=</span> <span class="n">DynamicPriceTariff</span><span class="p">(</span>
+    <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Tibber&quot;</span><span class="p">,</span>
+    <span class="n">base_price</span><span class="o">=</span><span class="mf">14.99</span><span class="p">,</span>
+    <span class="n">is_dynamic</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">start_date</span><span class="o">=</span><span class="n">datetime</span><span class="p">(</span><span class="mi">2024</span><span class="p">,</span> <span class="mi">12</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>
+    <span class="n">base_rate</span><span class="o">=</span><span class="mf">0.155</span><span class="p">,</span>
+    <span class="n">provider</span><span class="o">=</span><span class="s2">&quot;Tibber&quot;</span><span class="p">,</span>
+    <span class="n">features</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;dynamic&quot;</span><span class="p">,</span> <span class="s2">&quot;smart home&quot;</span><span class="p">,</span> <span class="s2">&quot;green&quot;</span><span class="p">],</span>
+    <span class="n">price_forecast_df</span><span class="o">=</span><span class="n">price_forecast</span>
+<span class="p">)</span>
+
+<span class="c1"># Compare with user&#39;s consumption</span>
+<span class="n">comparison</span> <span class="o">=</span> <span class="n">compare_tariffs</span><span class="p">(</span>
+    <span class="n">tariffs</span><span class="o">=</span><span class="p">[</span><span class="n">fixed_tariff</span><span class="p">,</span> <span class="n">dynamic_tariff</span><span class="p">],</span>
+    <span class="n">consumption_forecast</span><span class="o">=</span><span class="n">usage_forecast</span><span class="p">,</span>
+    <span class="n">period_days</span><span class="o">=</span><span class="mi">30</span>
+<span class="p">)</span>
+
+<span class="c1"># Display results</span>
+<span class="k">for</span> <span class="n">tariff_name</span><span class="p">,</span> <span class="n">result</span> <span class="ow">in</span> <span class="n">comparison</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="si">{</span><span class="n">tariff_name</span><span class="si">}</span><span class="s2">:&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Expected cost: </span><span class="si">{</span><span class="n">result</span><span class="p">[</span><span class="s1">&#39;total_cost&#39;</span><span class="p">]</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">€&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Risk score: </span><span class="si">{</span><span class="n">result</span><span class="p">[</span><span class="s1">&#39;risk_score&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">/100&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Best case: </span><span class="si">{</span><span class="n">result</span><span class="p">[</span><span class="s1">&#39;min_cost&#39;</span><span class="p">]</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">€&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  Worst case: </span><span class="si">{</span><span class="n">result</span><span class="p">[</span><span class="s1">&#39;max_cost&#39;</span><span class="p">]</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">€&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><strong>Recommendation Engine:</strong></p>
+<p>The system generates personalized recommendations based on:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">generate_recommendation</span><span class="p">(</span><span class="n">comparison_results</span><span class="p">,</span> <span class="n">user_profile</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Generate tariff recommendation based on user profile</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        comparison_results: Dict with tariff comparison data</span>
+<span class="sd">        user_profile: Dict with user preferences</span>
+<span class="sd">            - risk_tolerance: &#39;low&#39; | &#39;medium&#39; | &#39;high&#39;</span>
+<span class="sd">            - budget_limit: float (€)</span>
+<span class="sd">            - prefer_green: bool</span>
+<span class="sd">            - smart_home: bool</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">recommendations</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="k">for</span> <span class="n">tariff_name</span><span class="p">,</span> <span class="n">data</span> <span class="ow">in</span> <span class="n">comparison_results</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">score</span> <span class="o">=</span> <span class="mi">0</span>
+
+        <span class="c1"># Cost scoring (40% weight)</span>
+        <span class="k">if</span> <span class="n">data</span><span class="p">[</span><span class="s1">&#39;total_cost&#39;</span><span class="p">]</span> <span class="o">&lt;</span> <span class="n">user_profile</span><span class="p">[</span><span class="s1">&#39;budget_limit&#39;</span><span class="p">]:</span>
+            <span class="n">score</span> <span class="o">+=</span> <span class="mi">40</span>
+        <span class="k">elif</span> <span class="n">data</span><span class="p">[</span><span class="s1">&#39;max_cost&#39;</span><span class="p">]</span> <span class="o">&lt;</span> <span class="n">user_profile</span><span class="p">[</span><span class="s1">&#39;budget_limit&#39;</span><span class="p">]:</span>
+            <span class="n">score</span> <span class="o">+=</span> <span class="mi">20</span>
+
+        <span class="c1"># Risk scoring (30% weight)</span>
+        <span class="k">if</span> <span class="n">user_profile</span><span class="p">[</span><span class="s1">&#39;risk_tolerance&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;low&#39;</span><span class="p">:</span>
+            <span class="n">score</span> <span class="o">+=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">30</span> <span class="o">-</span> <span class="n">data</span><span class="p">[</span><span class="s1">&#39;risk_score&#39;</span><span class="p">]</span> <span class="o">*</span> <span class="mf">0.3</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">user_profile</span><span class="p">[</span><span class="s1">&#39;risk_tolerance&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;high&#39;</span><span class="p">:</span>
+            <span class="c1"># Reward potential savings from dynamic pricing</span>
+            <span class="k">if</span> <span class="n">data</span><span class="p">[</span><span class="s1">&#39;is_dynamic&#39;</span><span class="p">]</span> <span class="ow">and</span> <span class="n">data</span><span class="p">[</span><span class="s1">&#39;min_cost&#39;</span><span class="p">]</span> <span class="o">&lt;</span> <span class="n">data</span><span class="p">[</span><span class="s1">&#39;mean_cost&#39;</span><span class="p">]:</span>
+                <span class="n">score</span> <span class="o">+=</span> <span class="mi">30</span>
+
+        <span class="c1"># Feature matching (30% weight)</span>
+        <span class="k">if</span> <span class="n">user_profile</span><span class="p">[</span><span class="s1">&#39;prefer_green&#39;</span><span class="p">]</span> <span class="ow">and</span> <span class="s1">&#39;green&#39;</span> <span class="ow">in</span> <span class="n">data</span><span class="p">[</span><span class="s1">&#39;features&#39;</span><span class="p">]:</span>
+            <span class="n">score</span> <span class="o">+=</span> <span class="mi">15</span>
+        <span class="k">if</span> <span class="n">user_profile</span><span class="p">[</span><span class="s1">&#39;smart_home&#39;</span><span class="p">]</span> <span class="ow">and</span> <span class="s1">&#39;smart home&#39;</span> <span class="ow">in</span> <span class="n">data</span><span class="p">[</span><span class="s1">&#39;features&#39;</span><span class="p">]:</span>
+            <span class="n">score</span> <span class="o">+=</span> <span class="mi">15</span>
+
+        <span class="n">recommendations</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+            <span class="s1">&#39;tariff&#39;</span><span class="p">:</span> <span class="n">tariff_name</span><span class="p">,</span>
+            <span class="s1">&#39;score&#39;</span><span class="p">:</span> <span class="n">score</span><span class="p">,</span>
+            <span class="s1">&#39;reason&#39;</span><span class="p">:</span> <span class="n">generate_reason</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">user_profile</span><span class="p">)</span>
+        <span class="p">})</span>
+
+    <span class="c1"># Sort by score</span>
+    <span class="n">recommendations</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="p">[</span><span class="s1">&#39;score&#39;</span><span class="p">],</span> <span class="n">reverse</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">recommendations</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>  <span class="c1"># Return best match</span>
+</pre></div>
+</div>
+<p><strong>Example Output:</strong></p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>┌─────────────────────────────────────────────────────────────┐
+│ TARIFF RECOMMENDATION                                       │
+└─────────────────────────────────────────────────────────────┘
+
+🏆 BEST MATCH: Tibber Dynamic (Score: 87/100)
+
+📊 Cost Analysis:
+   • Expected monthly cost: 89.45€
+   • Savings vs. current: 12.30€/month (148€/year)
+   • Best case scenario: 68.20€
+   • Worst case scenario: 112.80€
+
+📈 Risk Assessment:
+   • Risk score: 42/100 (Medium)
+   • Price volatility: Moderate
+   • Cost predictability: 85%
+
+✨ Key Features:
+   • 100% green energy
+   • Smart home integration
+   • Real-time price tracking
+   • No minimum contract duration
+
+💡 Why this tariff?
+   Based on your consumption pattern and risk tolerance,
+   this dynamic tariff offers the best balance between
+   savings potential and manageable risk. Your flexible
+   consumption habits align well with time-of-use pricing.
+
+⚠️  Important Notes:
+   • Requires smart meter installation
+   • Monthly costs can vary
+   • Best suited for users who can shift consumption
+
+────────────────────────────────────────────────────────────
+
+Alternative Options:
+
+2. EWE Strom Fix (Score: 73/100)
+   • Fixed monthly cost: 95.00€
+   • Zero price risk
+   • 12-month price guarantee
+   → Best for: Maximum budget security
+</pre></div>
+</div>
+</section>
+<section id="real-world-example-scenario">
+<h3><strong>Real-World Example Scenario</strong><a class="headerlink" href="#real-world-example-scenario" title="Link to this heading">¶</a></h3>
+<p>Let’s walk through a complete example:</p>
+<p><strong>User Profile:</strong></p>
+<ul class="simple">
+<li><p>2-person household in Heidelberg (PLZ: 69117)</p></li>
+<li><p>Annual consumption: 2,500 kWh</p></li>
+<li><p>Has smart meter data available</p></li>
+<li><p>Moderate risk tolerance</p></li>
+<li><p>Prefers green energy</p></li>
+<li><p>Budget limit: 100€/month</p></li>
+</ul>
+<p><strong>Step 1: Data Collection</strong></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Scrape tariffs for Heidelberg</span>
+<span class="n">tariffs</span> <span class="o">=</span> <span class="k">await</span> <span class="n">collect_tariffs</span><span class="p">(</span>
+    <span class="n">postal_code</span><span class="o">=</span><span class="s2">&quot;69117&quot;</span><span class="p">,</span>
+    <span class="n">annual_kwh</span><span class="o">=</span><span class="mi">2500</span>
+<span class="p">)</span>
+<span class="c1"># Result: Found Tibber (14.99€ base + 15.5ct/kWh)</span>
+<span class="c1">#         Found EnBW (18.21€ base + 15.36ct/kWh)</span>
+</pre></div>
+</div>
+<p><strong>Step 2: Consumption Analysis</strong></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Load user&#39;s smart meter data</span>
+<span class="n">consumption</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="s1">&#39;user_smart_meter.csv&#39;</span><span class="p">)</span>
+<span class="c1"># Analysis shows:</span>
+<span class="c1"># - Peak usage 6-8 AM and 6-9 PM</span>
+<span class="c1"># - Average 6.85 kWh/day</span>
+<span class="c1"># - Higher consumption in winter</span>
+</pre></div>
+</div>
+<p><strong>Step 3: Price Forecast</strong></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Train and forecast prices</span>
+<span class="n">price_forecast</span> <span class="o">=</span> <span class="n">forecast_prices</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">periods</span><span class="o">=</span><span class="mi">720</span><span class="p">)</span>
+<span class="c1"># Result: Average 85€/MWh, range 60-120€/MWh</span>
+</pre></div>
+</div>
+<p><strong>Step 4: Usage Forecast</strong></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Forecast consumption</span>
+<span class="n">usage_forecast</span> <span class="o">=</span> <span class="n">forecast_prophet</span><span class="p">(</span><span class="n">consumption</span><span class="p">,</span> <span class="n">days</span><span class="o">=</span><span class="mi">30</span><span class="p">)</span>
+<span class="c1"># Result: Predicted 205 kWh total for 30 days</span>
+</pre></div>
+</div>
+<p><strong>Step 5: Risk Analysis</strong></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Calculate costs and risk</span>
+<span class="c1"># Tibber Dynamic: Mean 89.45€, Risk score 42</span>
+<span class="c1"># Fixed Alternative: Mean 95.00€, Risk score 8</span>
+</pre></div>
+</div>
+<p><strong>Step 6: Recommendation</strong></p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>RECOMMENDATION: Tibber Dynamic
+
+Reasoning:
+✓ Saves ~148€/year vs. fixed tariff
+✓ Risk score (42) acceptable for moderate tolerance
+✓ Green energy matches preference
+✓ Smart meter already installed
+✓ Peak consumption times have moderate prices
+
+Action: Switch to Tibber, consider shifting
+        some evening consumption to off-peak hours
+        for additional 10-15% savings
+</pre></div>
+</div>
+</section>
+</section>
+<section id="integration-api">
+<h2>Integration &amp; API<a class="headerlink" href="#integration-api" title="Link to this heading">¶</a></h2>
+<p>The complete workflow is exposed through a REST API:</p>
+<p><strong>Main Endpoint:</strong></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nd">@app</span><span class="o">.</span><span class="n">route</span><span class="p">(</span><span class="s1">&#39;/api/compare-tariffs&#39;</span><span class="p">,</span> <span class="n">methods</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;POST&#39;</span><span class="p">])</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">compare_tariffs_endpoint</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Complete tariff comparison pipeline</span>
+
+<span class="sd">    Request body:</span>
+<span class="sd">    {</span>
+<span class="sd">      &quot;postal_code&quot;: &quot;69117&quot;,</span>
+<span class="sd">      &quot;annual_kwh&quot;: 2500,</span>
+<span class="sd">      &quot;household_size&quot;: 2,</span>
+<span class="sd">      &quot;smart_meter_data&quot;: &quot;base64_encoded_csv&quot;,  # optional</span>
+<span class="sd">      &quot;risk_tolerance&quot;: &quot;medium&quot;,</span>
+<span class="sd">      &quot;prefer_green&quot;: true,</span>
+<span class="sd">      &quot;budget_limit&quot;: 100</span>
+<span class="sd">    }</span>
+
+<span class="sd">    Response:</span>
+<span class="sd">    {</span>
+<span class="sd">      &quot;recommendations&quot;: [...],</span>
+<span class="sd">      &quot;forecast_period&quot;: 30,</span>
+<span class="sd">      &quot;analysis&quot;: {...}</span>
+<span class="sd">    }</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">pass</span>
+</pre></div>
+</div>
+<p><strong>Frontend Integration:</strong></p>
+<p>The Vue.js frontend provides an interactive interface:</p>
+<div class="highlight-javascript notranslate"><div class="highlight"><pre><span></span><span class="c1">// User inputs postal code and preferences</span>
+<span class="k">async</span><span class="w"> </span><span class="kd">function</span><span class="w"> </span><span class="nx">getTariffRecommendation</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">response</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">fetch</span><span class="p">(</span><span class="s1">&#39;/api/compare-tariffs&#39;</span><span class="p">,</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nx">method</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;POST&#39;</span><span class="p">,</span>
+<span class="w">    </span><span class="nx">headers</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="s1">&#39;Content-Type&#39;</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;application/json&#39;</span><span class="w"> </span><span class="p">},</span>
+<span class="w">    </span><span class="nx">body</span><span class="o">:</span><span class="w"> </span><span class="nb">JSON</span><span class="p">.</span><span class="nx">stringify</span><span class="p">({</span>
+<span class="w">      </span><span class="nx">postal_code</span><span class="o">:</span><span class="w"> </span><span class="nx">userInput</span><span class="p">.</span><span class="nx">postalCode</span><span class="p">,</span>
+<span class="w">      </span><span class="nx">annual_kwh</span><span class="o">:</span><span class="w"> </span><span class="nx">userInput</span><span class="p">.</span><span class="nx">annualConsumption</span><span class="p">,</span>
+<span class="w">      </span><span class="nx">household_size</span><span class="o">:</span><span class="w"> </span><span class="nx">userInput</span><span class="p">.</span><span class="nx">householdSize</span><span class="p">,</span>
+<span class="w">      </span><span class="nx">risk_tolerance</span><span class="o">:</span><span class="w"> </span><span class="nx">userInput</span><span class="p">.</span><span class="nx">riskTolerance</span><span class="p">,</span>
+<span class="w">      </span><span class="nx">prefer_green</span><span class="o">:</span><span class="w"> </span><span class="nx">userInput</span><span class="p">.</span><span class="nx">preferGreen</span>
+<span class="w">    </span><span class="p">})</span>
+<span class="w">  </span><span class="p">});</span>
+
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">result</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">response</span><span class="p">.</span><span class="nx">json</span><span class="p">();</span>
+<span class="w">  </span><span class="nx">displayRecommendation</span><span class="p">(</span><span class="nx">result</span><span class="p">.</span><span class="nx">recommendations</span><span class="p">[</span><span class="mf">0</span><span class="p">]);</span>
+<span class="w">  </span><span class="nx">showComparison</span><span class="p">(</span><span class="nx">result</span><span class="p">.</span><span class="nx">analysis</span><span class="p">);</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="key-benefits-of-this-architecture">
+<h2>Key Benefits of This Architecture<a class="headerlink" href="#key-benefits-of-this-architecture" title="Link to this heading">¶</a></h2>
+<ol class="arabic simple">
+<li><p><strong>Data-Driven Decisions</strong></p>
+<ul class="simple">
+<li><p>Real-time tariff data</p></li>
+<li><p>Personalized consumption analysis</p></li>
+<li><p>Scientific forecasting methods</p></li>
+</ul>
+</li>
+<li><p><strong>Comprehensive Risk Assessment</strong></p>
+<ul class="simple">
+<li><p>Quantified volatility</p></li>
+<li><p>Clear worst/best case scenarios</p></li>
+<li><p>Informed decision support</p></li>
+</ul>
+</li>
+<li><p><strong>Flexible &amp; Extensible</strong></p>
+<ul class="simple">
+<li><p>Easy to add new providers</p></li>
+<li><p>Modular architecture</p></li>
+<li><p>Scalable forecasting</p></li>
+</ul>
+</li>
+<li><p><strong>User-Centric</strong></p>
+<ul class="simple">
+<li><p>Clear recommendations</p></li>
+<li><p>Transparent calculations</p></li>
+<li><p>Multiple risk profiles supported</p></li>
+</ul>
+</li>
+</ol>
+</section>
+<section id="technical-stack-summary">
+<h2>Technical Stack Summary<a class="headerlink" href="#technical-stack-summary" title="Link to this heading">¶</a></h2>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 30.0%" />
+<col style="width: 70.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Component</p></th>
+<th class="head"><p>Technology</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Web Scraping</p></td>
+<td><p>Playwright (async), Python</p></td>
+</tr>
+<tr class="row-odd"><td><p>Data Processing</p></td>
+<td><p>Pandas, NumPy</p></td>
+</tr>
+<tr class="row-even"><td><p>Forecasting</p></td>
+<td><p>Prophet, Chronos (optional)</p></td>
+</tr>
+<tr class="row-odd"><td><p>Risk Analysis</p></td>
+<td><p>Statistical modeling, VaR</p></td>
+</tr>
+<tr class="row-even"><td><p>Backend API</p></td>
+<td><p>Flask, Python</p></td>
+</tr>
+<tr class="row-odd"><td><p>Frontend</p></td>
+<td><p>Vue.js, Vite</p></td>
+</tr>
+<tr class="row-even"><td><p>Visualization</p></td>
+<td><p>Chart.js, Matplotlib</p></td>
+</tr>
+<tr class="row-odd"><td><p>Data Storage</p></td>
+<td><p>CSV files, JSON</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="future-enhancements">
+<h2>Future Enhancements<a class="headerlink" href="#future-enhancements" title="Link to this heading">¶</a></h2>
+<p>Planned improvements to the system:</p>
+<ol class="arabic simple">
+<li><p><strong>Machine Learning Optimization</strong></p>
+<ul class="simple">
+<li><p>Ensemble forecasting (Prophet + Chronos)</p></li>
+<li><p>Consumption pattern recognition</p></li>
+<li><p>Automated parameter tuning</p></li>
+</ul>
+</li>
+<li><p><strong>Extended Provider Support</strong></p>
+<ul class="simple">
+<li><p>Additional German energy providers</p></li>
+<li><p>European market integration</p></li>
+<li><p>Solar/battery integration</p></li>
+</ul>
+</li>
+<li><p><strong>Advanced Features</strong></p>
+<ul class="simple">
+<li><p>Real-time price alerts</p></li>
+<li><p>Automatic switching recommendations</p></li>
+<li><p>Carbon footprint tracking</p></li>
+<li><p>Solar production forecasting</p></li>
+</ul>
+</li>
+<li><p><strong>Mobile App</strong></p>
+<ul class="simple">
+<li><p>Native iOS/Android apps</p></li>
+<li><p>Push notifications</p></li>
+<li><p>Quick consumption logging</p></li>
+</ul>
+</li>
+<li><p><strong>AI-Powered Insights</strong></p>
+<ul class="simple">
+<li><p>Anomaly detection in consumption</p></li>
+<li><p>Personalized saving tips</p></li>
+<li><p>Predictive maintenance alerts</p></li>
+</ul>
+</li>
+</ol>
+</section>
+<section id="conclusion">
+<h2>Conclusion<a class="headerlink" href="#conclusion" title="Link to this heading">¶</a></h2>
+<p>The Energy Tariff Analysis System provides a complete, end-to-end solution for
+household electricity tariff optimization. By combining web scraping, machine learning
+forecasting, risk analysis, and user-centric design, it empowers consumers to make
+informed decisions about their energy contracts.</p>
+<p>The modular architecture ensures maintainability and extensibility, while the
+comprehensive documentation enables easy understanding and contribution.</p>
+<p>For detailed information on specific components, see:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="webscraping.html"><span class="doc">Web Scraping Module</span></a> - Web scraping module documentation</p></li>
+<li><p><a class="reference internal" href="forecasting.html"><span class="doc">Forecasting &amp; Predictions</span></a> - Forecasting and predictions</p></li>
+<li><p><a class="reference internal" href="api.html"><span class="doc">API Reference</span></a> - Backend API reference</p></li>
+</ul>
+</section>
+<section id="contributing">
+<h2>Contributing<a class="headerlink" href="#contributing" title="Link to this heading">¶</a></h2>
+<p>To contribute to this project:</p>
+<ol class="arabic simple">
+<li><p>Fork the repository</p></li>
+<li><p>Create a feature branch</p></li>
+<li><p>Follow the existing architecture patterns</p></li>
+<li><p>Add comprehensive tests</p></li>
+<li><p>Update documentation</p></li>
+<li><p>Submit a pull request</p></li>
+</ol>
+<p>For questions or suggestions, please open an issue on GitHub.</p>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="index.html">Project Energy Tariffs</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">System Concept &amp; Architecture</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#overview">Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#system-architecture">System Architecture</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#complete-workflow">Complete Workflow</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#integration-api">Integration &amp; API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#key-benefits-of-this-architecture">Key Benefits of This Architecture</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#technical-stack-summary">Technical Stack Summary</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#future-enhancements">Future Enhancements</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#conclusion">Conclusion</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#contributing">Contributing</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="webscraping.html">Web Scraping Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="forecasting.html">Forecasting &amp; Predictions</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="index.html" title="previous chapter">Project Energy Tariffs</a></li>
+      <li>Next: <a href="api.html" title="next chapter">API Reference</a></li>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2025, Julius Becker.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.2.3</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="_sources/concept.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>
