@@ -6,10 +6,11 @@ Test script for the price breakdown functionality
 import sys
 import os
 
-# Add src to Python path
-sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
+# Add project root to Python path
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(project_root, 'src'))
 
-from src.backend.forecasting.price_forecasting.EnergyPriceForecast import get_price_breakdown
+from backend.forecasting.energy_price_forecast import get_price_breakdown
 import json
 
 def test_price_breakdown():

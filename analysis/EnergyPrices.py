@@ -1,3 +1,7 @@
+"""
+Analysis functions to read, adjust, sample, and plot German energy price data.
+"""
+
 import pandas as pd
 import matplotlib.pyplot as plt
 

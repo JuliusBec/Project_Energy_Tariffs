@@ -9,7 +9,7 @@ from datetime import datetime
 # Add src to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-from backend.RiskAnalysis import create_historic_risk_analysis, calculate_coincidence_factor
+from backend.risk_analysis import create_historic_risk_analysis, calculate_coincidence_factor
 
 
 def test_with_user_data():

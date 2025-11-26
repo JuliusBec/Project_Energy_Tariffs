@@ -6,9 +6,10 @@ import os
 import logging
 
 # Add project root to path
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# Ensure the project root (parent directory of 'analysis') is on sys.path so 'src' is importable
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.backend.forecasting.price_forecasting.EnergyPriceForecast import create_chart_data
+from src.backend.forecasting.energy_price_forecast import create_chart_data
 import json
 
 # Configure logging

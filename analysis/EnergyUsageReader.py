@@ -1,3 +1,7 @@
+"""
+Analysis functions to read and adjust energy usage data from CSV files.
+"""
+
 import pandas as pd
 import matplotlib.pyplot as plt
 import os

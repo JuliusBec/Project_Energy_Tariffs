@@ -1,3 +1,7 @@
+"""
+Simple analysis of energy price data including stationarity check, seasonal decomposition, and ACF/PACF plots.
+"""
+
 import pandas as pd
 import EnergyPrices as energy_prices
 from statsmodels.tsa.statespace.sarimax import SARIMAX
@@ -9,7 +13,7 @@ import matplotlib.pyplot as plt
 from statsmodels.tsa.seasonal import seasonal_decompose
 import time
 
-# auslesen der csv datei
+# reading temperature data
 temperature_data = pd.read_csv("data/temperature_data_01:21-05:25.csv")
 
 temperature_data['datetime'] = pd.to_datetime(temperature_data['MESS_DATUM'], format='%Y%m%d%H')

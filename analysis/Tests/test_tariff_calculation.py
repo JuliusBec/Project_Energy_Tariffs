@@ -8,9 +8,9 @@ import os
 from datetime import datetime
 
 # Add src to Python path
-sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'src'))
 
-from src.backend.energy_tariff import FixedTariff, DynamicTariff
+from backend.energy_tariff import FixedTariff, DynamicTariff
 
 def test_fixed_tariff():
     """Test fixed tariff calculation with known values"""
