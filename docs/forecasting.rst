@@ -2,7 +2,6 @@ Forecasting & Predictions
 =========================
 
 The forecasting module provides powerful prediction models for energy prices and energy consumption.
-It combines Prophet and Chronos for accurate short-term and long-term forecasts.
 
 Overview
 --------
@@ -45,18 +44,16 @@ Basic Usage
 
 .. code-block:: python
 
-   from src.backend.forecasting.energy_price_forecast import (
-       load_and_prepare_data,
-       create_prophet_model,
-       forecast_prices
-   )
+   from prophet import Prophet
    import pandas as pd
 
-   # Load data
-   df = load_and_prepare_data('app_data/germany_dayahead_prices.csv')
+   # Load data from CSV
+   df = pd.read_csv('app_data/germany_dayahead_prices.csv')
+   df['ds'] = pd.to_datetime(df['ds'])
+   df = df[['ds', 'y']]  # Prophet requires 'ds' and 'y' columns
    
    # Create model
-   model = create_prophet_model(
+   model = Prophet(
        changepoint_prior_scale=0.15,
        seasonality_prior_scale=10.0
    )
@@ -65,7 +62,8 @@ Basic Usage
    model.fit(df)
    
    # Forecast for 7 days
-   forecast = forecast_prices(model, periods=168)  # 168 hours = 7 days
+   future = model.make_future_dataframe(periods=168, freq='h')  # 168 hours = 7 days
+   forecast = model.predict(future)
    
    print(forecast[['ds', 'yhat', 'yhat_lower', 'yhat_upper']].tail())
 
@@ -155,12 +153,12 @@ Description
 ^^^^^^^^^^^^
 
 The Energy Usage Forecaster predicts household electricity consumption.
-Prophet is used for traditional time series analysis and Chronos for deep learning-based predictions.
+Prophet is used for traditional time series analysis.
 
 Features
 ^^^^^^^^
 
-* Prophet & Chronos models
+* Prophet
 * Hourly consumption forecast
 * Weekly aggregation
 * Seasonality detection (daily, weekly)
@@ -196,34 +194,6 @@ Prophet-based Forecast
    weekly_usage = calculate_total_weekly_usage(forecast_df)
    print(f"Weekly consumption:\n{weekly_usage}")
 
-Chronos Deep Learning Modell
-""""""""""""""""""""""""""""
-
-.. code-block:: python
-
-   from chronos import ChronosPipeline
-   import torch
-   import numpy as np
-   
-   # Chronos Pipeline laden
-   pipeline = ChronosPipeline.from_pretrained(
-       "amazon/chronos-t5-small",
-       device_map="cpu",  # Oder "cuda" für GPU
-       torch_dtype=torch.bfloat16,
-   )
-   
-   # Prepare historical data
-   context = torch.tensor(df['value'].values[-168:])  # Last 7 days
-   
-   # Forecast for 24 hours
-   forecast = pipeline.predict(
-       context=context,
-       prediction_length=24,
-       num_samples=20
-   )
-   
-   # Median forecast
-   median_forecast = np.median(forecast[0].numpy(), axis=0)
 
 Data Format
 ^^^^^^^^^^^
@@ -392,26 +362,24 @@ Complete Pipeline: Price Forecast
 
 .. code-block:: python
 
-   from src.backend.forecasting.energy_price_forecast import (
-       load_and_prepare_data,
-       create_prophet_model,
-       forecast_prices,
-       save_forecast
-   )
+   from prophet import Prophet
    import pandas as pd
    
    # 1. Load data
-   df = load_and_prepare_data('app_data/germany_dayahead_prices.csv')
+   df = pd.read_csv('app_data/germany_dayahead_prices.csv')
+   df['ds'] = pd.to_datetime(df['ds'])
+   df = df[['ds', 'y']]  # Prophet requires 'ds' and 'y' columns
    
    # 2. Create and train model
-   model = create_prophet_model()
+   model = Prophet()
    model.fit(df)
    
    # 3. Forecast for 30 days
-   forecast = forecast_prices(model, periods=720)  # 30 days * 24 hours
+   future = model.make_future_dataframe(periods=720, freq='h')  # 30 days * 24 hours
+   forecast = model.predict(future)
    
    # 4. Save
-   save_forecast(forecast, 'app_data/germany_price_forecast_720h.csv')
+   forecast.to_csv('app_data/germany_price_forecast_720h.csv', index=False)
    
    # 5. Statistics
    print(f"Average price: {forecast['yhat'].mean():.2f} €/MWh")
@@ -479,33 +447,6 @@ Integration in Tariff Comparison
    total_cost = merged['cost'].sum()
    print(f"Estimated costs (30 days): {total_cost:.2f}€")
 
-Best Practices
---------------
-
-1. **Data Quality**
-   
-   - Use at least 1 year of historical data
-   - Remove outliers and faulty measurements
-   - Fill missing values appropriately
-
-2. **Model Selection**
-   
-   - Prophet for interpretable results
-   - Chronos for highest accuracy
-   - Combine models for ensemble predictions
-
-3. **Validation**
-   
-   - Use time series cross-validation
-   - Test on unseen data
-   - Monitor metrics continuously
-
-4. **Performance**
-   
-   - Cache trained models
-   - Use incremental training
-   - Parallelize batch predictions
-
 Troubleshooting
 ---------------
 
@@ -553,12 +494,6 @@ API Reference
 
 Functions
 ^^^^^^^^^
-
-.. autofunction:: backend.forecasting.energy_price_forecast.load_and_prepare_data
-
-.. autofunction:: backend.forecasting.energy_price_forecast.create_prophet_model
-
-.. autofunction:: backend.forecasting.energy_price_forecast.forecast_prices
 
 .. autofunction:: backend.forecasting.energy_usage_forecast.forecast_prophet
 
@@ -861,11 +796,17 @@ Scheduled Retraining
        logger.info("Starting model retraining...")
        
        # Fetch latest data
-       df = load_and_prepare_data('app_data/germany_dayahead_prices.csv')
+       df = pd.read_csv('app_data/germany_dayahead_prices.csv')
+       df['ds'] = pd.to_datetime(df['ds'])
+       df = df[['ds', 'y']]
        
        # Train new model
-       model = create_prophet_model()
+       model = Prophet()
        model.fit(df)
+       
+       # Generate forecast
+       future = model.make_future_dataframe(periods=720, freq='h')
+       forecast = model.predict(future)
        
        # Evaluate on holdout set
        # ... evaluation code ...

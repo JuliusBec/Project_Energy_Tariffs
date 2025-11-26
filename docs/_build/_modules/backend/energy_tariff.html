@@ -6,8 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>backend.energy_tariff &#8212; Project Energy Tariffs  documentation</title>
     <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=5ecbeea2" />
-    <link rel="stylesheet" type="text/css" href="../../_static/basic.css?v=b08954a9" />
-    <link rel="stylesheet" type="text/css" href="../../_static/alabaster.css?v=27fed22d" />
+    <link rel="stylesheet" type="text/css" href="../../_static/alabaster.css?v=12dfc556" />
     <script src="../../_static/documentation_options.js?v=5929fcd5"></script>
     <script src="../../_static/doctools.js?v=9bcbadda"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
@@ -31,7 +30,22 @@
           <div class="body" role="main">
             
   <h1>Source code for backend.energy_tariff</h1><div class="highlight"><pre>
-<span></span><span class="kn">from</span><span class="w"> </span><span class="nn">abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">ABC</span><span class="p">,</span> <span class="n">abstractmethod</span>
+<span></span><span class="sd">&quot;&quot;&quot;Energy tariff models for comparing fixed and dynamic electricity contracts.</span>
+
+<span class="sd">This module provides abstract and concrete implementations of energy tariffs,</span>
+<span class="sd">supporting both fixed-rate and dynamic (spot-market-based) pricing models.</span>
+<span class="sd">Includes German market-specific billing practices and seasonal consumption patterns.</span>
+
+<span class="sd">Classes:</span>
+<span class="sd">    EnergyTariff: Abstract base class for all energy tariff types.</span>
+<span class="sd">    FixedTariff: Fixed-rate electricity tariff with constant kWh pricing.</span>
+<span class="sd">    DynamicTariff: Spot-market-based tariff with hourly price variations.</span>
+
+<span class="sd">Functions:</span>
+<span class="sd">    slice_seasonal_data: Extract seasonal consumption patterns from historical data.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">ABC</span><span class="p">,</span> <span class="n">abstractmethod</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">datetime</span><span class="w"> </span><span class="kn">import</span> <span class="n">datetime</span><span class="p">,</span> <span class="n">time</span><span class="p">,</span> <span class="n">timedelta</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Optional</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
@@ -42,8 +56,22 @@
 <div class="viewcode-block" id="EnergyTariff">
 <a class="viewcode-back" href="../../backend.html#backend.energy_tariff.EnergyTariff">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">EnergyTariff</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Abstract base class for electricity contracts.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Abstract base class for electricity tariffs in the German market.</span>
+<span class="sd">    </span>
+<span class="sd">    Provides common functionality for calculating costs, managing billing periods,</span>
+<span class="sd">    and handling tariff metadata. Subclasses must implement cost calculation logic</span>
+<span class="sd">    specific to their pricing model (fixed vs. dynamic).</span>
+<span class="sd">    </span>
+<span class="sd">    Attributes:</span>
+<span class="sd">        name: Tariff name (e.g., &quot;EnBW Komfort&quot;).</span>
+<span class="sd">        provider: Energy provider company name.</span>
+<span class="sd">        base_price: Monthly base fee in EUR.</span>
+<span class="sd">        kwh_rate: Fixed price per kWh in EUR (None for dynamic tariffs).</span>
+<span class="sd">        start_date: Contract start date for billing calculations.</span>
+<span class="sd">        is_dynamic: True if tariff uses hourly spot market pricing.</span>
+<span class="sd">        features: List of tariff features (e.g., [&quot;green&quot;, &quot;fixed&quot;]).</span>
+<span class="sd">        postal_code: German postal code for location-specific pricing.</span>
+<span class="sd">        min_duration: Minimum contract duration in months.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
 <div class="viewcode-block" id="EnergyTariff.__init__">
@@ -51,19 +79,18 @@
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">base_price</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">is_dynamic</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span> <span class="n">start_date</span><span class="p">:</span> <span class="n">datetime</span><span class="p">,</span> <span class="n">kwh_rate</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> 
                  <span class="n">provider</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">min_duration</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">features</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">list</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
                  <span class="n">postal_code</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Initialize the energy tariff.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize energy tariff with pricing and contract parameters.</span>
 <span class="sd">        </span>
 <span class="sd">        Args:</span>
-<span class="sd">            name: Name of the tariff</span>
-<span class="sd">            base_price: Monthly base price in €</span>
-<span class="sd">            is_dynamic: Whether this is a dynamic tariff</span>
-<span class="sd">            start_date: Start date for the tariff</span>
-<span class="sd">            kwh_rate: Fixed price per kWh in € (for fixed tariffs)</span>
-<span class="sd">            provider: Energy provider name</span>
-<span class="sd">            min_duration: Minimum contract duration in months</span>
-<span class="sd">            features: List of tariff features (e.g., [&quot;green&quot;, &quot;fixed&quot;])</span>
-<span class="sd">            postal_code: German postal code (Postleitzahl) for location-specific pricing or availability</span>
+<span class="sd">            name: Tariff name for display and identification.</span>
+<span class="sd">            base_price: Monthly base fee in EUR.</span>
+<span class="sd">            is_dynamic: True if tariff uses hourly spot market pricing.</span>
+<span class="sd">            start_date: Contract start date for billing period calculations.</span>
+<span class="sd">            kwh_rate: Fixed price per kWh in EUR (None for dynamic tariffs).</span>
+<span class="sd">            provider: Energy provider company name (e.g., &quot;EnBW&quot;, &quot;Tibber&quot;).</span>
+<span class="sd">            min_duration: Minimum contract duration in months (None if no commitment).</span>
+<span class="sd">            features: Tariff characteristics (e.g., [&quot;green&quot;, &quot;fixed&quot;, &quot;smart_meter&quot;]).</span>
+<span class="sd">            postal_code: 5-digit German PLZ for location-specific pricing.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">name</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">provider</span> <span class="o">=</span> <span class="n">provider</span>
@@ -79,12 +106,18 @@
 <div class="viewcode-block" id="EnergyTariff.calculate_billing_period_days">
 <a class="viewcode-back" href="../../backend.html#backend.energy_tariff.EnergyTariff.calculate_billing_period_days">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">calculate_billing_period_days</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Calculate actual billing period in days based on German monthly billing practices.</span>
-<span class="sd">        Handles month-end adjustments and varying month lengths.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Calculate billing period length following German energy contract standards.</span>
+<span class="sd">        </span>
+<span class="sd">        Handles month-end billing adjustments and varying month lengths according</span>
+<span class="sd">        to German energy market practices. Contracts starting on month-end will</span>
+<span class="sd">        bill on the last day of subsequent months.</span>
 <span class="sd">        </span>
 <span class="sd">        Returns:</span>
-<span class="sd">            int: Number of days in the billing period</span>
+<span class="sd">            Number of days in the current billing period.</span>
+<span class="sd">            </span>
+<span class="sd">        Example:</span>
+<span class="sd">            Contract starting Jan 31 bills on Feb 28 (or 29) = 28/29 days.</span>
+<span class="sd">            Contract starting Jan 15 bills on Feb 15 = 31 days.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
 
         <span class="n">start_day</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">start_date</span><span class="o">.</span><span class="n">day</span>
@@ -119,14 +152,23 @@
 <a class="viewcode-back" href="../../backend.html#backend.energy_tariff.EnergyTariff.calculate_cost_split">[docs]</a>
     <span class="nd">@abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">calculate_cost_split</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">total_consumption_kwh</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Calculate the total cost breakdown for given consumption.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Calculate itemized cost breakdown for the tariff.</span>
+<span class="sd">        </span>
+<span class="sd">        Abstract method that must be implemented by concrete tariff classes.</span>
+<span class="sd">        Returns a detailed breakdown of all cost components (base fee, variable costs,</span>
+<span class="sd">        network fees, etc.) based on total consumption.</span>
 <span class="sd">        </span>
 <span class="sd">        Args:</span>
-<span class="sd">            total_consumption_kwh: Total energy consumption in kWh (from forecast or historical data)</span>
+<span class="sd">            total_consumption_kwh: Total energy consumption in kWh for billing period.</span>
 <span class="sd">            </span>
 <span class="sd">        Returns:</span>
-<span class="sd">            dict: Breakdown of costs including base_price, variable_cost, total_cost, etc.</span>
+<span class="sd">            Dictionary containing cost breakdown with keys like &#39;base_price&#39;,</span>
+<span class="sd">            &#39;variable_cost&#39;, &#39;total_cost&#39;, &#39;billing_period_days&#39;, etc.</span>
+<span class="sd">            Exact keys vary by tariff type.</span>
+<span class="sd">            </span>
+<span class="sd">        Note:</span>
+<span class="sd">            For dynamic tariffs, this provides simplified estimates without</span>
+<span class="sd">            time-dependent pricing. Use calculate_cost() for accurate time-based pricing.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">pass</span></div>
 </div>
@@ -135,8 +177,15 @@
 <div class="viewcode-block" id="FixedTariff">
 <a class="viewcode-back" href="../../backend.html#backend.energy_tariff.FixedTariff">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">FixedTariff</span><span class="p">(</span><span class="n">EnergyTariff</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Represents a fixed energy tariff.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Fixed-rate electricity tariff with constant per-kWh pricing.</span>
+<span class="sd">    </span>
+<span class="sd">    Traditional tariff model with a fixed monthly base fee and constant energy</span>
+<span class="sd">    price regardless of time of consumption. Common for conventional German</span>
+<span class="sd">    electricity contracts.</span>
+<span class="sd">    </span>
+<span class="sd">    Attributes:</span>
+<span class="sd">        Inherits all attributes from EnergyTariff.</span>
+<span class="sd">        is_dynamic: Always False for fixed tariffs.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
 <div class="viewcode-block" id="FixedTariff.__init__">
@@ -144,19 +193,18 @@
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">base_price</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">kwh_rate</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">start_date</span><span class="p">:</span> <span class="n">datetime</span><span class="p">,</span> <span class="n">provider</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> 
                  <span class="n">min_duration</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">is_dynamic</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">features</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">list</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
                  <span class="n">postal_code</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Initialize the fixed tariff with base price and kWh rate.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize fixed tariff with constant pricing parameters.</span>
 <span class="sd">        </span>
 <span class="sd">        Args:</span>
-<span class="sd">            name: Name of the tariff</span>
-<span class="sd">            base_price: Monthly base price in €</span>
-<span class="sd">            kwh_rate: Fixed price per kWh in €</span>
-<span class="sd">            start_date: Start date for the tariff</span>
-<span class="sd">            provider: Energy provider name</span>
-<span class="sd">            min_duration: Minimum contract duration in months</span>
-<span class="sd">            is_dynamic: Whether this is a dynamic tariff (always False for this class)</span>
-<span class="sd">            features: List of tariff features (e.g., [&quot;fixed&quot;, &quot;green&quot;])</span>
-<span class="sd">            postal_code: German postal code (Postleitzahl) for location-specific pricing or availability</span>
+<span class="sd">            name: Tariff name for display purposes.</span>
+<span class="sd">            base_price: Monthly base fee in EUR.</span>
+<span class="sd">            kwh_rate: Fixed price per kWh in EUR (constant at all times).</span>
+<span class="sd">            start_date: Contract start date for billing calculations.</span>
+<span class="sd">            provider: Energy provider company name.</span>
+<span class="sd">            min_duration: Minimum contract duration in months (None if flexible).</span>
+<span class="sd">            is_dynamic: Must be False for fixed tariffs (maintained for API consistency).</span>
+<span class="sd">            features: Tariff characteristics (e.g., [&quot;fixed&quot;, &quot;green&quot;, &quot;12_month&quot;]).</span>
+<span class="sd">            postal_code: 5-digit German PLZ for regional tariff availability.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span> <span class="n">base_price</span><span class="o">=</span><span class="n">base_price</span><span class="p">,</span> <span class="n">is_dynamic</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">start_date</span><span class="o">=</span><span class="n">start_date</span><span class="p">,</span>
                          <span class="n">kwh_rate</span><span class="o">=</span><span class="n">kwh_rate</span><span class="p">,</span> <span class="n">provider</span><span class="o">=</span><span class="n">provider</span><span class="p">,</span> <span class="n">min_duration</span><span class="o">=</span><span class="n">min_duration</span><span class="p">,</span> <span class="n">features</span><span class="o">=</span><span class="n">features</span><span class="p">,</span>
@@ -166,15 +214,19 @@
 <div class="viewcode-block" id="FixedTariff.calculate_cost_split">
 <a class="viewcode-back" href="../../backend.html#backend.energy_tariff.FixedTariff.calculate_cost_split">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">calculate_cost_split</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">total_consumption_kwh</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Calculate cost breakdown for fixed tariff.</span>
-<span class="sd">        Returns base price, variable cost, and total cost breakdown.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Calculate itemized cost breakdown for fixed tariff billing period.</span>
 <span class="sd">        </span>
 <span class="sd">        Args:</span>
-<span class="sd">            total_consumption_kwh: Total energy consumption in kWh (from forecast or historical data)</span>
+<span class="sd">            total_consumption_kwh: Total energy consumption in kWh for the period.</span>
 <span class="sd">            </span>
 <span class="sd">        Returns:</span>
-<span class="sd">            dict: Breakdown of costs including base_price, variable_cost, total_cost, etc.</span>
+<span class="sd">            Dictionary with the following keys:</span>
+<span class="sd">                - base_price (float): Monthly base fee in EUR.</span>
+<span class="sd">                - variable_cost (float): Total energy cost (consumption × rate) in EUR.</span>
+<span class="sd">                - total_cost (float): Sum of base and variable costs in EUR.</span>
+<span class="sd">                - total_consumption_kwh (float): Input consumption echoed back.</span>
+<span class="sd">                - fixed_kwh_rate (float): Fixed price per kWh in EUR.</span>
+<span class="sd">                - billing_period_days (int): Number of days in billing period.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="c1"># Calculate actual billing period based on German monthly billing practices</span>
         <span class="n">billing_period_days</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">calculate_billing_period_days</span><span class="p">()</span>
@@ -196,12 +248,28 @@
 <div class="viewcode-block" id="FixedTariff.calculate_cost">
 <a class="viewcode-back" href="../../backend.html#backend.energy_tariff.FixedTariff.calculate_cost">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">calculate_cost</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Calculate the total cost for a given consumption in kWh.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Calculate total cost for fixed tariff based on consumption data or forecast.</span>
+<span class="sd">        </span>
+<span class="sd">        Processes either historical consumption data (with Prophet forecasting) or</span>
+<span class="sd">        uses standard load profiles scaled to annual consumption. Converts power</span>
+<span class="sd">        readings to energy and handles various time interval formats (15-min, hourly).</span>
 <span class="sd">        </span>
 <span class="sd">        Args:</span>
-<span class="sd">            data: pandas DataFrame with &#39;datetime&#39; and &#39;value&#39; columns (hourly kWh consumption)</span>
-<span class="sd">                  or a numeric value representing annual consumption in kWh.</span>
+<span class="sd">            data: Either a pandas DataFrame with columns [&#39;datetime&#39;, &#39;value&#39;] containing</span>
+<span class="sd">                  hourly kWh consumption, or a numeric value representing annual</span>
+<span class="sd">                  consumption in kWh (will use standard load profile).</span>
+<span class="sd">                  </span>
+<span class="sd">        Returns:</span>
+<span class="sd">            Total cost in EUR for the billing period (base fee + energy costs).</span>
+<span class="sd">            </span>
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If data is neither a DataFrame nor a numeric value.</span>
+<span class="sd">            </span>
+<span class="sd">        Note:</span>
+<span class="sd">            - For DataFrames: Resamples to hourly frequency and forecasts future periods.</span>
+<span class="sd">            - For numeric values: Uses German standard load profile (H0) scaled to</span>
+<span class="sd">              the provided annual consumption.</span>
+<span class="sd">            - Automatically converts kW readings to kWh based on time intervals.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="si">{</span><span class="s1">&#39;=&#39;</span><span class="o">*</span><span class="mi">80</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
         <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;FixedTariff.calculate_cost() called for tariff: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
@@ -289,8 +357,18 @@
 <div class="viewcode-block" id="DynamicTariff">
 <a class="viewcode-back" href="../../backend.html#backend.energy_tariff.DynamicTariff">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">DynamicTariff</span><span class="p">(</span><span class="n">EnergyTariff</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Represents a dynamic energy tariff.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Spot-market-based electricity tariff with hourly price variations.</span>
+<span class="sd">    </span>
+<span class="sd">    Dynamic tariff following German day-ahead market prices (EPEX SPOT).</span>
+<span class="sd">    Prices vary hourly based on wholesale market conditions plus fixed</span>
+<span class="sd">    markup components (network fees, taxes, supplier costs).</span>
+<span class="sd">    </span>
+<span class="sd">    Attributes:</span>
+<span class="sd">        Inherits all attributes from EnergyTariff.</span>
+<span class="sd">        network_fee: One-time network connection fee in EUR.</span>
+<span class="sd">        additional_price_ct_kwh: Fixed price components in ct/kWh (network fees,</span>
+<span class="sd">            taxes, levies) scraped from provider websites.</span>
+<span class="sd">        is_dynamic: Always True for dynamic tariffs.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
 <div class="viewcode-block" id="DynamicTariff.__init__">
@@ -298,20 +376,20 @@
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">base_price</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">start_date</span><span class="p">:</span> <span class="n">datetime</span><span class="p">,</span> <span class="n">provider</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> 
                  <span class="n">is_dynamic</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span> <span class="n">network_fee</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span> <span class="n">features</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">list</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
                  <span class="n">postal_code</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">additional_price_ct_kwh</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Initialize the dynamic tariff with base price and one-time network fee.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize dynamic tariff with spot market pricing parameters.</span>
 <span class="sd">        </span>
 <span class="sd">        Args:</span>
-<span class="sd">            name: Name of the tariff</span>
-<span class="sd">            base_price: Monthly base price in €</span>
-<span class="sd">            start_date: Start date for the tariff</span>
-<span class="sd">            provider: Energy provider name</span>
-<span class="sd">            is_dynamic: Whether this is a dynamic tariff (always True for this class)</span>
-<span class="sd">            network_fee: One-time network usage fee (einmalige Zahlung für Netznutzung) in €</span>
-<span class="sd">            features: List of tariff features (e.g., [&quot;dynamic&quot;, &quot;green&quot;])</span>
-<span class="sd">            postal_code: German postal code (Postleitzahl) for location-specific pricing or availability</span>
-<span class="sd">            additional_price_ct_kwh: Fixed price components in ct/kWh (network fees, taxes, levies)</span>
-<span class="sd">                                     from scraped provider data (e.g., Tibber&#39;s 18.4 ct/kWh)</span>
+<span class="sd">            name: Tariff name for display purposes.</span>
+<span class="sd">            base_price: Monthly base fee in EUR.</span>
+<span class="sd">            start_date: Contract start date for billing calculations.</span>
+<span class="sd">            provider: Energy provider company name (e.g., &quot;Tibber&quot;, &quot;Rabot Charge&quot;).</span>
+<span class="sd">            is_dynamic: Must be True for dynamic tariffs (maintained for API consistency).</span>
+<span class="sd">            network_fee: One-time network connection/setup fee in EUR.</span>
+<span class="sd">            features: Tariff characteristics (e.g., [&quot;dynamic&quot;, &quot;green&quot;, &quot;smart_meter_required&quot;]).</span>
+<span class="sd">            postal_code: 5-digit German PLZ for regional pricing/availability.</span>
+<span class="sd">            additional_price_ct_kwh: Fixed markup components in ct/kWh including network</span>
+<span class="sd">                fees, electricity tax, concession fees, VAT, and supplier margin.</span>
+<span class="sd">                Typically 15-25 ct/kWh based on provider and region.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">base_price</span><span class="o">=</span><span class="n">base_price</span><span class="p">,</span> <span class="n">start_date</span><span class="o">=</span><span class="n">start_date</span><span class="p">,</span> <span class="n">provider</span><span class="o">=</span><span class="n">provider</span><span class="p">,</span> <span class="n">is_dynamic</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> 
                          <span class="n">features</span><span class="o">=</span><span class="n">features</span><span class="p">,</span> <span class="n">postal_code</span><span class="o">=</span><span class="n">postal_code</span><span class="p">)</span>
@@ -320,18 +398,25 @@
 
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_get_average_forecast_price</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Get average retail price from the latest forecast data.</span>
-<span class="sd">        Returns a default value if forecast data is not available.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Retrieve average retail electricity price from latest forecast data.</span>
 <span class="sd">        </span>
-<span class="sd">        Note: Uses yhat_retail column which includes:</span>
-<span class="sd">        - Zero-censored wholesale price E[max(0, Y)]</span>
-<span class="sd">        - Profile costs (10 EUR/MWh)</span>
-<span class="sd">        - Risk premium (5 EUR/MWh)  </span>
-<span class="sd">        - Supplier margin (55 EUR/MWh)</span>
-<span class="sd">        Total markup: 70 EUR/MWh (7 ct/kWh)</span>
+<span class="sd">        Loads the most recent price forecast CSV and calculates mean retail price.</span>
+<span class="sd">        The retail price includes wholesale day-ahead prices plus markup components</span>
+<span class="sd">        (profile costs, risk premium, supplier margin). Returns fallback value if</span>
+<span class="sd">        forecast data is unavailable.</span>
 <span class="sd">        </span>
-<span class="sd">        Network fee is handled separately as one-time charge.</span>
+<span class="sd">        Returns:</span>
+<span class="sd">            Average retail price in EUR/kWh for the forecast period.</span>
+<span class="sd">            Returns 0.25 EUR/kWh as fallback if data is unavailable.</span>
+<span class="sd">            </span>
+<span class="sd">        Note:</span>
+<span class="sd">            Price composition in yhat_retail:</span>
+<span class="sd">            - Zero-censored wholesale price E[max(0, Y)]</span>
+<span class="sd">            - Profile costs: 10 EUR/MWh</span>
+<span class="sd">            - Risk premium: 5 EUR/MWh</span>
+<span class="sd">            - Supplier margin: 55 EUR/MWh</span>
+<span class="sd">            Total markup: 70 EUR/MWh (7 ct/kWh)</span>
+<span class="sd">            Network fees handled separately via additional_price_ct_kwh.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
         <span class="k">try</span><span class="p">:</span>
@@ -367,16 +452,25 @@
 <div class="viewcode-block" id="DynamicTariff.calculate_cost_split">
 <a class="viewcode-back" href="../../backend.html#backend.energy_tariff.DynamicTariff.calculate_cost_split">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">calculate_cost_split</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">total_consumption_kwh</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Calculate cost breakdown for dynamic tariff.</span>
-<span class="sd">        For dynamic tariffs, this is a simplified version that doesn&#39;t include </span>
-<span class="sd">        time-dependent pricing details since those require the actual consumption timeline.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Calculate simplified cost breakdown for dynamic tariff.</span>
+<span class="sd">        </span>
+<span class="sd">        Provides basic cost estimates using average forecasted prices. For accurate</span>
+<span class="sd">        time-dependent pricing with hourly spot market variations, use calculate_cost()</span>
+<span class="sd">        or calculate_cost_with_breakdown() instead.</span>
 <span class="sd">        </span>
 <span class="sd">        Args:</span>
-<span class="sd">            total_consumption_kwh: Total energy consumption in kWh</span>
+<span class="sd">            total_consumption_kwh: Total energy consumption in kWh for the period.</span>
 <span class="sd">            </span>
 <span class="sd">        Returns:</span>
-<span class="sd">            dict: Basic breakdown with estimated average price</span>
+<span class="sd">            Dictionary with the following keys:</span>
+<span class="sd">                - base_price (float): Monthly base fee in EUR.</span>
+<span class="sd">                - variable_cost (float): Estimated energy cost using average price.</span>
+<span class="sd">                - network_fee (float): One-time network connection fee in EUR.</span>
+<span class="sd">                - total_cost (float): Sum of all cost components.</span>
+<span class="sd">                - total_consumption_kwh (float): Input consumption echoed back.</span>
+<span class="sd">                - estimated_avg_kwh_price (float): Average wholesale price in EUR/kWh.</span>
+<span class="sd">                - billing_period_days (int): Number of days in billing period.</span>
+<span class="sd">                - note (str): Warning about simplified calculation method.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="c1"># For dynamic tariffs, we can only provide a basic breakdown without timing data</span>
         <span class="c1"># The actual cost calculation with time-dependent pricing is handled in calculate_cost</span>
@@ -403,14 +497,38 @@
 <div class="viewcode-block" id="DynamicTariff.calculate_cost_with_breakdown">
 <a class="viewcode-back" href="../../backend.html#backend.energy_tariff.DynamicTariff.calculate_cost_with_breakdown">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">calculate_cost_with_breakdown</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Calculate the total cost and return both cost and average kWh price.</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Calculate total cost with detailed breakdown using time-dependent pricing.</span>
+<span class="sd">        </span>
+<span class="sd">        Matches consumption timestamps with spot market prices to calculate accurate</span>
+<span class="sd">        costs considering hourly price variations. Includes Prophet forecasting for</span>
+<span class="sd">        uploaded data or uses standard load profiles for annual consumption inputs.</span>
 <span class="sd">        </span>
 <span class="sd">        Args:</span>
-<span class="sd">            data: pandas DataFrame with &#39;datetime&#39; and &#39;value&#39; columns (hourly kWh consumption)</span>
-<span class="sd">                  or a numeric value representing annual consumption in kWh.</span>
+<span class="sd">            data: Either a pandas DataFrame with columns [&#39;datetime&#39;, &#39;value&#39;] containing</span>
+<span class="sd">                  consumption readings, or a numeric value representing annual consumption</span>
+<span class="sd">                  in kWh (will use standard load profile).</span>
 <span class="sd">                  </span>
-<span class="sd">        Returns: dict with &#39;total_cost&#39; and &#39;avg_kwh_price&#39;</span>
+<span class="sd">        Returns:</span>
+<span class="sd">            Dictionary containing:</span>
+<span class="sd">                - total_cost (float): Total cost in EUR for the billing period.</span>
+<span class="sd">                - avg_kwh_price (float): Average effective price per kWh in EUR.</span>
+<span class="sd">                </span>
+<span class="sd">        Note:</span>
+<span class="sd">            Price calculation methodology:</span>
+<span class="sd">            </span>
+<span class="sd">            1. Loads latest day-ahead price forecast (yhat_energy = zero-censored wholesale)</span>
+<span class="sd">            2. Adds fixed components (additional_price_ct_kwh) from provider:</span>
+<span class="sd">            </span>
+<span class="sd">               - Network fees (~7-8 ct/kWh)</span>
+<span class="sd">               - Electricity tax (2.05 ct/kWh)</span>
+<span class="sd">               - Concession fees (~1.5 ct/kWh)</span>
+<span class="sd">               - VAT 19% (~4-5 ct/kWh)</span>
+<span class="sd">               - Supplier costs (~7 ct/kWh)</span>
+<span class="sd">            </span>
+<span class="sd">            3. Matches consumption with prices by timestamp</span>
+<span class="sd">            4. Sums hourly costs: consumption[hour] × price[hour]</span>
+<span class="sd">            </span>
+<span class="sd">            Handles power-to-energy conversion for 15-minute and hourly interval data.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
         
@@ -601,10 +719,31 @@
 <div class="viewcode-block" id="slice_seasonal_data">
 <a class="viewcode-back" href="../../backend.html#backend.energy_tariff.slice_seasonal_data">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">slice_seasonal_data</span><span class="p">(</span><span class="n">df</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">start_date</span><span class="p">:</span> <span class="n">datetime</span><span class="p">,</span> <span class="n">days</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">30</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Slice data based on day/month only (ignoring year) for seasonal patterns.</span>
-<span class="sd">    Cycles through the year if needed.</span>
-<span class="sd">    Note: This function expects data to already be in hourly kWh format.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Extract seasonal consumption pattern matching specified date range.</span>
+<span class="sd">    </span>
+<span class="sd">    Extracts data by matching day-of-year and hour, ignoring the year component.</span>
+<span class="sd">    This allows using historical consumption patterns for future date projections.</span>
+<span class="sd">    Cycles through the year if needed (e.g., December-January transitions).</span>
+<span class="sd">    </span>
+<span class="sd">    Args:</span>
+<span class="sd">        df: DataFrame with columns [&#39;datetime&#39;, &#39;value&#39;] containing hourly consumption</span>
+<span class="sd">            in kWh. Must cover at least one full year of data.</span>
+<span class="sd">        start_date: Starting date for the extraction period.</span>
+<span class="sd">        days: Number of days to extract (default: 30 for monthly billing).</span>
+<span class="sd">        </span>
+<span class="sd">    Returns:</span>
+<span class="sd">        DataFrame with columns [&#39;datetime&#39;, &#39;value&#39;] containing the extracted</span>
+<span class="sd">        consumption data with updated timestamps matching the target date range.</span>
+<span class="sd">        Returns empty DataFrame if no matching seasonal data is found.</span>
+<span class="sd">        </span>
+<span class="sd">    Note:</span>
+<span class="sd">        Assumes input data is already in hourly kWh format. Does not perform</span>
+<span class="sd">        unit conversions. For proper usage, ensure data is preprocessed with</span>
+<span class="sd">        appropriate kW-to-kWh conversion based on time intervals.</span>
+<span class="sd">        </span>
+<span class="sd">    Example:</span>
+<span class="sd">        Extract consumption pattern for March 1-30, 2025 using 2024 data:</span>
+<span class="sd">        &gt;&gt;&gt; march_data = slice_seasonal_data(yearly_df, datetime(2025, 3, 1), days=30)</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">df_copy</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
     <span class="n">df_copy</span><span class="p">[</span><span class="s1">&#39;datetime&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">to_datetime</span><span class="p">(</span><span class="n">df_copy</span><span class="p">[</span><span class="s1">&#39;datetime&#39;</span><span class="p">])</span>
@@ -656,16 +795,7 @@
 
 
 
-
-<search id="searchbox" style="display: none" role="search">
-    <div class="searchformwrapper">
-    <form class="search" action="../../search.html" method="get">
-      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
-      <input type="submit" value="Go" />
-    </form>
-    </div>
-</search>
-<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<h3>Navigation</h3>
 <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../concept.html">System Concept &amp; Architecture</a></li>
@@ -683,6 +813,16 @@
   </ul></li>
 </ul>
 </div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
 
 
 
@@ -700,7 +840,7 @@
       
       |
       Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.2.3</a>
-      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 0.7.16</a>
       
     </div>
 

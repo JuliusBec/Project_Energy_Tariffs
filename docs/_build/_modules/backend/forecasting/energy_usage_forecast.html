@@ -6,8 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>backend.forecasting.energy_usage_forecast &#8212; Project Energy Tariffs  documentation</title>
     <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=5ecbeea2" />
-    <link rel="stylesheet" type="text/css" href="../../../_static/basic.css?v=b08954a9" />
-    <link rel="stylesheet" type="text/css" href="../../../_static/alabaster.css?v=27fed22d" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/alabaster.css?v=12dfc556" />
     <script src="../../../_static/documentation_options.js?v=5929fcd5"></script>
     <script src="../../../_static/doctools.js?v=9bcbadda"></script>
     <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
@@ -31,14 +30,18 @@
           <div class="body" role="main">
             
   <h1>Source code for backend.forecasting.energy_usage_forecast</h1><div class="highlight"><pre>
-<span></span><span class="k">try</span><span class="p">:</span>
-    <span class="kn">from</span><span class="w"> </span><span class="nn">chronos</span><span class="w"> </span><span class="kn">import</span> <span class="n">ChronosPipeline</span>
-    <span class="n">CHRONOS_AVAILABLE</span> <span class="o">=</span> <span class="kc">True</span>
-<span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
-    <span class="n">CHRONOS_AVAILABLE</span> <span class="o">=</span> <span class="kc">False</span>
-    <span class="n">ChronosPipeline</span> <span class="o">=</span> <span class="kc">None</span>
+<span></span><span class="sd">&quot;&quot;&quot;Energy consumption forecasting using Facebook Prophet.</span>
 
-<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span> 
+<span class="sd">Provides time-series forecasting for household electricity consumption using</span>
+<span class="sd">Prophet models with daily and weekly seasonality. Includes backtesting functionality</span>
+<span class="sd">for forecast quality assessment.</span>
+
+<span class="sd">Functions:</span>
+<span class="sd">    forecast_prophet: Generate consumption forecasts using Prophet.</span>
+<span class="sd">    create_backtest: Validate forecast accuracy against historical data.</span>
+<span class="sd">    calculate_total_weekly_usage: Aggregate forecasts to weekly totals.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">datetime</span><span class="w"> </span><span class="kn">import</span> <span class="n">datetime</span><span class="p">,</span> <span class="n">timedelta</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">prophet</span><span class="w"> </span><span class="kn">import</span> <span class="n">Prophet</span>
@@ -48,6 +51,15 @@
 <div class="viewcode-block" id="calculate_total_weekly_usage">
 <a class="viewcode-back" href="../../../forecasting.html#backend.forecasting.energy_usage_forecast.calculate_total_weekly_usage">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">calculate_total_weekly_usage</span><span class="p">(</span><span class="n">forecast_df</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Aggregate hourly forecast to weekly totals.</span>
+<span class="sd">    </span>
+<span class="sd">    Args:</span>
+<span class="sd">        forecast_df: DataFrame with columns [&#39;datetime&#39;, &#39;yhat&#39;] containing</span>
+<span class="sd">            hourly forecasted consumption in kWh.</span>
+<span class="sd">    </span>
+<span class="sd">    Returns:</span>
+<span class="sd">        DataFrame with weekly aggregated consumption indexed by week end date.</span>
+<span class="sd">    &quot;&quot;&quot;</span> 
     <span class="c1"># Resample to hourly frequency</span>
     <span class="n">forecast_df</span> <span class="o">=</span> <span class="n">forecast_df</span><span class="o">.</span><span class="n">resample</span><span class="p">(</span><span class="s2">&quot;H&quot;</span><span class="p">,</span> <span class="n">on</span><span class="o">=</span><span class="s2">&quot;datetime&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span><span class="o">.</span><span class="n">reset_index</span><span class="p">()</span>
     <span class="c1"># Sum the usage for each week</span>
@@ -58,6 +70,28 @@
 <div class="viewcode-block" id="forecast_prophet">
 <a class="viewcode-back" href="../../../forecasting.html#backend.forecasting.energy_usage_forecast.forecast_prophet">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">forecast_prophet</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">days</span><span class="o">=</span><span class="mi">30</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Generate future consumption forecast using Prophet time-series model.</span>
+<span class="sd">    </span>
+<span class="sd">    Trains Prophet model with daily and weekly seasonality on historical hourly</span>
+<span class="sd">    consumption data. Returns only future predictions (excludes historical period).</span>
+<span class="sd">    </span>
+<span class="sd">    Args:</span>
+<span class="sd">        df: DataFrame with columns [&#39;datetime&#39;, &#39;value&#39;] containing historical</span>
+<span class="sd">            hourly consumption in kWh. Optional &#39;status&#39; column is dropped.</span>
+<span class="sd">        days: Number of days to forecast into the future (default: 30).</span>
+<span class="sd">    </span>
+<span class="sd">    Returns:</span>
+<span class="sd">        DataFrame with Prophet forecast columns including &#39;ds&#39; (datetime),</span>
+<span class="sd">        &#39;yhat&#39; (predicted consumption), &#39;yhat_lower&#39;, &#39;yhat_upper&#39; for</span>
+<span class="sd">        the specified future period only.</span>
+<span class="sd">        </span>
+<span class="sd">    Note:</span>
+<span class="sd">        Model configuration:</span>
+<span class="sd">        - Daily and weekly seasonality enabled</span>
+<span class="sd">        - Additive seasonality mode</span>
+<span class="sd">        - 90% confidence intervals (interval_width=0.9)</span>
+<span class="sd">        - Linear growth trend</span>
+<span class="sd">    &quot;&quot;&quot;</span> 
     <span class="c1"># Explicitly create a copy to avoid SettingWithCopyWarning</span>
     <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
     <span class="n">df</span><span class="p">[</span><span class="s2">&quot;datetime&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">to_datetime</span><span class="p">(</span><span class="n">df</span><span class="p">[</span><span class="s2">&quot;datetime&quot;</span><span class="p">],</span> <span class="nb">format</span><span class="o">=</span><span class="s1">&#39;%m/</span><span class="si">%d</span><span class="s1">/%y %H:%M&#39;</span><span class="p">)</span>
@@ -105,17 +139,27 @@
 <div class="viewcode-block" id="create_backtest">
 <a class="viewcode-back" href="../../../forecasting.html#backend.forecasting.energy_usage_forecast.create_backtest">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">create_backtest</span><span class="p">(</span><span class="n">usage_df</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Create backtest data for API response comparing actual vs forecasted energy usage.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Validate Prophet forecast accuracy using hold-out test period.</span>
 <span class="sd">    </span>
-<span class="sd">    Parameters:</span>
-<span class="sd">    - usage_df: DataFrame with energy usage data (must have &#39;datetime&#39; and &#39;value&#39; columns)</span>
+<span class="sd">    Splits data into training set and 30-day test period. Trains Prophet on</span>
+<span class="sd">    historical data, forecasts the test period, and compares predictions against</span>
+<span class="sd">    actual consumption to calculate error metrics.</span>
+<span class="sd">    </span>
+<span class="sd">    Args:</span>
+<span class="sd">        usage_df: DataFrame with columns [&#39;datetime&#39;, &#39;value&#39;] containing</span>
+<span class="sd">            historical hourly consumption in kWh. Optional &#39;status&#39; column dropped.</span>
 <span class="sd">    </span>
 <span class="sd">    Returns:</span>
-<span class="sd">    - Dictionary with hourly_data, daily_data, and metrics for visualization</span>
+<span class="sd">        Dictionary containing:</span>
+<span class="sd">            - hourly_data: Hourly timestamps, forecast, confidence intervals, actual.</span>
+<span class="sd">            - daily_data: Daily aggregated forecast vs actual.</span>
+<span class="sd">            - metrics: Includes total_forecast_usage, total_actual_usage,</span>
+<span class="sd">              forecast_error_absolute, forecast_error_percentage, mae, mse,</span>
+<span class="sd">              avg_confidence_interval_width, relative_confidence_interval_width.</span>
 <span class="sd">    </span>
 <span class="sd">    Note:</span>
-<span class="sd">    - For local plotting and testing, use test_backtest_visualization.py in the analysis folder</span>
+<span class="sd">        Removes incomplete days from test period to ensure fair comparison.</span>
+<span class="sd">        Clips negative forecasts to zero (consumption cannot be negative).</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     
     <span class="n">usage_df</span> <span class="o">=</span> <span class="n">usage_df</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
@@ -257,16 +301,7 @@
 
 
 
-
-<search id="searchbox" style="display: none" role="search">
-    <div class="searchformwrapper">
-    <form class="search" action="../../../search.html" method="get">
-      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
-      <input type="submit" value="Go" />
-    </form>
-    </div>
-</search>
-<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<h3>Navigation</h3>
 <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../../concept.html">System Concept &amp; Architecture</a></li>
@@ -284,6 +319,16 @@
   </ul></li>
 </ul>
 </div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
 
 
 
@@ -301,7 +346,7 @@
       
       |
       Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.2.3</a>
-      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 0.7.16</a>
       
     </div>
 

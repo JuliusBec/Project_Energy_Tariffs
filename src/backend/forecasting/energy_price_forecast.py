@@ -800,6 +800,7 @@ def get_price_breakdown(avg_price_eur_per_mwh=None, app_data_dir='app_data'):
     
     Returns:
         dict: Price breakdown suitable for Chart.js semi-circle chart with structure:
+        
             {
                 'labels': List of component names,
                 'values': List of percentage values,

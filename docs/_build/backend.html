@@ -7,14 +7,13 @@
 
     <title>Backend API &#8212; Project Energy Tariffs  documentation</title>
     <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=5ecbeea2" />
-    <link rel="stylesheet" type="text/css" href="_static/basic.css?v=b08954a9" />
-    <link rel="stylesheet" type="text/css" href="_static/alabaster.css?v=27fed22d" />
+    <link rel="stylesheet" type="text/css" href="_static/alabaster.css?v=12dfc556" />
     <script src="_static/documentation_options.js?v=5929fcd5"></script>
     <script src="_static/doctools.js?v=9bcbadda"></script>
     <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Forecasting &amp; Predictions" href="forecasting.html" />
+    <link rel="next" title="Web Scraping Module" href="webscraping.html" />
     <link rel="prev" title="API Reference" href="api.html" />
    
   <link rel="stylesheet" href="_static/custom.css" type="text/css" />
@@ -37,27 +36,96 @@
 <h1>Backend API<a class="headerlink" href="#backend-api" title="Link to this heading">¶</a></h1>
 <section id="module-backend.energy_tariff">
 <span id="energy-tariff"></span><h2>Energy Tariff<a class="headerlink" href="#module-backend.energy_tariff" title="Link to this heading">¶</a></h2>
+<p>Energy tariff models for comparing fixed and dynamic electricity contracts.</p>
+<p>This module provides abstract and concrete implementations of energy tariffs,
+supporting both fixed-rate and dynamic (spot-market-based) pricing models.
+Includes German market-specific billing practices and seasonal consumption patterns.</p>
+<dl class="simple">
+<dt>Classes:</dt><dd><p>EnergyTariff: Abstract base class for all energy tariff types.
+FixedTariff: Fixed-rate electricity tariff with constant kWh pricing.
+DynamicTariff: Spot-market-based tariff with hourly price variations.</p>
+</dd>
+<dt>Functions:</dt><dd><p>slice_seasonal_data: Extract seasonal consumption patterns from historical data.</p>
+</dd>
+</dl>
 <dl class="py class">
 <dt class="sig sig-object py" id="backend.energy_tariff.EnergyTariff">
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">backend.energy_tariff.</span></span><span class="sig-name descname"><span class="pre">EnergyTariff</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">base_price</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_dynamic</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">start_date</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">datetime</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">kwh_rate</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">provider</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">min_duration</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">features</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">postal_code</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/backend/energy_tariff.html#EnergyTariff"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#backend.energy_tariff.EnergyTariff" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">ABC</span></code></p>
-<p>Abstract base class for electricity contracts.</p>
+<p>Abstract base class for electricity tariffs in the German market.</p>
+<p>Provides common functionality for calculating costs, managing billing periods,
+and handling tariff metadata. Subclasses must implement cost calculation logic
+specific to their pricing model (fixed vs. dynamic).</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="backend.energy_tariff.EnergyTariff.name">
+<span class="sig-name descname"><span class="pre">name</span></span><a class="headerlink" href="#backend.energy_tariff.EnergyTariff.name" title="Link to this definition">¶</a></dt>
+<dd><p>Tariff name (e.g., “EnBW Komfort”).</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="backend.energy_tariff.EnergyTariff.provider">
+<span class="sig-name descname"><span class="pre">provider</span></span><a class="headerlink" href="#backend.energy_tariff.EnergyTariff.provider" title="Link to this definition">¶</a></dt>
+<dd><p>Energy provider company name.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="backend.energy_tariff.EnergyTariff.base_price">
+<span class="sig-name descname"><span class="pre">base_price</span></span><a class="headerlink" href="#backend.energy_tariff.EnergyTariff.base_price" title="Link to this definition">¶</a></dt>
+<dd><p>Monthly base fee in EUR.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="backend.energy_tariff.EnergyTariff.kwh_rate">
+<span class="sig-name descname"><span class="pre">kwh_rate</span></span><a class="headerlink" href="#backend.energy_tariff.EnergyTariff.kwh_rate" title="Link to this definition">¶</a></dt>
+<dd><p>Fixed price per kWh in EUR (None for dynamic tariffs).</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="backend.energy_tariff.EnergyTariff.start_date">
+<span class="sig-name descname"><span class="pre">start_date</span></span><a class="headerlink" href="#backend.energy_tariff.EnergyTariff.start_date" title="Link to this definition">¶</a></dt>
+<dd><p>Contract start date for billing calculations.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="backend.energy_tariff.EnergyTariff.is_dynamic">
+<span class="sig-name descname"><span class="pre">is_dynamic</span></span><a class="headerlink" href="#backend.energy_tariff.EnergyTariff.is_dynamic" title="Link to this definition">¶</a></dt>
+<dd><p>True if tariff uses hourly spot market pricing.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="backend.energy_tariff.EnergyTariff.features">
+<span class="sig-name descname"><span class="pre">features</span></span><a class="headerlink" href="#backend.energy_tariff.EnergyTariff.features" title="Link to this definition">¶</a></dt>
+<dd><p>List of tariff features (e.g., [“green”, “fixed”]).</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="backend.energy_tariff.EnergyTariff.postal_code">
+<span class="sig-name descname"><span class="pre">postal_code</span></span><a class="headerlink" href="#backend.energy_tariff.EnergyTariff.postal_code" title="Link to this definition">¶</a></dt>
+<dd><p>German postal code for location-specific pricing.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="backend.energy_tariff.EnergyTariff.min_duration">
+<span class="sig-name descname"><span class="pre">min_duration</span></span><a class="headerlink" href="#backend.energy_tariff.EnergyTariff.min_duration" title="Link to this definition">¶</a></dt>
+<dd><p>Minimum contract duration in months.</p>
+</dd></dl>
+
 <dl class="py method">
 <dt class="sig sig-object py" id="backend.energy_tariff.EnergyTariff.__init__">
 <span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">base_price</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_dynamic</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">start_date</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">datetime</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">kwh_rate</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">provider</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">min_duration</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">features</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">postal_code</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/backend/energy_tariff.html#EnergyTariff.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#backend.energy_tariff.EnergyTariff.__init__" title="Link to this definition">¶</a></dt>
-<dd><p>Initialize the energy tariff.</p>
+<dd><p>Initialize energy tariff with pricing and contract parameters.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>name</strong> – Name of the tariff</p></li>
-<li><p><strong>base_price</strong> – Monthly base price in €</p></li>
-<li><p><strong>is_dynamic</strong> – Whether this is a dynamic tariff</p></li>
-<li><p><strong>start_date</strong> – Start date for the tariff</p></li>
-<li><p><strong>kwh_rate</strong> – Fixed price per kWh in € (for fixed tariffs)</p></li>
-<li><p><strong>provider</strong> – Energy provider name</p></li>
-<li><p><strong>min_duration</strong> – Minimum contract duration in months</p></li>
-<li><p><strong>features</strong> – List of tariff features (e.g., [“green”, “fixed”])</p></li>
-<li><p><strong>postal_code</strong> – German postal code (Postleitzahl) for location-specific pricing or availability</p></li>
+<li><p><strong>name</strong> – Tariff name for display and identification.</p></li>
+<li><p><strong>base_price</strong> – Monthly base fee in EUR.</p></li>
+<li><p><strong>is_dynamic</strong> – True if tariff uses hourly spot market pricing.</p></li>
+<li><p><strong>start_date</strong> – Contract start date for billing period calculations.</p></li>
+<li><p><strong>kwh_rate</strong> – Fixed price per kWh in EUR (None for dynamic tariffs).</p></li>
+<li><p><strong>provider</strong> – Energy provider company name (e.g., “EnBW”, “Tibber”).</p></li>
+<li><p><strong>min_duration</strong> – Minimum contract duration in months (None if no commitment).</p></li>
+<li><p><strong>features</strong> – Tariff characteristics (e.g., [“green”, “fixed”, “smart_meter”]).</p></li>
+<li><p><strong>postal_code</strong> – 5-digit German PLZ for location-specific pricing.</p></li>
 </ul>
 </dd>
 </dl>
@@ -66,33 +134,42 @@
 <dl class="py method">
 <dt class="sig sig-object py" id="backend.energy_tariff.EnergyTariff.calculate_billing_period_days">
 <span class="sig-name descname"><span class="pre">calculate_billing_period_days</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">int</span></span></span><a class="reference internal" href="_modules/backend/energy_tariff.html#EnergyTariff.calculate_billing_period_days"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#backend.energy_tariff.EnergyTariff.calculate_billing_period_days" title="Link to this definition">¶</a></dt>
-<dd><p>Calculate actual billing period in days based on German monthly billing practices.
-Handles month-end adjustments and varying month lengths.</p>
+<dd><p>Calculate billing period length following German energy contract standards.</p>
+<p>Handles month-end billing adjustments and varying month lengths according
+to German energy market practices. Contracts starting on month-end will
+bill on the last day of subsequent months.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Returns<span class="colon">:</span></dt>
-<dd class="field-odd"><p>Number of days in the billing period</p>
-</dd>
-<dt class="field-even">Return type<span class="colon">:</span></dt>
-<dd class="field-even"><p>int</p>
+<dd class="field-odd"><p>Number of days in the current billing period.</p>
 </dd>
 </dl>
+<p class="rubric">Example</p>
+<p>Contract starting Jan 31 bills on Feb 28 (or 29) = 28/29 days.
+Contract starting Jan 15 bills on Feb 15 = 31 days.</p>
 </dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="backend.energy_tariff.EnergyTariff.calculate_cost_split">
 <em class="property"><span class="k"><span class="pre">abstractmethod</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">calculate_cost_split</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">total_consumption_kwh</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="reference internal" href="_modules/backend/energy_tariff.html#EnergyTariff.calculate_cost_split"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#backend.energy_tariff.EnergyTariff.calculate_cost_split" title="Link to this definition">¶</a></dt>
-<dd><p>Calculate the total cost breakdown for given consumption.</p>
+<dd><p>Calculate itemized cost breakdown for the tariff.</p>
+<p>Abstract method that must be implemented by concrete tariff classes.
+Returns a detailed breakdown of all cost components (base fee, variable costs,
+network fees, etc.) based on total consumption.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>total_consumption_kwh</strong> – Total energy consumption in kWh (from forecast or historical data)</p>
+<dd class="field-odd"><p><strong>total_consumption_kwh</strong> – Total energy consumption in kWh for billing period.</p>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>Breakdown of costs including base_price, variable_cost, total_cost, etc.</p>
-</dd>
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p>dict</p>
+<dd class="field-even"><p>Dictionary containing cost breakdown with keys like ‘base_price’,
+‘variable_cost’, ‘total_cost’, ‘billing_period_days’, etc.
+Exact keys vary by tariff type.</p>
 </dd>
 </dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>For dynamic tariffs, this provides simplified estimates without
+time-dependent pricing. Use calculate_cost() for accurate time-based pricing.</p>
+</div>
 </dd></dl>
 
 </dd></dl>
@@ -101,23 +178,37 @@ Handles month-end adjustments and varying month lengths.</p>
 <dt class="sig sig-object py" id="backend.energy_tariff.FixedTariff">
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">backend.energy_tariff.</span></span><span class="sig-name descname"><span class="pre">FixedTariff</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">base_price</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">kwh_rate</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">start_date</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">datetime</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">provider</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">min_duration</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_dynamic</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">features</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">postal_code</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/backend/energy_tariff.html#FixedTariff"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#backend.energy_tariff.FixedTariff" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference internal" href="#backend.energy_tariff.EnergyTariff" title="backend.energy_tariff.EnergyTariff"><code class="xref py py-class docutils literal notranslate"><span class="pre">EnergyTariff</span></code></a></p>
-<p>Represents a fixed energy tariff.</p>
+<p>Fixed-rate electricity tariff with constant per-kWh pricing.</p>
+<p>Traditional tariff model with a fixed monthly base fee and constant energy
+price regardless of time of consumption. Common for conventional German
+electricity contracts.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">Inherits</span> <span class="pre">all</span> <span class="pre">attributes</span> <span class="pre">from</span> <span class="pre">EnergyTariff.</span></span></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="backend.energy_tariff.FixedTariff.is_dynamic">
+<span class="sig-name descname"><span class="pre">is_dynamic</span></span><a class="headerlink" href="#backend.energy_tariff.FixedTariff.is_dynamic" title="Link to this definition">¶</a></dt>
+<dd><p>Always False for fixed tariffs.</p>
+</dd></dl>
+
 <dl class="py method">
 <dt class="sig sig-object py" id="backend.energy_tariff.FixedTariff.__init__">
 <span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">base_price</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">kwh_rate</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">start_date</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">datetime</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">provider</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">min_duration</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_dynamic</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">features</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">postal_code</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/backend/energy_tariff.html#FixedTariff.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#backend.energy_tariff.FixedTariff.__init__" title="Link to this definition">¶</a></dt>
-<dd><p>Initialize the fixed tariff with base price and kWh rate.</p>
+<dd><p>Initialize fixed tariff with constant pricing parameters.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>name</strong> – Name of the tariff</p></li>
-<li><p><strong>base_price</strong> – Monthly base price in €</p></li>
-<li><p><strong>kwh_rate</strong> – Fixed price per kWh in €</p></li>
-<li><p><strong>start_date</strong> – Start date for the tariff</p></li>
-<li><p><strong>provider</strong> – Energy provider name</p></li>
-<li><p><strong>min_duration</strong> – Minimum contract duration in months</p></li>
-<li><p><strong>is_dynamic</strong> – Whether this is a dynamic tariff (always False for this class)</p></li>
-<li><p><strong>features</strong> – List of tariff features (e.g., [“fixed”, “green”])</p></li>
-<li><p><strong>postal_code</strong> – German postal code (Postleitzahl) for location-specific pricing or availability</p></li>
+<li><p><strong>name</strong> – Tariff name for display purposes.</p></li>
+<li><p><strong>base_price</strong> – Monthly base fee in EUR.</p></li>
+<li><p><strong>kwh_rate</strong> – Fixed price per kWh in EUR (constant at all times).</p></li>
+<li><p><strong>start_date</strong> – Contract start date for billing calculations.</p></li>
+<li><p><strong>provider</strong> – Energy provider company name.</p></li>
+<li><p><strong>min_duration</strong> – Minimum contract duration in months (None if flexible).</p></li>
+<li><p><strong>is_dynamic</strong> – Must be False for fixed tariffs (maintained for API consistency).</p></li>
+<li><p><strong>features</strong> – Tariff characteristics (e.g., [“fixed”, “green”, “12_month”]).</p></li>
+<li><p><strong>postal_code</strong> – 5-digit German PLZ for regional tariff availability.</p></li>
 </ul>
 </dd>
 </dl>
@@ -126,17 +217,24 @@ Handles month-end adjustments and varying month lengths.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="backend.energy_tariff.FixedTariff.calculate_cost_split">
 <span class="sig-name descname"><span class="pre">calculate_cost_split</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">total_consumption_kwh</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="reference internal" href="_modules/backend/energy_tariff.html#FixedTariff.calculate_cost_split"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#backend.energy_tariff.FixedTariff.calculate_cost_split" title="Link to this definition">¶</a></dt>
-<dd><p>Calculate cost breakdown for fixed tariff.
-Returns base price, variable cost, and total cost breakdown.</p>
+<dd><p>Calculate itemized cost breakdown for fixed tariff billing period.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>total_consumption_kwh</strong> – Total energy consumption in kWh (from forecast or historical data)</p>
+<dd class="field-odd"><p><strong>total_consumption_kwh</strong> – Total energy consumption in kWh for the period.</p>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>Breakdown of costs including base_price, variable_cost, total_cost, etc.</p>
+<dd class="field-even"><p><ul class="simple">
+<li><p>base_price (float): Monthly base fee in EUR.</p></li>
+<li><p>variable_cost (float): Total energy cost (consumption × rate) in EUR.</p></li>
+<li><p>total_cost (float): Sum of base and variable costs in EUR.</p></li>
+<li><p>total_consumption_kwh (float): Input consumption echoed back.</p></li>
+<li><p>fixed_kwh_rate (float): Fixed price per kWh in EUR.</p></li>
+<li><p>billing_period_days (int): Number of days in billing period.</p></li>
+</ul>
+</p>
 </dd>
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p>dict</p>
+<dd class="field-odd"><p>Dictionary with the following keys</p>
 </dd>
 </dl>
 </dd></dl>
@@ -144,13 +242,32 @@ Returns base price, variable cost, and total cost breakdown.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="backend.energy_tariff.FixedTariff.calculate_cost">
 <span class="sig-name descname"><span class="pre">calculate_cost</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">float</span></span></span><a class="reference internal" href="_modules/backend/energy_tariff.html#FixedTariff.calculate_cost"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#backend.energy_tariff.FixedTariff.calculate_cost" title="Link to this definition">¶</a></dt>
-<dd><p>Calculate the total cost for a given consumption in kWh.</p>
+<dd><p>Calculate total cost for fixed tariff based on consumption data or forecast.</p>
+<p>Processes either historical consumption data (with Prophet forecasting) or
+uses standard load profiles scaled to annual consumption. Converts power
+readings to energy and handles various time interval formats (15-min, hourly).</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>data</strong> – pandas DataFrame with ‘datetime’ and ‘value’ columns (hourly kWh consumption)
-or a numeric value representing annual consumption in kWh.</p>
+<dd class="field-odd"><p><strong>data</strong> – Either a pandas DataFrame with columns [‘datetime’, ‘value’] containing
+hourly kWh consumption, or a numeric value representing annual
+consumption in kWh (will use standard load profile).</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Total cost in EUR for the billing period (base fee + energy costs).</p>
+</dd>
+<dt class="field-odd">Raises<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>ValueError</strong> – If data is neither a DataFrame nor a numeric value.</p>
 </dd>
 </dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<ul class="simple">
+<li><p>For DataFrames: Resamples to hourly frequency and forecasts future periods.</p></li>
+<li><p>For numeric values: Uses German standard load profile (H0) scaled to
+the provided annual consumption.</p></li>
+<li><p>Automatically converts kW readings to kWh based on time intervals.</p></li>
+</ul>
+</div>
 </dd></dl>
 
 </dd></dl>
@@ -159,24 +276,52 @@ or a numeric value representing annual consumption in kWh.</p>
 <dt class="sig sig-object py" id="backend.energy_tariff.DynamicTariff">
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">backend.energy_tariff.</span></span><span class="sig-name descname"><span class="pre">DynamicTariff</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">base_price</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">start_date</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">datetime</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">provider</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_dynamic</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">network_fee</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">features</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">postal_code</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">additional_price_ct_kwh</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/backend/energy_tariff.html#DynamicTariff"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#backend.energy_tariff.DynamicTariff" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference internal" href="#backend.energy_tariff.EnergyTariff" title="backend.energy_tariff.EnergyTariff"><code class="xref py py-class docutils literal notranslate"><span class="pre">EnergyTariff</span></code></a></p>
-<p>Represents a dynamic energy tariff.</p>
+<p>Spot-market-based electricity tariff with hourly price variations.</p>
+<p>Dynamic tariff following German day-ahead market prices (EPEX SPOT).
+Prices vary hourly based on wholesale market conditions plus fixed
+markup components (network fees, taxes, supplier costs).</p>
+<dl class="py attribute">
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">Inherits</span> <span class="pre">all</span> <span class="pre">attributes</span> <span class="pre">from</span> <span class="pre">EnergyTariff.</span></span></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="backend.energy_tariff.DynamicTariff.network_fee">
+<span class="sig-name descname"><span class="pre">network_fee</span></span><a class="headerlink" href="#backend.energy_tariff.DynamicTariff.network_fee" title="Link to this definition">¶</a></dt>
+<dd><p>One-time network connection fee in EUR.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="backend.energy_tariff.DynamicTariff.additional_price_ct_kwh">
+<span class="sig-name descname"><span class="pre">additional_price_ct_kwh</span></span><a class="headerlink" href="#backend.energy_tariff.DynamicTariff.additional_price_ct_kwh" title="Link to this definition">¶</a></dt>
+<dd><p>Fixed price components in ct/kWh (network fees,
+taxes, levies) scraped from provider websites.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="backend.energy_tariff.DynamicTariff.is_dynamic">
+<span class="sig-name descname"><span class="pre">is_dynamic</span></span><a class="headerlink" href="#backend.energy_tariff.DynamicTariff.is_dynamic" title="Link to this definition">¶</a></dt>
+<dd><p>Always True for dynamic tariffs.</p>
+</dd></dl>
+
 <dl class="py method">
 <dt class="sig sig-object py" id="backend.energy_tariff.DynamicTariff.__init__">
 <span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">base_price</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">start_date</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">datetime</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">provider</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_dynamic</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">network_fee</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">features</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">postal_code</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">additional_price_ct_kwh</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/backend/energy_tariff.html#DynamicTariff.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#backend.energy_tariff.DynamicTariff.__init__" title="Link to this definition">¶</a></dt>
-<dd><p>Initialize the dynamic tariff with base price and one-time network fee.</p>
+<dd><p>Initialize dynamic tariff with spot market pricing parameters.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>name</strong> – Name of the tariff</p></li>
-<li><p><strong>base_price</strong> – Monthly base price in €</p></li>
-<li><p><strong>start_date</strong> – Start date for the tariff</p></li>
-<li><p><strong>provider</strong> – Energy provider name</p></li>
-<li><p><strong>is_dynamic</strong> – Whether this is a dynamic tariff (always True for this class)</p></li>
-<li><p><strong>network_fee</strong> – One-time network usage fee (einmalige Zahlung für Netznutzung) in €</p></li>
-<li><p><strong>features</strong> – List of tariff features (e.g., [“dynamic”, “green”])</p></li>
-<li><p><strong>postal_code</strong> – German postal code (Postleitzahl) for location-specific pricing or availability</p></li>
-<li><p><strong>additional_price_ct_kwh</strong> – Fixed price components in ct/kWh (network fees, taxes, levies)
-from scraped provider data (e.g., Tibber’s 18.4 ct/kWh)</p></li>
+<li><p><strong>name</strong> – Tariff name for display purposes.</p></li>
+<li><p><strong>base_price</strong> – Monthly base fee in EUR.</p></li>
+<li><p><strong>start_date</strong> – Contract start date for billing calculations.</p></li>
+<li><p><strong>provider</strong> – Energy provider company name (e.g., “Tibber”, “Rabot Charge”).</p></li>
+<li><p><strong>is_dynamic</strong> – Must be True for dynamic tariffs (maintained for API consistency).</p></li>
+<li><p><strong>network_fee</strong> – One-time network connection/setup fee in EUR.</p></li>
+<li><p><strong>features</strong> – Tariff characteristics (e.g., [“dynamic”, “green”, “smart_meter_required”]).</p></li>
+<li><p><strong>postal_code</strong> – 5-digit German PLZ for regional pricing/availability.</p></li>
+<li><p><strong>additional_price_ct_kwh</strong> – Fixed markup components in ct/kWh including network
+fees, electricity tax, concession fees, VAT, and supplier margin.
+Typically 15-25 ct/kWh based on provider and region.</p></li>
 </ul>
 </dd>
 </dl>
@@ -185,18 +330,29 @@ from scraped provider data (e.g., Tibber’s 18.4 ct/kWh)</p></li>
 <dl class="py method">
 <dt class="sig sig-object py" id="backend.energy_tariff.DynamicTariff.calculate_cost_split">
 <span class="sig-name descname"><span class="pre">calculate_cost_split</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">total_consumption_kwh</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="reference internal" href="_modules/backend/energy_tariff.html#DynamicTariff.calculate_cost_split"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#backend.energy_tariff.DynamicTariff.calculate_cost_split" title="Link to this definition">¶</a></dt>
-<dd><p>Calculate cost breakdown for dynamic tariff.
-For dynamic tariffs, this is a simplified version that doesn’t include
-time-dependent pricing details since those require the actual consumption timeline.</p>
+<dd><p>Calculate simplified cost breakdown for dynamic tariff.</p>
+<p>Provides basic cost estimates using average forecasted prices. For accurate
+time-dependent pricing with hourly spot market variations, use calculate_cost()
+or calculate_cost_with_breakdown() instead.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>total_consumption_kwh</strong> – Total energy consumption in kWh</p>
+<dd class="field-odd"><p><strong>total_consumption_kwh</strong> – Total energy consumption in kWh for the period.</p>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>Basic breakdown with estimated average price</p>
+<dd class="field-even"><p><ul class="simple">
+<li><p>base_price (float): Monthly base fee in EUR.</p></li>
+<li><p>variable_cost (float): Estimated energy cost using average price.</p></li>
+<li><p>network_fee (float): One-time network connection fee in EUR.</p></li>
+<li><p>total_cost (float): Sum of all cost components.</p></li>
+<li><p>total_consumption_kwh (float): Input consumption echoed back.</p></li>
+<li><p>estimated_avg_kwh_price (float): Average wholesale price in EUR/kWh.</p></li>
+<li><p>billing_period_days (int): Number of days in billing period.</p></li>
+<li><p>note (str): Warning about simplified calculation method.</p></li>
+</ul>
+</p>
 </dd>
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p>dict</p>
+<dd class="field-odd"><p>Dictionary with the following keys</p>
 </dd>
 </dl>
 </dd></dl>
@@ -204,14 +360,46 @@ time-dependent pricing details since those require the actual consumption timeli
 <dl class="py method">
 <dt class="sig sig-object py" id="backend.energy_tariff.DynamicTariff.calculate_cost_with_breakdown">
 <span class="sig-name descname"><span class="pre">calculate_cost_with_breakdown</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/backend/energy_tariff.html#DynamicTariff.calculate_cost_with_breakdown"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#backend.energy_tariff.DynamicTariff.calculate_cost_with_breakdown" title="Link to this definition">¶</a></dt>
-<dd><p>Calculate the total cost and return both cost and average kWh price.</p>
+<dd><p>Calculate total cost with detailed breakdown using time-dependent pricing.</p>
+<p>Matches consumption timestamps with spot market prices to calculate accurate
+costs considering hourly price variations. Includes Prophet forecasting for
+uploaded data or uses standard load profiles for annual consumption inputs.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>data</strong> – pandas DataFrame with ‘datetime’ and ‘value’ columns (hourly kWh consumption)
-or a numeric value representing annual consumption in kWh.</p>
+<dd class="field-odd"><p><strong>data</strong> – Either a pandas DataFrame with columns [‘datetime’, ‘value’] containing
+consumption readings, or a numeric value representing annual consumption
+in kWh (will use standard load profile).</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><ul class="simple">
+<li><p>total_cost (float): Total cost in EUR for the billing period.</p></li>
+<li><p>avg_kwh_price (float): Average effective price per kWh in EUR.</p></li>
+</ul>
+</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Dictionary containing</p>
 </dd>
 </dl>
-<p>Returns: dict with ‘total_cost’ and ‘avg_kwh_price’</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Price calculation methodology:</p>
+<ol class="arabic simple">
+<li><p>Loads latest day-ahead price forecast (yhat_energy = zero-censored wholesale)</p></li>
+<li><p>Adds fixed components (additional_price_ct_kwh) from provider:</p>
+<ul class="simple">
+<li><p>Network fees (~7-8 ct/kWh)</p></li>
+<li><p>Electricity tax (2.05 ct/kWh)</p></li>
+<li><p>Concession fees (~1.5 ct/kWh)</p></li>
+<li><p>VAT 19% (~4-5 ct/kWh)</p></li>
+<li><p>Supplier costs (~7 ct/kWh)</p></li>
+</ul>
+</li>
+<li><p>Matches consumption with prices by timestamp</p></li>
+<li><p>Sums hourly costs: consumption[hour] × price[hour]</p></li>
+</ol>
+<p>Handles power-to-energy conversion for 15-minute and hourly interval data.</p>
+</div>
 </dd></dl>
 
 </dd></dl>
@@ -219,182 +407,211 @@ or a numeric value representing annual consumption in kWh.</p>
 <dl class="py function">
 <dt class="sig sig-object py" id="backend.energy_tariff.slice_seasonal_data">
 <span class="sig-prename descclassname"><span class="pre">backend.energy_tariff.</span></span><span class="sig-name descname"><span class="pre">slice_seasonal_data</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">df</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">pandas.DataFrame</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">start_date</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">datetime</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">days</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">30</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">pandas.DataFrame</span></span></span><a class="reference internal" href="_modules/backend/energy_tariff.html#slice_seasonal_data"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#backend.energy_tariff.slice_seasonal_data" title="Link to this definition">¶</a></dt>
-<dd><p>Slice data based on day/month only (ignoring year) for seasonal patterns.
-Cycles through the year if needed.
-Note: This function expects data to already be in hourly kWh format.</p>
+<dd><p>Extract seasonal consumption pattern matching specified date range.</p>
+<p>Extracts data by matching day-of-year and hour, ignoring the year component.
+This allows using historical consumption patterns for future date projections.
+Cycles through the year if needed (e.g., December-January transitions).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>df</strong> – DataFrame with columns [‘datetime’, ‘value’] containing hourly consumption
+in kWh. Must cover at least one full year of data.</p></li>
+<li><p><strong>start_date</strong> – Starting date for the extraction period.</p></li>
+<li><p><strong>days</strong> – Number of days to extract (default: 30 for monthly billing).</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>DataFrame with columns [‘datetime’, ‘value’] containing the extracted
+consumption data with updated timestamps matching the target date range.
+Returns empty DataFrame if no matching seasonal data is found.</p>
+</dd>
+</dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Assumes input data is already in hourly kWh format. Does not perform
+unit conversions. For proper usage, ensure data is preprocessed with
+appropriate kW-to-kWh conversion based on time intervals.</p>
+</div>
+<p class="rubric">Example</p>
+<p>Extract consumption pattern for March 1-30, 2025 using 2024 data:
+&gt;&gt;&gt; march_data = slice_seasonal_data(yearly_df, datetime(2025, 3, 1), days=30)</p>
 </dd></dl>
 
 </section>
 <section id="module-backend.risk_analysis">
 <span id="risk-analysis"></span><h2>Risk Analysis<a class="headerlink" href="#module-backend.risk_analysis" title="Link to this heading">¶</a></h2>
+<p>Risk analysis module for dynamic electricity tariff comparison.</p>
+<p>Analyzes consumption patterns against historical and forecasted electricity prices
+to assess suitability for dynamic tariffs. Provides metrics including coincidence
+factors, weighted pricing, and aggregated risk scores.</p>
+<dl class="simple">
+<dt>Functions:</dt><dd><p>create_historic_risk_analysis: Compare user’s weighted price vs market average.
+calculate_coincidence_factor: Measure consumption during expensive periods.
+get_user_load_profile: Analyze hourly consumption patterns.
+get_price_forecast_volatility: Calculate price forecast uncertainty metrics.
+get_aggregated_risk_score: Combine multiple risk factors into overall score.
+get_simplified_risk_score_for_yearly_usage: Risk score for standard load profiles.</p>
+</dd>
+</dl>
 <dl class="py function">
 <dt class="sig sig-object py" id="backend.risk_analysis.create_historic_risk_analysis">
 <span class="sig-prename descclassname"><span class="pre">backend.risk_analysis.</span></span><span class="sig-name descname"><span class="pre">create_historic_risk_analysis</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">consumption_data</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">pandas.DataFrame</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">days</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">30</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">app_data_dir</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="reference internal" href="_modules/backend/risk_analysis.html#create_historic_risk_analysis"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#backend.risk_analysis.create_historic_risk_analysis" title="Link to this definition">¶</a></dt>
-<dd><p>Perform historic risk analysis by comparing market average prices with user’s weighted average price.</p>
-<p>This function analyzes how much exposure the user had to price fluctuations by comparing:
-- The simple market average price over the period
-- The weighted average price the user actually faced based on their consumption pattern</p>
-<p>Parameters:
-consumption_data (pd.DataFrame): DataFrame with user consumption data, must have ‘datetime’ and ‘value’ columns
-days (int): Number of days to analyze (default: 30)
-app_data_dir (str): Path to app_data directory. If None, uses default path</p>
-<p>Returns:
-dict: A dictionary containing:</p>
-<blockquote>
-<div><ul class="simple">
-<li><p>market_avg_price: Simple average of all hourly prices (€/kWh)</p></li>
-<li><p>user_weighted_price: Weighted average price based on consumption (€/kWh)</p></li>
-<li><p>price_differential: Difference between user’s price and market average (€/kWh)</p></li>
-<li><p>price_differential_pct: Percentage difference</p></li>
-<li><p>risk_exposure: ‘favorable’ if user paid less than average, ‘unfavorable’ if more</p></li>
-<li><p>total_consumption: Total consumption over the period (kWh)</p></li>
-<li><p>total_cost: Total cost over the period (€)</p></li>
-<li><p>price_volatility: Standard deviation of prices over the period</p></li>
-<li><p>days_analyzed: Actual number of days in the analysis</p></li>
-<li><p>num_hours: Number of hours with matching price and consumption data</p></li>
-<li><p>price_file_used: Name of the price data file used</p></li>
+<dd><p>Analyze historical consumption exposure to price fluctuations.</p>
+<p>Compares simple market average price against user’s consumption-weighted
+average to determine if usage pattern resulted in favorable or unfavorable pricing.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>consumption_data</strong> – DataFrame with columns [‘datetime’, ‘value’] containing
+hourly consumption in kWh.</p></li>
+<li><p><strong>days</strong> – Number of days to analyze (default: 30).</p></li>
+<li><p><strong>app_data_dir</strong> – Path to app_data directory (auto-detected if None).</p></li>
 </ul>
-</div></blockquote>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Dictionary containing market_avg_price, user_weighted_price,
+price_differential, price_differential_pct, risk_exposure,
+total_consumption, total_cost, price_volatility, days_analyzed,
+num_hours, price_file_used, analysis_period.</p>
+</dd>
+<dt class="field-odd">Raises<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>FileNotFoundError</strong> – If price data files are not available.</p></li>
+<li><p><strong>ValueError</strong> – If consumption data doesn’t overlap with price data.</p></li>
+</ul>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="backend.risk_analysis.calculate_coincidence_factor">
 <span class="sig-prename descclassname"><span class="pre">backend.risk_analysis.</span></span><span class="sig-name descname"><span class="pre">calculate_coincidence_factor</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">consumption_data</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">pandas.DataFrame</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">days</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">30</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">expensive_hours_pct</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">20.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">app_data_dir</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="reference internal" href="_modules/backend/risk_analysis.html#calculate_coincidence_factor"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#backend.risk_analysis.calculate_coincidence_factor" title="Link to this definition">¶</a></dt>
-<dd><p>Calculate the coincidence factor by analyzing how much energy usage occurred during
-the most expensive hours in the last n days.</p>
-<p>This function identifies the most expensive X% of hours and calculates what percentage
-of the user’s total consumption occurred during those expensive periods. A high coincidence
-factor indicates that the user consumes more energy when prices are high (unfavorable),
-while a low factor suggests better consumption timing.</p>
-<p>Parameters:
-consumption_data (pd.DataFrame): DataFrame with user consumption data, must have ‘datetime’ and ‘value’ columns
-days (int): Number of days to analyze (default: 30)
-expensive_hours_pct (float): Percentage of most expensive hours to analyze (default: 20.0, range: 0-100)
-app_data_dir (str): Path to app_data directory. If None, uses default path</p>
-<p>Returns:
-dict: A dictionary containing:</p>
-<blockquote>
-<div><ul class="simple">
-<li><p>expensive_hours_pct: Percentage threshold used for expensive hours</p></li>
-<li><p>num_expensive_hours: Number of hours classified as expensive</p></li>
-<li><p>total_hours: Total number of hours analyzed</p></li>
-<li><p>consumption_during_expensive_hours: kWh consumed during expensive hours</p></li>
-<li><p>total_consumption: Total kWh consumed</p></li>
-<li><p>consumption_coincidence_pct: % of total consumption during expensive hours</p></li>
-<li><p>cost_during_expensive_hours: Cost incurred during expensive hours (€)</p></li>
-<li><p>total_cost: Total cost (€)</p></li>
-<li><p>cost_coincidence_pct: % of total cost during expensive hours</p></li>
-<li><p>avg_price_expensive_hours: Average price during expensive hours (€/kWh)</p></li>
-<li><p>avg_price_cheap_hours: Average price during cheap hours (€/kWh)</p></li>
-<li><p>price_threshold: Price threshold for expensive hours (€/kWh)</p></li>
-<li><p>correlation: Correlation coefficient between consumption and prices</p></li>
-<li><p>coincidence_rating: ‘high’, ‘medium’, or ‘low’ based on consumption_coincidence_pct</p></li>
+<dd><p>Calculate consumption coincidence with expensive price periods.</p>
+<p>Identifies the most expensive X% of hours and calculates what percentage of
+total consumption occurred during those periods. High coincidence indicates
+unfavorable consumption timing (consuming during expensive hours).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>consumption_data</strong> – DataFrame with columns [‘datetime’, ‘value’] in kWh.</p></li>
+<li><p><strong>days</strong> – Number of days to analyze (default: 30).</p></li>
+<li><p><strong>expensive_hours_pct</strong> – Threshold for expensive hours, 0-100 (default: 20).</p></li>
+<li><p><strong>app_data_dir</strong> – Path to app_data directory (auto-detected if None).</p></li>
 </ul>
-</div></blockquote>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Dictionary with expensive_hours_pct, num_expensive_hours, total_hours,
+consumption_during_expensive_hours, consumption_during_cheap_hours,
+total_consumption, consumption_coincidence_pct, cost metrics,
+avg_price_expensive_hours, avg_price_cheap_hours, price_threshold,
+correlation, coincidence_rating, rating_message, days_analyzed,
+analysis_period.</p>
+</dd>
+<dt class="field-odd">Raises<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>ValueError</strong> – If expensive_hours_pct not in range (0, 100] or if no
+    timestamp overlap between consumption and price data.</p></li>
+<li><p><strong>FileNotFoundError</strong> – If price data files are not available.</p></li>
+</ul>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="backend.risk_analysis.get_user_load_profile">
 <span class="sig-prename descclassname"><span class="pre">backend.risk_analysis.</span></span><span class="sig-name descname"><span class="pre">get_user_load_profile</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">consumption_data</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">pandas.DataFrame</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">days</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">30</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">app_data_dir</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="reference internal" href="_modules/backend/risk_analysis.html#get_user_load_profile"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#backend.risk_analysis.get_user_load_profile" title="Link to this definition">¶</a></dt>
-<dd><p>Analyze the user’s load profile by calculating average consumption and price patterns per hour of day.</p>
-<p>This function calculates the average energy usage for each hour of the day (0-23) over the past n days,
-along with the corresponding average energy prices at those hours. This allows visualization of how
-the user’s consumption pattern correlates with price patterns throughout the day.</p>
-<p>Parameters:
-consumption_data (pd.DataFrame): DataFrame with user consumption data, must have ‘datetime’ and ‘value’ columns
-days (int): Number of days to analyze (default: 30)
-app_data_dir (str): Path to app_data directory. If None, uses default path</p>
-<p>Returns:
-dict: A dictionary containing:</p>
-<blockquote>
-<div><ul class="simple">
-<li><dl class="simple">
-<dt>hourly_data: List of 24 objects (one per hour), each containing:</dt><dd><ul>
-<li><p>hour: Hour of day (0-23)</p></li>
-<li><p>avg_consumption_kwh: Average consumption during this hour (kWh)</p></li>
-<li><p>avg_price_eur_per_kwh: Average price during this hour (€/kWh)</p></li>
-<li><p>num_data_points: Number of data points used for this hour</p></li>
+<dd><p>Analyze hourly consumption patterns and price correlation.</p>
+<p>Calculates average consumption and prices for each hour of day (0-23) to
+visualize how usage patterns align with price patterns.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>consumption_data</strong> – DataFrame with columns [‘datetime’, ‘value’] in kWh.</p></li>
+<li><p><strong>days</strong> – Number of days to analyze (default: 30).</p></li>
+<li><p><strong>app_data_dir</strong> – Path to app_data directory (auto-detected if None).</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Dictionary with hourly_data (list of 24 hourly averages) and summary
+(peak/lowest hours, correlation, analysis_period).</p>
+</dd>
+<dt class="field-odd">Raises<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>ValueError</strong> – If no consumption data available for specified period.</p></li>
+<li><p><strong>FileNotFoundError</strong> – If price data files are not available.</p></li>
 </ul>
 </dd>
 </dl>
-</li>
-<li><dl class="simple">
-<dt>summary: Dictionary with overall statistics:</dt><dd><ul>
-<li><p>total_days_analyzed: Actual number of days in the analysis</p></li>
-<li><p>peak_consumption_hour: Hour with highest average consumption</p></li>
-<li><p>lowest_consumption_hour: Hour with lowest average consumption</p></li>
-<li><p>peak_price_hour: Hour with highest average price</p></li>
-<li><p>lowest_price_hour: Hour with lowest average price</p></li>
-<li><p>correlation: Correlation coefficient between hourly consumption and prices</p></li>
-</ul>
-</dd>
-</dl>
-</li>
-</ul>
-</div></blockquote>
 </dd></dl>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="backend.risk_analysis.get_price_forecast_volatility">
 <span class="sig-prename descclassname"><span class="pre">backend.risk_analysis.</span></span><span class="sig-name descname"><span class="pre">get_price_forecast_volatility</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">app_data_dir</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="reference internal" href="_modules/backend/risk_analysis.html#get_price_forecast_volatility"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#backend.risk_analysis.get_price_forecast_volatility" title="Link to this definition">¶</a></dt>
-<dd><p>Analyze price forecast volatility by reading the most recent forecast data.</p>
-<p>This function loads the most recent price forecast file from the app_data directory
-and calculates two key volatility metrics.</p>
-<p>Parameters:
-app_data_dir (str): Path to app_data directory. If None, uses default path</p>
-<p>Returns:
-dict: Contains:</p>
-<blockquote>
-<div><ul class="simple">
-<li><p>forecast_std_dev: Standard deviation of forecasted prices (€/kWh)</p></li>
-<li><p>avg_confidence_interval_width: Average width of confidence intervals if available (€/kWh), None otherwise</p></li>
+<dd><p>Calculate price forecast uncertainty metrics.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>app_data_dir</strong> – Path to app_data directory (auto-detected if None).</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Dictionary with forecast_std_dev (standard deviation of forecasted prices
+in EUR/kWh) and avg_confidence_interval_width (average Prophet CI width
+in EUR/kWh, or None if unavailable).</p>
+</dd>
+<dt class="field-odd">Raises<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>FileNotFoundError</strong> – If forecast file doesn’t exist.</p></li>
+<li><p><strong>ValueError</strong> – If required columns are missing from forecast file.</p></li>
 </ul>
-</div></blockquote>
-<p>Raises:
-FileNotFoundError: If no forecast files are found</p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="backend.risk_analysis.get_simplified_risk_score_for_yearly_usage">
 <span class="sig-prename descclassname"><span class="pre">backend.risk_analysis.</span></span><span class="sig-name descname"><span class="pre">get_simplified_risk_score_for_yearly_usage</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">forecast_price_volatility</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_dynamic</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">historic_price_volatility</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="reference internal" href="_modules/backend/risk_analysis.html#get_simplified_risk_score_for_yearly_usage"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#backend.risk_analysis.get_simplified_risk_score_for_yearly_usage" title="Link to this definition">¶</a></dt>
-<dd><p>Calculate a simplified risk score when only yearly usage is provided (no CSV uploaded).</p>
-<p>Since we don’t have actual consumption patterns, we can only assess risk based on:
-- Price volatility (both historic and forecasted) for dynamic tariffs
-- Fixed tariff advantage (inherently lower risk)</p>
-<p>Parameters:
-forecast_price_volatility (dict): Output from price volatility analysis
-is_dynamic (bool): Whether the tariff is dynamic
-historic_price_volatility (float): Optional historic price volatility from market data</p>
-<p>Returns:
-dict: Contains risk_level, risk_score, risk_message, risk_factors, simplified flag</p>
+<dd><p>Calculate risk score for standard load profile scenarios.</p>
+<p>Used when only annual consumption is provided (no smart meter data).
+Assesses risk based solely on price volatility since consumption patterns
+are unknown.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>forecast_price_volatility</strong> – Output from get_price_forecast_volatility().</p></li>
+<li><p><strong>is_dynamic</strong> – True for dynamic tariffs, False for fixed.</p></li>
+<li><p><strong>historic_price_volatility</strong> – Optional historical price std dev in EUR/kWh.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Dictionary with risk_level, risk_score, risk_message, risk_factors,
+forecast_quality_included (False), simplified (True), note.</p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="backend.risk_analysis.get_aggregated_risk_score">
 <span class="sig-prename descclassname"><span class="pre">backend.risk_analysis.</span></span><span class="sig-name descname"><span class="pre">get_aggregated_risk_score</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">historic_risk_analysis</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">coincidence_factor</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">forecast_price_volatility</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_dynamic</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">usage_forecast_quality</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="reference internal" href="_modules/backend/risk_analysis.html#get_aggregated_risk_score"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#backend.risk_analysis.get_aggregated_risk_score" title="Link to this definition">¶</a></dt>
-<dd><p>Aggregate the risk analysis results into a simple risk assessment.</p>
-<p>This function combines the outputs from historic risk analysis, coincidence factor
-calculations, and forecast quality metrics to provide an overall risk assessment for the user.</p>
-<p>Parameters:
-historic_risk_analysis (dict): Output from create_historic_risk_analysis function
-coincidence_factor (dict): Output from calculate_coincidence_factor function
-forecast_price_volatility (dict): Output from price volatility analysis
-is_dynamic (bool): Whether the tariff is dynamic
-usage_forecast_quality (dict): Optional. Quality metrics from backtest (includes avg_confidence_interval_width,</p>
-<blockquote>
-<div><p>relative_confidence_interval_width, mae, forecast_error_percentage)</p>
-</div></blockquote>
-<p>Returns:
-dict: Contains:</p>
-<blockquote>
-<div><ul class="simple">
-<li><p>risk_level: ‘low’, ‘moderate’, or ‘high’</p></li>
-<li><p>risk_score: numeric score (0-100, lower is better)</p></li>
-<li><p>risk_message: human-readable explanation</p></li>
-<li><p>risk_factors: breakdown of contributing factors</p></li>
-<li><p>forecast_quality_included: boolean indicating if forecast quality was factored in</p></li>
+<dd><p>Combine multiple risk metrics into overall assessment.</p>
+<p>Aggregates historical consumption patterns, coincidence factors, price volatility,
+and forecast quality into a single risk score and level.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>historic_risk_analysis</strong> – Output from create_historic_risk_analysis().</p></li>
+<li><p><strong>coincidence_factor</strong> – Output from calculate_coincidence_factor().</p></li>
+<li><p><strong>forecast_price_volatility</strong> – Output from get_price_forecast_volatility().</p></li>
+<li><p><strong>is_dynamic</strong> – True for dynamic tariffs, False for fixed.</p></li>
+<li><p><strong>usage_forecast_quality</strong> – Optional backtest metrics including
+avg_confidence_interval_width, relative_confidence_interval_width,
+mae, forecast_error_percentage.</p></li>
 </ul>
-</div></blockquote>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Dictionary with risk_level (‘low’/’moderate’/’high’), risk_score (0-100,
+lower is better), risk_message, risk_factors (list of contributing factors),
+forecast_quality_included (boolean).</p>
+</dd>
+</dl>
 </dd></dl>
 
 </section>
@@ -416,23 +633,12 @@ dict: Contains:</p>
 
 
 
-
-<search id="searchbox" style="display: none" role="search">
-    <div class="searchformwrapper">
-    <form class="search" action="search.html" method="get">
-      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
-      <input type="submit" value="Go" />
-    </form>
-    </div>
-</search>
-<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<h3>Navigation</h3>
 <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="concept.html">System Concept &amp; Architecture</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="api.html">API Reference</a><ul class="current">
 <li class="toctree-l2 current"><a class="current reference internal" href="#">Backend API</a></li>
-<li class="toctree-l2"><a class="reference internal" href="forecasting.html">Forecasting &amp; Predictions</a></li>
-<li class="toctree-l2"><a class="reference internal" href="webscraping.html">Web Scraping Module</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="webscraping.html">Web Scraping Module</a></li>
@@ -445,11 +651,21 @@ dict: Contains:</p>
   <li><a href="index.html">Documentation overview</a><ul>
   <li><a href="api.html">API Reference</a><ul>
       <li>Previous: <a href="api.html" title="previous chapter">API Reference</a></li>
-      <li>Next: <a href="forecasting.html" title="next chapter">Forecasting &amp; Predictions</a></li>
+      <li>Next: <a href="webscraping.html" title="next chapter">Web Scraping Module</a></li>
   </ul></li>
   </ul></li>
 </ul>
 </div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
 
 
 
@@ -467,7 +683,7 @@ dict: Contains:</p>
       
       |
       Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.2.3</a>
-      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 0.7.16</a>
       
       |
       <a href="_sources/backend.rst.txt"

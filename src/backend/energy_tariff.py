@@ -449,13 +449,16 @@ class DynamicTariff(EnergyTariff):
                 
         Note:
             Price calculation methodology:
+            
             1. Loads latest day-ahead price forecast (yhat_energy = zero-censored wholesale)
             2. Adds fixed components (additional_price_ct_kwh) from provider:
+            
                - Network fees (~7-8 ct/kWh)
                - Electricity tax (2.05 ct/kWh)
                - Concession fees (~1.5 ct/kWh)
                - VAT 19% (~4-5 ct/kWh)
                - Supplier costs (~7 ct/kWh)
+            
             3. Matches consumption with prices by timestamp
             4. Sums hourly costs: consumption[hour] × price[hour]
             
