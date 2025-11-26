@@ -1,11 +1,15 @@
-try:
-    from chronos import ChronosPipeline
-    CHRONOS_AVAILABLE = True
-except ImportError:
-    CHRONOS_AVAILABLE = False
-    ChronosPipeline = None
+"""Energy consumption forecasting using Facebook Prophet.
 
-import numpy as np 
+Provides time-series forecasting for household electricity consumption using
+Prophet models with daily and weekly seasonality. Includes backtesting functionality
+for forecast quality assessment.
+
+Functions:
+    forecast_prophet: Generate consumption forecasts using Prophet.
+    create_backtest: Validate forecast accuracy against historical data.
+    calculate_total_weekly_usage: Aggregate forecasts to weekly totals.
+"""
+import numpy as np
 import pandas as pd
 from datetime import datetime, timedelta
 from prophet import Prophet
@@ -13,6 +17,15 @@ from prophet import Prophet
 
 
 def calculate_total_weekly_usage(forecast_df):
+    """Aggregate hourly forecast to weekly totals.
+    
+    Args:
+        forecast_df: DataFrame with columns ['datetime', 'yhat'] containing
+            hourly forecasted consumption in kWh.
+    
+    Returns:
+        DataFrame with weekly aggregated consumption indexed by week end date.
+    """ 
     # Resample to hourly frequency
     forecast_df = forecast_df.resample("H", on="datetime").sum().reset_index()
     # Sum the usage for each week
@@ -20,6 +33,28 @@ def calculate_total_weekly_usage(forecast_df):
     return weekly_usage
 
 def forecast_prophet(df, days=30):
+    """Generate future consumption forecast using Prophet time-series model.
+    
+    Trains Prophet model with daily and weekly seasonality on historical hourly
+    consumption data. Returns only future predictions (excludes historical period).
+    
+    Args:
+        df: DataFrame with columns ['datetime', 'value'] containing historical
+            hourly consumption in kWh. Optional 'status' column is dropped.
+        days: Number of days to forecast into the future (default: 30).
+    
+    Returns:
+        DataFrame with Prophet forecast columns including 'ds' (datetime),
+        'yhat' (predicted consumption), 'yhat_lower', 'yhat_upper' for
+        the specified future period only.
+        
+    Note:
+        Model configuration:
+        - Daily and weekly seasonality enabled
+        - Additive seasonality mode
+        - 90% confidence intervals (interval_width=0.9)
+        - Linear growth trend
+    """ 
     # Explicitly create a copy to avoid SettingWithCopyWarning
     df = df.copy()
     df["datetime"] = pd.to_datetime(df["datetime"], format='%m/%d/%y %H:%M')
@@ -64,17 +99,27 @@ def forecast_prophet(df, days=30):
     return future_forecast
 
 def create_backtest(usage_df):
-    """
-    Create backtest data for API response comparing actual vs forecasted energy usage.
+    """Validate Prophet forecast accuracy using hold-out test period.
     
-    Parameters:
-    - usage_df: DataFrame with energy usage data (must have 'datetime' and 'value' columns)
+    Splits data into training set and 30-day test period. Trains Prophet on
+    historical data, forecasts the test period, and compares predictions against
+    actual consumption to calculate error metrics.
+    
+    Args:
+        usage_df: DataFrame with columns ['datetime', 'value'] containing
+            historical hourly consumption in kWh. Optional 'status' column dropped.
     
     Returns:
-    - Dictionary with hourly_data, daily_data, and metrics for visualization
+        Dictionary containing:
+            - hourly_data: Hourly timestamps, forecast, confidence intervals, actual.
+            - daily_data: Daily aggregated forecast vs actual.
+            - metrics: Includes total_forecast_usage, total_actual_usage,
+              forecast_error_absolute, forecast_error_percentage, mae, mse,
+              avg_confidence_interval_width, relative_confidence_interval_width.
     
     Note:
-    - For local plotting and testing, use test_backtest_visualization.py in the analysis folder
+        Removes incomplete days from test period to ensure fair comparison.
+        Clips negative forecasts to zero (consumption cannot be negative).
     """
     
     usage_df = usage_df.copy()

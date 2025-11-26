@@ -44,9 +44,20 @@ import { Chart, registerables } from 'chart.js'
 
 Chart.register(...registerables)
 
+/**
+ * LoadProfileChart - Dual-axis chart showing energy consumption patterns vs. pricing.
+ * 
+ * Displays average hourly energy consumption alongside pricing data to identify
+ * cost optimization opportunities. Shows correlation between usage and price.
+ * 
+ * @component
+ * @example
+ * <LoadProfileChart :loadProfileData="profileData" />
+ */
 export default {
   name: 'LoadProfileChart',
   props: {
+    /** Object containing hourly_data array and summary statistics */
     loadProfileData: {
       type: Object,
       default: null

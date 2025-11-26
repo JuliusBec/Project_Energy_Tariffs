@@ -1,3 +1,18 @@
+"""Energy tariff models for comparing fixed and dynamic electricity contracts.
+
+This module provides abstract and concrete implementations of energy tariffs,
+supporting both fixed-rate and dynamic (spot-market-based) pricing models.
+Includes German market-specific billing practices and seasonal consumption patterns.
+
+Classes:
+    EnergyTariff: Abstract base class for all energy tariff types.
+    FixedTariff: Fixed-rate electricity tariff with constant kWh pricing.
+    DynamicTariff: Spot-market-based tariff with hourly price variations.
+
+Functions:
+    slice_seasonal_data: Extract seasonal consumption patterns from historical data.
+"""
+
 from abc import ABC, abstractmethod
 from datetime import datetime, time, timedelta
 from typing import Optional
@@ -7,26 +22,39 @@ from calendar import monthrange
 import os
 
 class EnergyTariff(ABC):
-    """
-    Abstract base class for electricity contracts.
+    """Abstract base class for electricity tariffs in the German market.
+    
+    Provides common functionality for calculating costs, managing billing periods,
+    and handling tariff metadata. Subclasses must implement cost calculation logic
+    specific to their pricing model (fixed vs. dynamic).
+    
+    Attributes:
+        name: Tariff name (e.g., "EnBW Komfort").
+        provider: Energy provider company name.
+        base_price: Monthly base fee in EUR.
+        kwh_rate: Fixed price per kWh in EUR (None for dynamic tariffs).
+        start_date: Contract start date for billing calculations.
+        is_dynamic: True if tariff uses hourly spot market pricing.
+        features: List of tariff features (e.g., ["green", "fixed"]).
+        postal_code: German postal code for location-specific pricing.
+        min_duration: Minimum contract duration in months.
     """
 
     def __init__(self, name: str, base_price: float, is_dynamic: bool, start_date: datetime, kwh_rate: Optional[float] = None, 
                  provider: Optional[str] = None, min_duration: Optional[int] = None, features: Optional[list] = None,
                  postal_code: Optional[str] = None):
-        """
-        Initialize the energy tariff.
+        """Initialize energy tariff with pricing and contract parameters.
         
         Args:
-            name: Name of the tariff
-            base_price: Monthly base price in €
-            is_dynamic: Whether this is a dynamic tariff
-            start_date: Start date for the tariff
-            kwh_rate: Fixed price per kWh in € (for fixed tariffs)
-            provider: Energy provider name
-            min_duration: Minimum contract duration in months
-            features: List of tariff features (e.g., ["green", "fixed"])
-            postal_code: German postal code (Postleitzahl) for location-specific pricing or availability
+            name: Tariff name for display and identification.
+            base_price: Monthly base fee in EUR.
+            is_dynamic: True if tariff uses hourly spot market pricing.
+            start_date: Contract start date for billing period calculations.
+            kwh_rate: Fixed price per kWh in EUR (None for dynamic tariffs).
+            provider: Energy provider company name (e.g., "EnBW", "Tibber").
+            min_duration: Minimum contract duration in months (None if no commitment).
+            features: Tariff characteristics (e.g., ["green", "fixed", "smart_meter"]).
+            postal_code: 5-digit German PLZ for location-specific pricing.
         """
         self.name = name
         self.provider = provider
@@ -39,12 +67,18 @@ class EnergyTariff(ABC):
         self.postal_code = postal_code
 
     def calculate_billing_period_days(self) -> int:
-        """
-        Calculate actual billing period in days based on German monthly billing practices.
-        Handles month-end adjustments and varying month lengths.
+        """Calculate billing period length following German energy contract standards.
+        
+        Handles month-end billing adjustments and varying month lengths according
+        to German energy market practices. Contracts starting on month-end will
+        bill on the last day of subsequent months.
         
         Returns:
-            int: Number of days in the billing period
+            Number of days in the current billing period.
+            
+        Example:
+            Contract starting Jan 31 bills on Feb 28 (or 29) = 28/29 days.
+            Contract starting Jan 15 bills on Feb 15 = 31 days.
         """
 
         start_day = self.start_date.day
@@ -76,53 +110,72 @@ class EnergyTariff(ABC):
     
     @abstractmethod
     def calculate_cost_split(self, total_consumption_kwh: float) -> dict:
-        """
-        Calculate the total cost breakdown for given consumption.
+        """Calculate itemized cost breakdown for the tariff.
+        
+        Abstract method that must be implemented by concrete tariff classes.
+        Returns a detailed breakdown of all cost components (base fee, variable costs,
+        network fees, etc.) based on total consumption.
         
         Args:
-            total_consumption_kwh: Total energy consumption in kWh (from forecast or historical data)
+            total_consumption_kwh: Total energy consumption in kWh for billing period.
             
         Returns:
-            dict: Breakdown of costs including base_price, variable_cost, total_cost, etc.
+            Dictionary containing cost breakdown with keys like 'base_price',
+            'variable_cost', 'total_cost', 'billing_period_days', etc.
+            Exact keys vary by tariff type.
+            
+        Note:
+            For dynamic tariffs, this provides simplified estimates without
+            time-dependent pricing. Use calculate_cost() for accurate time-based pricing.
         """
         pass
 
 class FixedTariff(EnergyTariff):
-    """
-    Represents a fixed energy tariff.
+    """Fixed-rate electricity tariff with constant per-kWh pricing.
+    
+    Traditional tariff model with a fixed monthly base fee and constant energy
+    price regardless of time of consumption. Common for conventional German
+    electricity contracts.
+    
+    Attributes:
+        Inherits all attributes from EnergyTariff.
+        is_dynamic: Always False for fixed tariffs.
     """
 
     def __init__(self, name: str, base_price: float, kwh_rate: float, start_date: datetime, provider: Optional[str] = None, 
                  min_duration: Optional[int] = None, is_dynamic: bool = False, features: Optional[list] = None,
                  postal_code: Optional[str] = None):
-        """
-        Initialize the fixed tariff with base price and kWh rate.
+        """Initialize fixed tariff with constant pricing parameters.
         
         Args:
-            name: Name of the tariff
-            base_price: Monthly base price in €
-            kwh_rate: Fixed price per kWh in €
-            start_date: Start date for the tariff
-            provider: Energy provider name
-            min_duration: Minimum contract duration in months
-            is_dynamic: Whether this is a dynamic tariff (always False for this class)
-            features: List of tariff features (e.g., ["fixed", "green"])
-            postal_code: German postal code (Postleitzahl) for location-specific pricing or availability
+            name: Tariff name for display purposes.
+            base_price: Monthly base fee in EUR.
+            kwh_rate: Fixed price per kWh in EUR (constant at all times).
+            start_date: Contract start date for billing calculations.
+            provider: Energy provider company name.
+            min_duration: Minimum contract duration in months (None if flexible).
+            is_dynamic: Must be False for fixed tariffs (maintained for API consistency).
+            features: Tariff characteristics (e.g., ["fixed", "green", "12_month"]).
+            postal_code: 5-digit German PLZ for regional tariff availability.
         """
         super().__init__(name=name, base_price=base_price, is_dynamic=False, start_date=start_date,
                          kwh_rate=kwh_rate, provider=provider, min_duration=min_duration, features=features,
                          postal_code=postal_code)
 
     def calculate_cost_split(self, total_consumption_kwh: float) -> dict:
-        """
-        Calculate cost breakdown for fixed tariff.
-        Returns base price, variable cost, and total cost breakdown.
+        """Calculate itemized cost breakdown for fixed tariff billing period.
         
         Args:
-            total_consumption_kwh: Total energy consumption in kWh (from forecast or historical data)
+            total_consumption_kwh: Total energy consumption in kWh for the period.
             
         Returns:
-            dict: Breakdown of costs including base_price, variable_cost, total_cost, etc.
+            Dictionary with the following keys:
+                - base_price (float): Monthly base fee in EUR.
+                - variable_cost (float): Total energy cost (consumption × rate) in EUR.
+                - total_cost (float): Sum of base and variable costs in EUR.
+                - total_consumption_kwh (float): Input consumption echoed back.
+                - fixed_kwh_rate (float): Fixed price per kWh in EUR.
+                - billing_period_days (int): Number of days in billing period.
         """
         # Calculate actual billing period based on German monthly billing practices
         billing_period_days = self.calculate_billing_period_days()
@@ -141,12 +194,28 @@ class FixedTariff(EnergyTariff):
         }
 
     def calculate_cost(self, data) -> float:
-        """
-        Calculate the total cost for a given consumption in kWh.
+        """Calculate total cost for fixed tariff based on consumption data or forecast.
+        
+        Processes either historical consumption data (with Prophet forecasting) or
+        uses standard load profiles scaled to annual consumption. Converts power
+        readings to energy and handles various time interval formats (15-min, hourly).
         
         Args:
-            data: pandas DataFrame with 'datetime' and 'value' columns (hourly kWh consumption)
-                  or a numeric value representing annual consumption in kWh.
+            data: Either a pandas DataFrame with columns ['datetime', 'value'] containing
+                  hourly kWh consumption, or a numeric value representing annual
+                  consumption in kWh (will use standard load profile).
+                  
+        Returns:
+            Total cost in EUR for the billing period (base fee + energy costs).
+            
+        Raises:
+            ValueError: If data is neither a DataFrame nor a numeric value.
+            
+        Note:
+            - For DataFrames: Resamples to hourly frequency and forecasts future periods.
+            - For numeric values: Uses German standard load profile (H0) scaled to
+              the provided annual consumption.
+            - Automatically converts kW readings to kWh based on time intervals.
         """
         print(f"\n{'='*80}")
         print(f"FixedTariff.calculate_cost() called for tariff: {self.name}")
@@ -230,27 +299,37 @@ class FixedTariff(EnergyTariff):
 
 
 class DynamicTariff(EnergyTariff):
-    """
-    Represents a dynamic energy tariff.
+    """Spot-market-based electricity tariff with hourly price variations.
+    
+    Dynamic tariff following German day-ahead market prices (EPEX SPOT).
+    Prices vary hourly based on wholesale market conditions plus fixed
+    markup components (network fees, taxes, supplier costs).
+    
+    Attributes:
+        Inherits all attributes from EnergyTariff.
+        network_fee: One-time network connection fee in EUR.
+        additional_price_ct_kwh: Fixed price components in ct/kWh (network fees,
+            taxes, levies) scraped from provider websites.
+        is_dynamic: Always True for dynamic tariffs.
     """
 
     def __init__(self, name: str, base_price: float, start_date: datetime, provider: Optional[str] = None, 
                  is_dynamic: bool = True, network_fee: float = 0.0, features: Optional[list] = None,
                  postal_code: Optional[str] = None, additional_price_ct_kwh: Optional[float] = None):
-        """
-        Initialize the dynamic tariff with base price and one-time network fee.
+        """Initialize dynamic tariff with spot market pricing parameters.
         
         Args:
-            name: Name of the tariff
-            base_price: Monthly base price in €
-            start_date: Start date for the tariff
-            provider: Energy provider name
-            is_dynamic: Whether this is a dynamic tariff (always True for this class)
-            network_fee: One-time network usage fee (einmalige Zahlung für Netznutzung) in €
-            features: List of tariff features (e.g., ["dynamic", "green"])
-            postal_code: German postal code (Postleitzahl) for location-specific pricing or availability
-            additional_price_ct_kwh: Fixed price components in ct/kWh (network fees, taxes, levies)
-                                     from scraped provider data (e.g., Tibber's 18.4 ct/kWh)
+            name: Tariff name for display purposes.
+            base_price: Monthly base fee in EUR.
+            start_date: Contract start date for billing calculations.
+            provider: Energy provider company name (e.g., "Tibber", "Rabot Charge").
+            is_dynamic: Must be True for dynamic tariffs (maintained for API consistency).
+            network_fee: One-time network connection/setup fee in EUR.
+            features: Tariff characteristics (e.g., ["dynamic", "green", "smart_meter_required"]).
+            postal_code: 5-digit German PLZ for regional pricing/availability.
+            additional_price_ct_kwh: Fixed markup components in ct/kWh including network
+                fees, electricity tax, concession fees, VAT, and supplier margin.
+                Typically 15-25 ct/kWh based on provider and region.
         """
         super().__init__(name, base_price=base_price, start_date=start_date, provider=provider, is_dynamic=True, 
                          features=features, postal_code=postal_code)
@@ -258,18 +337,25 @@ class DynamicTariff(EnergyTariff):
         self.additional_price_ct_kwh = additional_price_ct_kwh  # Fixed components from scraper (ct/kWh)
 
     def _get_average_forecast_price(self) -> float:
-        """
-        Get average retail price from the latest forecast data.
-        Returns a default value if forecast data is not available.
+        """Retrieve average retail electricity price from latest forecast data.
         
-        Note: Uses yhat_retail column which includes:
-        - Zero-censored wholesale price E[max(0, Y)]
-        - Profile costs (10 EUR/MWh)
-        - Risk premium (5 EUR/MWh)  
-        - Supplier margin (55 EUR/MWh)
-        Total markup: 70 EUR/MWh (7 ct/kWh)
+        Loads the most recent price forecast CSV and calculates mean retail price.
+        The retail price includes wholesale day-ahead prices plus markup components
+        (profile costs, risk premium, supplier margin). Returns fallback value if
+        forecast data is unavailable.
         
-        Network fee is handled separately as one-time charge.
+        Returns:
+            Average retail price in EUR/kWh for the forecast period.
+            Returns 0.25 EUR/kWh as fallback if data is unavailable.
+            
+        Note:
+            Price composition in yhat_retail:
+            - Zero-censored wholesale price E[max(0, Y)]
+            - Profile costs: 10 EUR/MWh
+            - Risk premium: 5 EUR/MWh
+            - Supplier margin: 55 EUR/MWh
+            Total markup: 70 EUR/MWh (7 ct/kWh)
+            Network fees handled separately via additional_price_ct_kwh.
         """
         import os
         try:
@@ -303,16 +389,25 @@ class DynamicTariff(EnergyTariff):
             return 0.25  # Default fallback price in €/kWh
 
     def calculate_cost_split(self, total_consumption_kwh: float) -> dict:
-        """
-        Calculate cost breakdown for dynamic tariff.
-        For dynamic tariffs, this is a simplified version that doesn't include 
-        time-dependent pricing details since those require the actual consumption timeline.
+        """Calculate simplified cost breakdown for dynamic tariff.
+        
+        Provides basic cost estimates using average forecasted prices. For accurate
+        time-dependent pricing with hourly spot market variations, use calculate_cost()
+        or calculate_cost_with_breakdown() instead.
         
         Args:
-            total_consumption_kwh: Total energy consumption in kWh
+            total_consumption_kwh: Total energy consumption in kWh for the period.
             
         Returns:
-            dict: Basic breakdown with estimated average price
+            Dictionary with the following keys:
+                - base_price (float): Monthly base fee in EUR.
+                - variable_cost (float): Estimated energy cost using average price.
+                - network_fee (float): One-time network connection fee in EUR.
+                - total_cost (float): Sum of all cost components.
+                - total_consumption_kwh (float): Input consumption echoed back.
+                - estimated_avg_kwh_price (float): Average wholesale price in EUR/kWh.
+                - billing_period_days (int): Number of days in billing period.
+                - note (str): Warning about simplified calculation method.
         """
         # For dynamic tariffs, we can only provide a basic breakdown without timing data
         # The actual cost calculation with time-dependent pricing is handled in calculate_cost
@@ -336,14 +431,35 @@ class DynamicTariff(EnergyTariff):
         }
     
     def calculate_cost_with_breakdown(self, data):
-        """
-        Calculate the total cost and return both cost and average kWh price.
+        """Calculate total cost with detailed breakdown using time-dependent pricing.
+        
+        Matches consumption timestamps with spot market prices to calculate accurate
+        costs considering hourly price variations. Includes Prophet forecasting for
+        uploaded data or uses standard load profiles for annual consumption inputs.
         
         Args:
-            data: pandas DataFrame with 'datetime' and 'value' columns (hourly kWh consumption)
-                  or a numeric value representing annual consumption in kWh.
+            data: Either a pandas DataFrame with columns ['datetime', 'value'] containing
+                  consumption readings, or a numeric value representing annual consumption
+                  in kWh (will use standard load profile).
                   
-        Returns: dict with 'total_cost' and 'avg_kwh_price'
+        Returns:
+            Dictionary containing:
+                - total_cost (float): Total cost in EUR for the billing period.
+                - avg_kwh_price (float): Average effective price per kWh in EUR.
+                
+        Note:
+            Price calculation methodology:
+            1. Loads latest day-ahead price forecast (yhat_energy = zero-censored wholesale)
+            2. Adds fixed components (additional_price_ct_kwh) from provider:
+               - Network fees (~7-8 ct/kWh)
+               - Electricity tax (2.05 ct/kWh)
+               - Concession fees (~1.5 ct/kWh)
+               - VAT 19% (~4-5 ct/kWh)
+               - Supplier costs (~7 ct/kWh)
+            3. Matches consumption with prices by timestamp
+            4. Sums hourly costs: consumption[hour] × price[hour]
+            
+            Handles power-to-energy conversion for 15-minute and hourly interval data.
         """
         import os
         
@@ -530,10 +646,31 @@ class DynamicTariff(EnergyTariff):
         }
 
 def slice_seasonal_data(df: pd.DataFrame, start_date: datetime, days: int = 30) -> pd.DataFrame:
-    """
-    Slice data based on day/month only (ignoring year) for seasonal patterns.
-    Cycles through the year if needed.
-    Note: This function expects data to already be in hourly kWh format.
+    """Extract seasonal consumption pattern matching specified date range.
+    
+    Extracts data by matching day-of-year and hour, ignoring the year component.
+    This allows using historical consumption patterns for future date projections.
+    Cycles through the year if needed (e.g., December-January transitions).
+    
+    Args:
+        df: DataFrame with columns ['datetime', 'value'] containing hourly consumption
+            in kWh. Must cover at least one full year of data.
+        start_date: Starting date for the extraction period.
+        days: Number of days to extract (default: 30 for monthly billing).
+        
+    Returns:
+        DataFrame with columns ['datetime', 'value'] containing the extracted
+        consumption data with updated timestamps matching the target date range.
+        Returns empty DataFrame if no matching seasonal data is found.
+        
+    Note:
+        Assumes input data is already in hourly kWh format. Does not perform
+        unit conversions. For proper usage, ensure data is preprocessed with
+        appropriate kW-to-kWh conversion based on time intervals.
+        
+    Example:
+        Extract consumption pattern for March 1-30, 2025 using 2024 data:
+        >>> march_data = slice_seasonal_data(yearly_df, datetime(2025, 3, 1), days=30)
     """
     df_copy = df.copy()
     df_copy['datetime'] = pd.to_datetime(df_copy['datetime'])

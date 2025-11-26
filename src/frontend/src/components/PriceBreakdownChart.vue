@@ -31,6 +31,16 @@ import { apiService } from '../services/api';
 // Register Chart.js components
 Chart.register(ArcElement, Tooltip, Legend);
 
+/**
+ * PriceBreakdownChart - Semi-circle doughnut chart showing electricity price composition.
+ * 
+ * Visualizes cost breakdown by component (energy, network fees, taxes, levies)
+ * with percentage distribution and individual pricing. Data from Bundesnetzagentur.
+ * 
+ * @component
+ * @example
+ * <PriceBreakdownChart />
+ */
 export default {
   name: 'PriceBreakdownChart',
   data() {

@@ -82,6 +82,16 @@ Chart.register(
   Filler
 );
 
+/**
+ * PriceEvolutionChart - Time-series chart showing historical and forecasted electricity prices.
+ * 
+ * Displays combined historical day-ahead prices and AI-generated forecasts with 95%
+ * confidence intervals. Shows price trends, averages, and percentage change metrics.
+ * 
+ * @component
+ * @example
+ * <PriceEvolutionChart />
+ */
 export default {
   name: 'PriceEvolutionChart',
   data() {

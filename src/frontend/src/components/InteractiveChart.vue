@@ -80,24 +80,42 @@ ChartJS.register(
   Filler
 )
 
+/**
+ * InteractiveChart - Flexible energy usage comparison chart with switchable views.
+ * 
+ * Visualizes actual vs. forecasted energy consumption with daily/hourly granularity.
+ * Includes confidence intervals for hourly data and key accuracy metrics (MAE, error %).
+ * 
+ * @component
+ * @example
+ * <InteractiveChart 
+ *   title="Energy Backtest"
+ *   :hourlyData="hourlyTimeseries"
+ *   :dailyData="dailyAggregates"
+ *   :metrics="performanceMetrics" />
+ */
 export default {
   name: 'InteractiveChart',
   components: {
     Line
   },
   props: {
+    /** Chart title displayed at the top */
     title: {
       type: String,
       default: 'Energy Usage Backtest'
     },
+    /** Hourly consumption data with timestamps, actual, and forecast values */
     hourlyData: {
       type: Object,
       required: true
     },
+    /** Daily aggregated consumption data */
     dailyData: {
       type: Object,
       required: true
     },
+    /** Performance metrics (MAE, error %, total usage) */
     metrics: {
       type: Object,
       required: true

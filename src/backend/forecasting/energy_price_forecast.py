@@ -780,7 +780,7 @@ def create_chart_data(historical_file=None,
 
 def get_price_breakdown(avg_price_eur_per_mwh=None, app_data_dir='app_data'):
     """
-    Calculate the breakdown of energy price components for doughnut chart.
+    Calculate the breakdown of energy price components for semi-circle chart.
     
     This function calculates the breakdown of electricity price components based on
     typical German electricity price structure. The percentages are based on data
@@ -799,7 +799,7 @@ def get_price_breakdown(avg_price_eur_per_mwh=None, app_data_dir='app_data'):
         app_data_dir: Directory containing the forecast data files.
     
     Returns:
-        dict: Price breakdown suitable for Chart.js doughnut chart with structure:
+        dict: Price breakdown suitable for Chart.js semi-circle chart with structure:
             {
                 'labels': List of component names,
                 'values': List of percentage values,

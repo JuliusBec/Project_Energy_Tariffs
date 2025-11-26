@@ -1,3 +1,30 @@
+"""FastAPI backend for DYNERGY dynamic electricity tariff comparison platform.
+
+Provides REST API endpoints for tariff calculations, consumption forecasting,
+risk analysis, and integration with German energy provider web scrapers.
+Supports both fixed and dynamic tariff comparisons with smart meter data.
+
+Main Endpoints:
+    GET /api/tariffs: List available tariffs.
+    POST /api/compare-tariffs-with-csv: Compare tariffs with uploaded consumption data.
+    POST /api/calculate-with-csv: Calculate costs with smart meter CSV.
+    POST /api/calculate-yearly-usage: Extract annual consumption from CSV.
+    POST /api/risk-analysis: Analyze consumption patterns vs market prices.
+    POST /api/risk-score: Calculate aggregated risk score for dynamic tariffs.
+    POST /api/backtest-data: Validate Prophet forecast accuracy.
+    GET /api/price-chart-data: Retrieve day-ahead price forecasts.
+    
+Scraper Endpoints:
+    POST /api/scrape/enbw: Fetch EnBW tariff data.
+    POST /api/scrape/tado: Fetch Tado tariff data.
+    POST /api/scrape/tibber: Fetch Tibber pricing data.
+
+Data Models:
+    TariffRequest: User input for tariff comparison.
+    TariffCalculationResponse: Cost calculation results.
+    BacktestDataResponse: Prophet forecast validation results.
+"""
+
 from fastapi import FastAPI, File, HTTPException, UploadFile, Form, Response, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
@@ -97,10 +124,14 @@ class BacktestDataResponse(BaseModel):
 
 # EnBW tariffs as EnergyTariff instances
 def create_enbw_tariffs():
-    """Create EnBW conventional (fixed) tariffs using EnergyTariff classes
+    """Create EnBW fixed-rate tariff instances for baseline comparison.
     
-    Note: Dynamic tariffs are now fetched via scrapers instead of being hardcoded.
-    This function only returns conventional fixed-rate tariffs for comparison.
+    Returns:
+        List of FixedTariff objects with EnBW's conventional electricity tariffs.
+        All tariffs include green energy and 12-month minimum duration.
+        
+    Note:
+        Dynamic tariffs are fetched via web scrapers, not hardcoded here.
     """
     start_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
     
@@ -154,11 +185,12 @@ ENBW_TARIFFS = create_enbw_tariffs()
 
 @app.get("/")
 async def root():
+    """API root endpoint."""
     return {"message": "DYNERGY API is running", "status": "active"}
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint for Docker container monitoring"""
+    """Health check endpoint for container orchestration and monitoring."""
     return {
         "status": "healthy",
         "service": "DYNERGY API",
@@ -167,7 +199,12 @@ async def health_check():
 
 @app.get("/api/tariffs")
 async def get_tariffs():
-    """Get available tariffs using real EnergyTariff objects"""
+    """Retrieve list of available electricity tariffs.
+    
+    Returns:
+        List of tariff dictionaries with id, name, provider, pricing details,
+        contract terms, and features. Includes both fixed and dynamic tariffs.
+    """
     print("GET /api/tariffs called")  # Debug log
     try:
         # Use real tariff objects
@@ -223,21 +260,30 @@ async def get_tariffs():
 
 @app.options("/api/tariffs")
 async def options_tariffs():
-    """Handle preflight OPTIONS request for CORS"""
+    """Handle CORS preflight request."""
     return {"message": "OK"}
 
 @app.options("/api/calculate-yearly-usage")
 async def options_calculate_yearly_usage():
-    """Handle preflight OPTIONS request for CORS"""
+    """Handle CORS preflight request."""
     return {"message": "OK"}
 
 @app.post("/api/calculate-yearly-usage")
 async def calculate_yearly_usage(
     file: UploadFile = File(...)
 ):
-    """
-    Calculate the total yearly usage from an uploaded CSV file.
-    Returns the annual kWh consumption extrapolated from the provided data.
+    """Extract and extrapolate annual consumption from smart meter CSV.
+    
+    Args:
+        file: CSV file with columns ['datetime', 'value'] containing consumption
+              readings (typically 15-minute intervals).
+    
+    Returns:
+        Dictionary with annual_kwh (extrapolated), total_consumption, date range,
+        and data quality metrics.
+        
+    Raises:
+        HTTPException: If file is not CSV or missing required columns.
     """
     # Validate file type
     if not file.filename.endswith('.csv'):
@@ -306,22 +352,22 @@ async def compare_tariffs_with_csv(
     zip_code: str = Form(...),
     providers: str = Form("tibber,enbw")  # Comma-separated
 ):
-    """
-    Tarifvergleich mit hochgeladenen Verbrauchsdaten (CSV) und PLZ-spezifischen Preisen
+    """Compare electricity tariffs using uploaded consumption data and PLZ-specific pricing.
     
-    **Dieser Endpunkt kombiniert:**
-    - Hochgeladene CSV-Verbrauchsdaten (echte Smart-Meter Daten)
-    - PLZ-spezifische Preise von verschiedenen Anbietern (gescrapt)
-    - Prophet-Forecast für zukünftige Börsenstrompreise
+    Combines smart meter CSV data with scraped provider tariffs and Prophet price
+    forecasts to calculate realistic costs for different tariff options.
     
-    **Parameter:**
-    - file: CSV-Datei mit Verbrauchsdaten (Spalten: datetime, value)
-    - zip_code: Deutsche Postleitzahl (5 Stellen, z.B. "68167")
-    - providers: Komma-separierte Liste von Anbietern (z.B. "tibber,enbw")
+    Args:
+        file: CSV file with columns for datetime and consumption values.
+        zip_code: 5-digit German postal code (Postleitzahl) for regional pricing.
+        providers: Comma-separated provider names (e.g., "tibber,enbw").
     
-    **Rückgabe:**
-    - Tarifvergleich mit realistischen, PLZ-spezifischen Preisen
-    - Basierend auf ECHTEN Verbrauchsdaten aus CSV
+    Returns:
+        Dictionary with tariff comparison results including costs, risk analysis,
+        and provider-specific pricing details based on actual consumption patterns.
+        
+    Raises:
+        HTTPException: If CSV format invalid or providers unavailable.
     """
     try:
         # 1. CSV-Datei validieren und einlesen
@@ -578,9 +624,21 @@ async def compare_tariffs_with_csv(
 async def calculate_with_csv(
     file: UploadFile = File(...)
 ):
-    """
-    For users WITH smart meters - they upload their CSV data
-    Note: household_size is not needed since we use actual consumption data
+    """Calculate tariff costs using uploaded smart meter consumption data.
+    
+    Args:
+        file: CSV file with columns ['datetime', 'value'] containing hourly or
+              15-minute interval consumption readings in kWh or kW.
+    
+    Returns:
+        List of TariffCalculationResponse objects for all available tariffs,
+        sorted by total cost (cheapest first).
+        
+    Raises:
+        HTTPException: If CSV invalid or calculation fails.
+        
+    Note:
+        Processes actual smart meter data, no household size estimation needed.
     """
     # Validate file type
     if not file.filename.endswith('.csv'):
@@ -673,6 +731,24 @@ async def calculate_with_csv(
 
 @app.post("/api/calculate-basic")
 async def calculate_basic(user_data: BasicUserData):
+    """Calculate tariff costs using standard load profile (no smart meter data).
+    
+    Uses German standard household load profile (H0) scaled to provided annual
+    consumption or estimated from household size.
+    
+    Args:
+        user_data: BasicUserData with household_size, optional annual_consumption,
+                   and has_smart_meter flag.
+    
+    Returns:
+        List of TariffCalculationResponse objects for all available tariffs.
+        
+    Note:
+        If annual_consumption not provided, estimates based on household size:
+        - 1 person: 1500 kWh/year
+        - 2 people: 2500 kWh/year
+        - 3+ people: 3500 kWh/year
+    """
     """
     For users WITHOUT smart meters - use synthetic data
     """
@@ -750,6 +826,23 @@ async def calculate_basic(user_data: BasicUserData):
 
 @app.post("/api/backtest-data")
 async def get_backtest_data(file: UploadFile = File(...)):
+    """Validate Prophet forecast accuracy using historical consumption data.
+    
+    Splits uploaded data into train/test sets, generates 30-day forecast, and
+    compares predictions against actual consumption to calculate error metrics.
+    
+    Args:
+        file: CSV with columns ['datetime', 'value'] containing at least 60 days
+              of historical consumption data.
+    
+    Returns:
+        BacktestDataResponse with hourly_data (timestamps, forecast, confidence
+        intervals, actual), daily_data (aggregated), and metrics (MAE, MSE,
+        forecast error percentage, confidence interval width).
+        
+    Raises:
+        HTTPException: If CSV invalid or insufficient data for backtesting.
+    """
     """
     Generate backtest data for visualization (returns JSON data instead of matplotlib plots)
     """
@@ -785,6 +878,20 @@ async def get_backtest_data(file: UploadFile = File(...)):
 
 @app.post("/api/calculate")
 async def calculate_tariffs(request: TariffRequest):
+    """Calculate costs for all tariffs based on annual consumption.
+    
+    Uses standard load profile scaled to requested annual consumption.
+    
+    Args:
+        request: TariffRequest with annualConsumption or annual_kwh in kWh/year.
+    
+    Returns:
+        List of tariff calculation results sorted by total cost (cheapest first).
+        Each result includes tariff details, costs, and cost breakdown.
+        
+    Raises:
+        HTTPException: If annual consumption not provided or invalid.
+    """
     """Calculate tariff costs for given consumption - enhanced with real business logic"""
     
     # Handle both frontend and direct API formats
@@ -976,6 +1083,12 @@ async def calculate_tariffs_mock(request: TariffRequest):
 
 @app.get("/api/market-prices")
 async def get_market_prices():
+    """Retrieve current and forecasted day-ahead electricity market prices.
+    
+    Returns:
+        Dictionary with current_price (most recent spot price), forecast_avg
+        (average forecasted price), and trend ('rising'/'falling'/'stable').
+    """
     """Get current market prices"""
     # Mock market data
     current_price = random.uniform(0.08, 0.15)
@@ -992,6 +1105,12 @@ async def get_market_prices():
 
 @app.get("/api/price-chart-data")
 async def get_price_chart_data():
+    """Retrieve formatted price forecast data for frontend charts.
+    
+    Returns:
+        Dictionary from create_chart_data() with timestamps, prices, and
+        confidence intervals formatted for visualization.
+    """
     """Get historical and forecast price data for chart visualization"""
     try:
         from .forecasting.energy_price_forecast import create_chart_data
@@ -1010,6 +1129,12 @@ async def get_price_chart_data():
 
 @app.get("/api/price-breakdown")
 async def get_price_breakdown():
+    """Get detailed breakdown of dynamic tariff price components.
+    
+    Returns:
+        Dictionary with wholesale price, network fees, taxes, levies, supplier
+        costs, and total retail price in ct/kWh and EUR/kWh.
+    """
     """Get energy price component breakdown for doughnut chart visualization"""
     try:
         from .forecasting.energy_price_forecast import get_price_breakdown
@@ -1028,6 +1153,12 @@ async def get_price_breakdown():
 
 @app.get("/api/forecast")
 async def get_price_forecast():
+    """Retrieve Prophet-generated day-ahead price forecast for next 30 days.
+    
+    Returns:
+        List of hourly forecasts with datetime, predicted price (EUR/MWh),
+        and confidence intervals.
+    """
     """Get price forecast for the next 7 days from day-ahead market prices"""
     
     try:
@@ -1114,6 +1245,15 @@ async def get_price_forecast():
 
 @app.post("/api/predict-savings")
 async def predict_savings(usage_data: dict):
+    """Predict potential savings from switching to dynamic tariff.
+    
+    Args:
+        usage_data: Dictionary with consumption patterns and preferences.
+    
+    Returns:
+        Dictionary with estimated_savings, best_tariff recommendation,
+        and switching rationale.
+    """
     """Predict potential savings with dynamic tariffs"""
     annual_kwh = usage_data.get("annual_kwh", 3500)
     has_smart_meter = usage_data.get("has_smart_meter", False)
@@ -1147,6 +1287,12 @@ async def predict_savings(usage_data: dict):
 
 @app.get("/api/usage-tips")
 async def get_usage_tips():
+    """Get personalized energy usage optimization tips.
+    
+    Returns:
+        List of actionable tips for reducing consumption or shifting to cheaper
+        time periods for dynamic tariff users.
+    """
     """Get energy saving tips"""
     tips = [
         "Nutzen Sie Haushaltsgeräte in den günstigen Nachtstunden",
@@ -1166,6 +1312,22 @@ async def get_usage_tips():
 
 @app.post("/api/risk-analysis")
 async def get_risk_analysis(file: UploadFile = File(...), days: int = Form(30)):
+    """Analyze consumption patterns against historical market prices.
+    
+    Calculates coincidence factor (consumption during expensive periods) and
+    compares user's weighted average price to market average.
+    
+    Args:
+        file: CSV with columns ['datetime', 'value'] containing consumption data.
+        days: Number of historical days to analyze (default: 30).
+    
+    Returns:
+        Dictionary with historic_risk, coincidence_factor, load_profile analysis,
+        and summary statistics comparing user behavior to market conditions.
+        
+    Raises:
+        HTTPException: If CSV invalid or insufficient price data available.
+    """
     """
     Perform comprehensive risk analysis on user consumption data.
     Returns historic risk analysis, coincidence factor, and load profile data.
@@ -1229,6 +1391,22 @@ async def get_risk_analysis(file: UploadFile = File(...), days: int = Form(30)):
 
 @app.post("/api/risk-score")
 async def get_risk_score(file: UploadFile = File(...), days: int = Form(30)):
+    """Calculate aggregated risk score for dynamic tariff suitability.
+    
+    Combines historical consumption patterns, coincidence factors, price volatility,
+    and Prophet forecast quality into a single risk assessment (0-100 scale).
+    
+    Args:
+        file: CSV with columns ['datetime', 'value'] containing consumption data.
+        days: Number of historical days to analyze (default: 30).
+    
+    Returns:
+        Dictionary with risk_level ('low'/'moderate'/'high'), risk_score (0-100),
+        risk_message, risk_factors breakdown, and forecast_quality_included flag.
+        
+    Raises:
+        HTTPException: If CSV invalid or risk analysis fails.
+    """
     """
     Get aggregated risk scores for both dynamic and fixed tariffs.
     Returns risk assessments for both tariff types to enable comparison.
@@ -1505,15 +1683,15 @@ async def get_risk_score_yearly_usage(
 
 # Helper function to create DynamicTariff objects from scraper data
 def create_dynamic_tariff_from_scraper(scraper_data: dict, provider: str) -> DynamicTariff:
-    """
-    Create a DynamicTariff object from scraper response data.
+    """Convert scraped tariff data to DynamicTariff instance.
     
     Args:
-        scraper_data: Raw scraper response dictionary
-        provider: Provider name (e.g., "EnBW", "Tado", "Tibber")
+        scraper_data: Dictionary with base_price, additional_price_ct_kwh,
+                      network_fee, features from web scraper.
+        provider: Provider name (e.g., "Tibber", "EnBW", "Tado").
     
     Returns:
-        DynamicTariff: Configured tariff object with scraped pricing data
+        DynamicTariff object with scraped pricing parameters.
     """
     
     # Extract common fields
@@ -1570,16 +1748,15 @@ def create_dynamic_tariff_from_scraper(scraper_data: dict, provider: str) -> Dyn
 
 # Helper function to convert scraper data to EnergyTariff-compatible dict (legacy)
 def scraper_to_tariff(scraper_data: dict, provider: str, tariff_type: str = "dynamic") -> dict:
-    """
-    Convert scraper response data to EnergyTariff-compatible format.
+    """Transform scraped data to frontend-compatible tariff dictionary.
     
     Args:
-        scraper_data: Raw scraper response dictionary
-        provider: Provider name (e.g., "EnBW", "Tado", "Tibber")
-        tariff_type: Type of tariff ("dynamic" or "fixed")
+        scraper_data: Dictionary with pricing details from web scraper.
+        provider: Provider name for identification.
+        tariff_type: "dynamic" or "fixed" (default: "dynamic").
     
     Returns:
-        dict: EnergyTariff-compatible data structure
+        Dictionary formatted for frontend with id, name, pricing, features.
     """
     
     # Build features list based on provider
