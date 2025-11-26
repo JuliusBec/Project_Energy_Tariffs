@@ -1,3 +1,10 @@
+"""
+Energy Price Forecast Script
+
+Generates 30-day hourly energy price forecasts using Random Forest regression.
+Trains on 90 days of historical data with time-based and lag features.
+Outputs predictions, model metrics, and visualization plots.
+"""
 import pandas as pd
 import requests
 from datetime import datetime, timedelta

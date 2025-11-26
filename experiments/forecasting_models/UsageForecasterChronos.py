@@ -1,3 +1,10 @@
+"""
+Chronos-based Energy Usage Forecaster
+
+Forecasts hourly energy usage using Amazon's Chronos time series model.
+Supports both rolling window and single-shot prediction approaches with
+uncertainty quantification via confidence intervals (95% CI).
+"""
 import torch
 import numpy as np 
 import pandas as pd

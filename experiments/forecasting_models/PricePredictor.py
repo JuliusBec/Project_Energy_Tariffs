@@ -1,3 +1,10 @@
+"""
+SARIMAX Energy Price Predictor
+
+Loads a pre-trained SARIMAX model to generate 90-day energy price forecasts.
+Uses historical weather averages and time-based features as exogenous variables.
+Validates predictions against actual data and exports results with confidence intervals.
+"""
 import pandas as pd
 import matplotlib.pyplot as plt
 import time

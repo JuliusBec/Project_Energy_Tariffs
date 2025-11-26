@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# Author: Julius Becker
+
 """Test script for the create_chart_data method"""
 
 import sys

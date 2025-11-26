@@ -1,3 +1,4 @@
+# Author: Julius Becker
 """
 Test script for backtest visualization with local plotting capabilities.
 This module provides two different views for analyzing backtest results:

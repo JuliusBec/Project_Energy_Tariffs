@@ -1,3 +1,10 @@
+"""
+SARIMA Energy Price Forecaster
+
+Trains a SARIMAX model on German energy market prices using 2023-2024 data.
+Incorporates exogenous variables: temperature, humidity, weekday, and weekend indicators.
+Saves the fitted model for future predictions with 24-hour seasonality.
+"""
 import time
 import pandas as pd
 from statsmodels.tsa.statespace.sarimax import SARIMAX
