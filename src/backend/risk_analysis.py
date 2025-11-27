@@ -1,18 +1,3 @@
-"""Risk analysis module for dynamic electricity tariff comparison.
-
-Analyzes consumption patterns against historical and forecasted electricity prices
-to assess suitability for dynamic tariffs. Provides metrics including coincidence
-factors, weighted pricing, and aggregated risk scores.
-
-Functions:
-    create_historic_risk_analysis: Compare user's weighted price vs market average.
-    calculate_coincidence_factor: Measure consumption during expensive periods.
-    get_user_load_profile: Analyze hourly consumption patterns.
-    get_price_forecast_volatility: Calculate price forecast uncertainty metrics.
-    get_aggregated_risk_score: Combine multiple risk factors into overall score.
-    get_simplified_risk_score_for_yearly_usage: Risk score for standard load profiles.
-"""
-
 import pandas as pd
 from datetime import datetime, time, timedelta
 import os
@@ -21,16 +6,17 @@ import numpy as np
 
 
 def _get_most_recent_price_file(app_data_dir: str) -> str:
-    """Find the most recent SMARD price data file by timestamp.
+    """
+    Find the most recent price data file in the app_data directory.
     
-    Args:
-        app_data_dir: Path to app_data directory containing price files.
+    Parameters:
+    app_data_dir (str): Path to the app_data directory
     
     Returns:
-        Path to the most recent germany_dayahead_prices_raw_*.csv file.
+    str: Path to the most recent price file
     
     Raises:
-        FileNotFoundError: If no price data files are found.
+    FileNotFoundError: If no price files are found
     """
     # Pattern for price files: germany_dayahead_prices_raw_YYYYMMDD_HHMMSS.csv
     pattern = os.path.join(app_data_dir, "germany_dayahead_prices_raw_*.csv")
@@ -45,16 +31,17 @@ def _get_most_recent_price_file(app_data_dir: str) -> str:
 
 
 def _get_price_forecast_file(app_data_dir: str) -> str:
-    """Find the Prophet-generated price forecast file.
+    """
+    Find the price forecast file in the app_data directory.
     
-    Args:
-        app_data_dir: Path to app_data directory.
+    Parameters:
+    app_data_dir (str): Path to the app_data directory
     
     Returns:
-        Path to germany_price_forecast_720h.csv file.
+    str: Path to the price forecast file
     
     Raises:
-        FileNotFoundError: If forecast file doesn't exist.
+    FileNotFoundError: If no forecast file is found
     """
     # Look for the forecast file (static name for now)
     forecast_file = os.path.join(app_data_dir, "germany_price_forecast_720h.csv")
@@ -66,15 +53,16 @@ def _get_price_forecast_file(app_data_dir: str) -> str:
 
 
 def _load_historic_prices(price_file_path: str, days: int, end_date: datetime = None) -> pd.DataFrame:
-    """Load and filter historical price data for specified time window.
+    """
+    Load historic price data for the last n days.
     
-    Args:
-        price_file_path: Path to price CSV file.
-        days: Number of days to look back from end_date.
-        end_date: End date for analysis. Defaults to most recent date in file.
+    Parameters:
+    price_file_path (str): Path to the price data file
+    days (int): Number of days to look back
+    end_date (datetime): End date for the analysis period. If None, uses the most recent date in the file.
     
     Returns:
-        DataFrame with columns ['ds', 'price_eur_per_mwh', 'price_eur_per_kwh'].
+    pd.DataFrame: DataFrame with columns ['ds', 'price_eur_per_mwh', 'price_eur_per_kwh']
     """
     df = pd.read_csv(price_file_path)
     df['ds'] = pd.to_datetime(df['ds'])
@@ -97,20 +85,15 @@ def _load_historic_prices(price_file_path: str, days: int, end_date: datetime = 
 
 
 def _calculate_weighted_average_price(prices: pd.DataFrame, consumption: pd.DataFrame) -> dict:
-    """Calculate consumption-weighted average electricity price.
+    """
+    Calculate the weighted average price based on consumption profile.
     
-    Matches consumption timestamps with prices to compute the effective price
-    paid based on actual usage patterns.
-    
-    Args:
-        prices: DataFrame with columns ['ds', 'price_eur_per_kwh'].
-        consumption: DataFrame with columns ['datetime', 'value'] in kWh.
+    Parameters:
+    prices (pd.DataFrame): Price data with columns ['ds', 'price_eur_per_kwh']
+    consumption (pd.DataFrame): Consumption data with columns ['datetime', 'value']
     
     Returns:
-        Dictionary with weighted_avg_price, total_consumption, total_cost, num_hours.
-    
-    Raises:
-        ValueError: If no timestamps match between consumption and price data.
+    dict: Contains weighted_avg_price, total_consumption, total_cost
     """
     # Ensure datetime columns are properly formatted
     prices = prices.copy()
@@ -151,26 +134,31 @@ def _calculate_weighted_average_price(prices: pd.DataFrame, consumption: pd.Data
 
 
 def create_historic_risk_analysis(consumption_data: pd.DataFrame, days: int = 30, app_data_dir: str = None) -> dict:
-    """Analyze historical consumption exposure to price fluctuations.
+    """
+    Perform historic risk analysis by comparing market average prices with user's weighted average price.
     
-    Compares simple market average price against user's consumption-weighted
-    average to determine if usage pattern resulted in favorable or unfavorable pricing.
+    This function analyzes how much exposure the user had to price fluctuations by comparing:
+    - The simple market average price over the period
+    - The weighted average price the user actually faced based on their consumption pattern
     
-    Args:
-        consumption_data: DataFrame with columns ['datetime', 'value'] containing
-            hourly consumption in kWh.
-        days: Number of days to analyze (default: 30).
-        app_data_dir: Path to app_data directory (auto-detected if None).
+    Parameters:
+    consumption_data (pd.DataFrame): DataFrame with user consumption data, must have 'datetime' and 'value' columns
+    days (int): Number of days to analyze (default: 30)
+    app_data_dir (str): Path to app_data directory. If None, uses default path
     
     Returns:
-        Dictionary containing market_avg_price, user_weighted_price,
-        price_differential, price_differential_pct, risk_exposure,
-        total_consumption, total_cost, price_volatility, days_analyzed,
-        num_hours, price_file_used, analysis_period.
-    
-    Raises:
-        FileNotFoundError: If price data files are not available.
-        ValueError: If consumption data doesn't overlap with price data.
+    dict: A dictionary containing:
+        - market_avg_price: Simple average of all hourly prices (€/kWh)
+        - user_weighted_price: Weighted average price based on consumption (€/kWh)
+        - price_differential: Difference between user's price and market average (€/kWh)
+        - price_differential_pct: Percentage difference
+        - risk_exposure: 'favorable' if user paid less than average, 'unfavorable' if more
+        - total_consumption: Total consumption over the period (kWh)
+        - total_cost: Total cost over the period (€)
+        - price_volatility: Standard deviation of prices over the period
+        - days_analyzed: Actual number of days in the analysis
+        - num_hours: Number of hours with matching price and consumption data
+        - price_file_used: Name of the price data file used
     """
     # Determine app_data directory
     if app_data_dir is None:
@@ -254,30 +242,37 @@ def create_historic_risk_analysis(consumption_data: pd.DataFrame, days: int = 30
 
 def calculate_coincidence_factor(consumption_data: pd.DataFrame, days: int = 30, 
                                 expensive_hours_pct: float = 20.0, app_data_dir: str = None) -> dict:
-    """Calculate consumption coincidence with expensive price periods.
+    """
+    Calculate the coincidence factor by analyzing how much energy usage occurred during 
+    the most expensive hours in the last n days.
     
-    Identifies the most expensive X% of hours and calculates what percentage of
-    total consumption occurred during those periods. High coincidence indicates
-    unfavorable consumption timing (consuming during expensive hours).
+    This function identifies the most expensive X% of hours and calculates what percentage 
+    of the user's total consumption occurred during those expensive periods. A high coincidence
+    factor indicates that the user consumes more energy when prices are high (unfavorable),
+    while a low factor suggests better consumption timing.
     
-    Args:
-        consumption_data: DataFrame with columns ['datetime', 'value'] in kWh.
-        days: Number of days to analyze (default: 30).
-        expensive_hours_pct: Threshold for expensive hours, 0-100 (default: 20).
-        app_data_dir: Path to app_data directory (auto-detected if None).
+    Parameters:
+    consumption_data (pd.DataFrame): DataFrame with user consumption data, must have 'datetime' and 'value' columns
+    days (int): Number of days to analyze (default: 30)
+    expensive_hours_pct (float): Percentage of most expensive hours to analyze (default: 20.0, range: 0-100)
+    app_data_dir (str): Path to app_data directory. If None, uses default path
     
     Returns:
-        Dictionary with expensive_hours_pct, num_expensive_hours, total_hours,
-        consumption_during_expensive_hours, consumption_during_cheap_hours,
-        total_consumption, consumption_coincidence_pct, cost metrics,
-        avg_price_expensive_hours, avg_price_cheap_hours, price_threshold,
-        correlation, coincidence_rating, rating_message, days_analyzed,
-        analysis_period.
-    
-    Raises:
-        ValueError: If expensive_hours_pct not in range (0, 100] or if no
-            timestamp overlap between consumption and price data.
-        FileNotFoundError: If price data files are not available.
+    dict: A dictionary containing:
+        - expensive_hours_pct: Percentage threshold used for expensive hours
+        - num_expensive_hours: Number of hours classified as expensive
+        - total_hours: Total number of hours analyzed
+        - consumption_during_expensive_hours: kWh consumed during expensive hours
+        - total_consumption: Total kWh consumed
+        - consumption_coincidence_pct: % of total consumption during expensive hours
+        - cost_during_expensive_hours: Cost incurred during expensive hours (€)
+        - total_cost: Total cost (€)
+        - cost_coincidence_pct: % of total cost during expensive hours
+        - avg_price_expensive_hours: Average price during expensive hours (€/kWh)
+        - avg_price_cheap_hours: Average price during cheap hours (€/kWh)
+        - price_threshold: Price threshold for expensive hours (€/kWh)
+        - correlation: Correlation coefficient between consumption and prices
+        - coincidence_rating: 'high', 'medium', or 'low' based on consumption_coincidence_pct
     """
     # Validate percentage
     if not 0 < expensive_hours_pct <= 100:
@@ -412,23 +407,32 @@ def calculate_coincidence_factor(consumption_data: pd.DataFrame, days: int = 30,
     }
 
 def get_user_load_profile(consumption_data: pd.DataFrame, days: int = 30, app_data_dir: str = None) -> dict:
-    """Analyze hourly consumption patterns and price correlation.
+    """
+    Analyze the user's load profile by calculating average consumption and price patterns per hour of day.
     
-    Calculates average consumption and prices for each hour of day (0-23) to
-    visualize how usage patterns align with price patterns.
+    This function calculates the average energy usage for each hour of the day (0-23) over the past n days,
+    along with the corresponding average energy prices at those hours. This allows visualization of how
+    the user's consumption pattern correlates with price patterns throughout the day.
     
-    Args:
-        consumption_data: DataFrame with columns ['datetime', 'value'] in kWh.
-        days: Number of days to analyze (default: 30).
-        app_data_dir: Path to app_data directory (auto-detected if None).
+    Parameters:
+    consumption_data (pd.DataFrame): DataFrame with user consumption data, must have 'datetime' and 'value' columns
+    days (int): Number of days to analyze (default: 30)
+    app_data_dir (str): Path to app_data directory. If None, uses default path
     
     Returns:
-        Dictionary with hourly_data (list of 24 hourly averages) and summary
-        (peak/lowest hours, correlation, analysis_period).
-    
-    Raises:
-        ValueError: If no consumption data available for specified period.
-        FileNotFoundError: If price data files are not available.
+    dict: A dictionary containing:
+        - hourly_data: List of 24 objects (one per hour), each containing:
+            - hour: Hour of day (0-23)
+            - avg_consumption_kwh: Average consumption during this hour (kWh)
+            - avg_price_eur_per_kwh: Average price during this hour (€/kWh)
+            - num_data_points: Number of data points used for this hour
+        - summary: Dictionary with overall statistics:
+            - total_days_analyzed: Actual number of days in the analysis
+            - peak_consumption_hour: Hour with highest average consumption
+            - lowest_consumption_hour: Hour with lowest average consumption
+            - peak_price_hour: Hour with highest average price
+            - lowest_price_hour: Hour with lowest average price
+            - correlation: Correlation coefficient between hourly consumption and prices
     """
     # Determine app_data directory
     if app_data_dir is None:
@@ -551,19 +555,22 @@ def get_user_load_profile(consumption_data: pd.DataFrame, days: int = 30, app_da
     }
 
 def get_price_forecast_volatility(app_data_dir: str = None) -> dict:
-    """Calculate price forecast uncertainty metrics.
+    """
+    Analyze price forecast volatility by reading the most recent forecast data.
     
-    Args:
-        app_data_dir: Path to app_data directory (auto-detected if None).
+    This function loads the most recent price forecast file from the app_data directory
+    and calculates two key volatility metrics.
+    
+    Parameters:
+    app_data_dir (str): Path to app_data directory. If None, uses default path
     
     Returns:
-        Dictionary with forecast_std_dev (standard deviation of forecasted prices
-        in EUR/kWh) and avg_confidence_interval_width (average Prophet CI width
-        in EUR/kWh, or None if unavailable).
+    dict: Contains:
+        - forecast_std_dev: Standard deviation of forecasted prices (€/kWh)
+        - avg_confidence_interval_width: Average width of confidence intervals if available (€/kWh), None otherwise
     
     Raises:
-        FileNotFoundError: If forecast file doesn't exist.
-        ValueError: If required columns are missing from forecast file.
+    FileNotFoundError: If no forecast files are found
     """
     # Determine app_data directory
     if app_data_dir is None:
@@ -641,20 +648,20 @@ def get_price_forecast_volatility(app_data_dir: str = None) -> dict:
 
 def get_simplified_risk_score_for_yearly_usage(forecast_price_volatility: dict, is_dynamic: bool, 
                                                 historic_price_volatility: float = None) -> dict:
-    """Calculate risk score for standard load profile scenarios.
+    """
+    Calculate a simplified risk score when only yearly usage is provided (no CSV uploaded).
     
-    Used when only annual consumption is provided (no smart meter data).
-    Assesses risk based solely on price volatility since consumption patterns
-    are unknown.
+    Since we don't have actual consumption patterns, we can only assess risk based on:
+    - Price volatility (both historic and forecasted) for dynamic tariffs
+    - Fixed tariff advantage (inherently lower risk)
     
-    Args:
-        forecast_price_volatility: Output from get_price_forecast_volatility().
-        is_dynamic: True for dynamic tariffs, False for fixed.
-        historic_price_volatility: Optional historical price std dev in EUR/kWh.
+    Parameters:
+    forecast_price_volatility (dict): Output from price volatility analysis
+    is_dynamic (bool): Whether the tariff is dynamic
+    historic_price_volatility (float): Optional historic price volatility from market data
     
     Returns:
-        Dictionary with risk_level, risk_score, risk_message, risk_factors,
-        forecast_quality_included (False), simplified (True), note.
+    dict: Contains risk_level, risk_score, risk_message, risk_factors, simplified flag
     """
     score = 40  # Start with moderate baseline
     factors = []
@@ -775,24 +782,27 @@ def get_simplified_risk_score_for_yearly_usage(forecast_price_volatility: dict, 
     
 def get_aggregated_risk_score(historic_risk_analysis: dict, coincidence_factor: dict, forecast_price_volatility: dict,
                               is_dynamic: bool, usage_forecast_quality: dict = None) -> dict:
-    """Combine multiple risk metrics into overall assessment.
+    """
+    Aggregate the risk analysis results into a simple risk assessment.
     
-    Aggregates historical consumption patterns, coincidence factors, price volatility,
-    and forecast quality into a single risk score and level.
+    This function combines the outputs from historic risk analysis, coincidence factor
+    calculations, and forecast quality metrics to provide an overall risk assessment for the user.
     
-    Args:
-        historic_risk_analysis: Output from create_historic_risk_analysis().
-        coincidence_factor: Output from calculate_coincidence_factor().
-        forecast_price_volatility: Output from get_price_forecast_volatility().
-        is_dynamic: True for dynamic tariffs, False for fixed.
-        usage_forecast_quality: Optional backtest metrics including
-            avg_confidence_interval_width, relative_confidence_interval_width,
-            mae, forecast_error_percentage.
+    Parameters:
+    historic_risk_analysis (dict): Output from create_historic_risk_analysis function
+    coincidence_factor (dict): Output from calculate_coincidence_factor function
+    forecast_price_volatility (dict): Output from price volatility analysis
+    is_dynamic (bool): Whether the tariff is dynamic
+    usage_forecast_quality (dict): Optional. Quality metrics from backtest (includes avg_confidence_interval_width, 
+                                    relative_confidence_interval_width, mae, forecast_error_percentage)
     
     Returns:
-        Dictionary with risk_level ('low'/'moderate'/'high'), risk_score (0-100,
-        lower is better), risk_message, risk_factors (list of contributing factors),
-        forecast_quality_included (boolean).
+    dict: Contains:
+        - risk_level: 'low', 'moderate', or 'high'
+        - risk_score: numeric score (0-100, lower is better)
+        - risk_message: human-readable explanation
+        - risk_factors: breakdown of contributing factors
+        - forecast_quality_included: boolean indicating if forecast quality was factored in
     """
     # Initialize score (lower is better/less risky)
     # Start with a lower baseline to allow for more differentiation

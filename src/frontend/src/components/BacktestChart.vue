@@ -79,20 +79,9 @@ import { apiService } from '../services/api'
 
 Chart.register(...registerables)
 
-/**
- * BacktestChart - Interactive chart for visualizing AI-based energy consumption forecasts.
- * 
- * Displays historical energy usage vs. predicted consumption with daily/hourly toggle,
- * accuracy metrics, and fullscreen mode. Validates forecast accuracy using uploaded data.
- * 
- * @component
- * @example
- * <BacktestChart :uploadedFile="userFile" />
- */
 export default {
   name: 'BacktestChart',
   props: {
-    /** CSV file containing historical energy consumption data */
     uploadedFile: {
       type: File,
       default: null
