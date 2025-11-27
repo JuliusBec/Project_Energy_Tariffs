@@ -136,6 +136,37 @@ EnBW Strom Scraper
    :undoc-members:
    :show-inheritance:
 
+The EnBW Strom Scraper extracts standard electricity tariff data from EnBW's main tariff page
+for fixed-price contracts with optional green energy.
+
+Example Usage
+^^^^^^^^^^^^^
+
+.. code-block:: python
+
+   from src.webscraping.scraper_enbw_strom import EnbwStromScraper
+   import asyncio
+
+   async def get_enbw_strom_prices():
+       scraper = EnbwStromScraper()
+       tariffs = await scraper.scrape_tariffs(
+           postal_code="70173",
+           annual_consumption=3000
+       )
+       for tariff in tariffs:
+           print(f"{tariff['name']}: {tariff['base_price_monthly']}€/month")
+           print(f"  Working price: {tariff['kwh_price']}ct/kWh")
+
+   asyncio.run(get_enbw_strom_prices())
+
+Features
+^^^^^^^^
+
+* Multiple tariff options (Standard, Eco)
+* Price guarantees
+* Contract duration details
+* Regional pricing variations
+
 Tado Scraper
 ------------
 
@@ -143,6 +174,36 @@ Tado Scraper
    :members:
    :undoc-members:
    :show-inheritance:
+
+The Tado Scraper extracts dynamic tariff data from Tado's smart home energy platform,
+which offers hourly pricing and smart meter integration.
+
+Example Usage
+^^^^^^^^^^^^^
+
+.. code-block:: python
+
+   from src.webscraping.scraper_tado import TadoScraper
+   import asyncio
+
+   async def get_tado_prices():
+       scraper = TadoScraper()
+       tariff = await scraper.scrape_tariff(
+           postal_code="10115",
+           annual_consumption=2500
+       )
+       print(f"Base price: {tariff['base_price_monthly']}€")
+       print(f"Average price: {tariff['avg_price_ct_kwh']}ct/kWh")
+
+   asyncio.run(get_tado_prices())
+
+Features
+^^^^^^^^
+
+* Hourly dynamic pricing
+* Smart meter required
+* Smart home integration
+* Web-based energy management
 
 Installation
 ------------
