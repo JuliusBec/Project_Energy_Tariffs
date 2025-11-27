@@ -12,8 +12,11 @@ for German electricity markets.
 
    concept
    api
+   tariff_models
+   risk_analysis
    webscraping
-   forecasting
+   price_forecasting
+   usage_forecasting
 
 Features
 --------
@@ -38,13 +41,29 @@ Complete explanation of the system architecture and workflow.
    End-to-end explanation of the tariff analysis pipeline from data collection
    to personalized recommendations. Includes detailed workflow diagrams and real-world examples.
 
-API Documentation
-^^^^^^^^^^^^^^^^^
+REST API
+^^^^^^^^
 
-Complete API reference for the backend energy tariff system.
+FastAPI backend endpoints for tariff comparison and analysis.
 
 :doc:`api`
-   Core tariff calculation, risk analysis, and backend services.
+   HTTP endpoints for tariff calculations, risk analysis, and web scraping integration.
+
+Tariff Models
+^^^^^^^^^^^^^
+
+Core tariff calculation models for fixed and dynamic pricing.
+
+:doc:`tariff_models`
+   FixedTariff and DynamicTariff classes with cost calculation methods.
+
+Risk Analysis
+^^^^^^^^^^^^^
+
+Risk assessment for dynamic tariff suitability.
+
+:doc:`risk_analysis`
+   Consumption pattern analysis, price correlation, and aggregated risk scoring.
 
 Web Scraping
 ^^^^^^^^^^^^
@@ -55,14 +74,23 @@ Automated data collection from German energy providers.
    Scraper modules for Tibber, EnBW, Tado and other providers.
    Includes PLZ-based pricing and async support.
 
-Forecasting & Predictions
-^^^^^^^^^^^^^^^^^^^^^^^^^^
+Price Forecasting
+^^^^^^^^^^^^^^^^^
 
-Machine learning models for price and usage predictions.
+Day-ahead electricity price predictions.
 
-:doc:`forecasting`
-   Prophet and Chronos models for energy price and consumption forecasting.
-   Includes SMARD integration and time series analysis.
+:doc:`price_forecasting`
+   Prophet model for energy price forecasting using SMARD data.
+   Includes wholesale to retail price conversion.
+
+Usage Forecasting
+^^^^^^^^^^^^^^^^^
+
+Household electricity consumption predictions.
+
+:doc:`usage_forecasting`
+   Prophet model for consumption forecasting based on smart meter data.
+   Includes backtesting and validation metrics.
 
 Quick Start
 -----------
@@ -112,8 +140,8 @@ Web Scraping
 
    asyncio.run(get_prices())
 
-Forecasting
-"""""""""""
+Usage Forecasting
+"""""""""""""""""
 
 .. code-block:: python
 
@@ -122,7 +150,7 @@ Forecasting
 
    df = pd.read_csv('app_data/example_smart_meter.csv')
    forecast = forecast_prophet(df, days=30)
-   print(forecast[['datetime', 'yhat']].head())
+   print(forecast[['ds', 'yhat']].head())
 
 Project Structure
 -----------------

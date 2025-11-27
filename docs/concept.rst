@@ -832,9 +832,12 @@ comprehensive documentation enables easy understanding and contribution.
 
 For detailed information on specific components, see:
 
-- :doc:`webscraping` - Web scraping module documentation
-- :doc:`forecasting` - Forecasting and predictions
-- :doc:`api` - Backend API reference
+- :doc:`api` - REST API endpoints
+- :doc:`tariff_models` - Tariff calculation models
+- :doc:`risk_analysis` - Risk assessment
+- :doc:`webscraping` - Web scraping modules
+- :doc:`price_forecasting` - Energy price forecasting
+- :doc:`usage_forecasting` - Consumption forecasting
 
 Contributing
 ------------
