@@ -96,9 +96,9 @@ class EnbwStromScraper:
                 user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
             )
             self.page = await self.context.new_page()
-            logger.info("✅ Browser initialisiert")
+            logger.info("Browser initialisiert")
         except Exception as e:
-            logger.error(f"❌ Browser-Initialisierung fehlgeschlagen: {e}")
+            logger.error(f"Browser-Initialisierung fehlgeschlagen: {e}")
             raise
     
     async def close_browser(self):
@@ -110,9 +110,9 @@ class EnbwStromScraper:
                 await self.context.close()
             if self.browser:
                 await self.browser.close()
-            logger.info("✅ Browser geschlossen")
+            logger.info("Browser geschlossen")
         except Exception as e:
-            logger.error(f"⚠️ Fehler beim Schließen: {e}")
+            logger.error(f"Fehler beim Schließen: {e}")
     
     def get_fallback_data(self, postal_code: str, annual_consumption_kwh: int) -> Dict[str, Any]:
         """Gibt Fallback-Daten basierend auf PLZ zurück"""
@@ -157,18 +157,18 @@ class EnbwStromScraper:
         Returns:
             List[Dict]: Liste mit allen verfügbaren Tarifen
         """
-        logger.info(f"🔧 Starting EnBW Strom scraping for PLZ {postal_code}, {annual_consumption_kwh} kWh")
+        logger.info(f"Starting EnBW Strom scraping for PLZ {postal_code}, {annual_consumption_kwh} kWh")
         
         try:
             await self.init_browser()
             
             # Navigiere zur Seite
-            logger.info(f"📍 Navigiere zu {self.BASE_URL}")
+            logger.info(f"Navigiere zu {self.BASE_URL}")
             await self.page.goto(self.BASE_URL, wait_until='networkidle', timeout=30000)
             
             # Cookie-Banner akzeptieren
             try:
-                logger.info("🍪 Akzeptiere Cookies...")
+                logger.info("Akzeptiere Cookies...")
                 cookie_button = await self.page.wait_for_selector(
                     'button#onetrust-accept-btn-handler, button[aria-label*="Accept"], button:has-text("Alle akzeptieren")',
                     timeout=5000
@@ -176,16 +176,16 @@ class EnbwStromScraper:
                 if cookie_button:
                     await cookie_button.click()
                     await self.page.wait_for_timeout(1000)
-                    logger.info("✅ Cookies akzeptiert")
+                    logger.info("Cookies akzeptiert")
             except Exception as e:
-                logger.warning(f"⚠️ Cookie-Banner nicht gefunden oder bereits akzeptiert: {e}")
+                logger.warning(f"Cookie-Banner nicht gefunden oder bereits akzeptiert: {e}")
             
             # Warte auf Tarif-Finder
-            logger.info("⏳ Warte auf Tarif-Finder Formular...")
+            logger.info("Warte auf Tarif-Finder Formular...")
             await self.page.wait_for_selector('input[name="Postleitzahl"]', timeout=15000)
             
             # PLZ eingeben
-            logger.info(f"📝 Gebe PLZ ein: {postal_code}")
+            logger.info(f"Gebe PLZ ein: {postal_code}")
             plz_input = await self.page.query_selector('input[name="Postleitzahl"]')
             await plz_input.fill(postal_code)
             await self.page.wait_for_timeout(1500)
@@ -196,10 +196,10 @@ class EnbwStromScraper:
             if ort_input:
                 city_name = await ort_input.get_attribute('value')
                 if city_name:
-                    logger.info(f"✅ Ort erkannt: {city_name}")
+                    logger.info(f"Ort erkannt: {city_name}")
             
             # Klicke auf "Jetzt Tarif finden" Button
-            logger.info("🔘 Klicke auf 'Jetzt Tarif finden'")
+            logger.info("Klicke auf 'Jetzt Tarif finden'")
             submit_button = await self.page.query_selector('button[type="submit"]')
             if submit_button:
                 try:
@@ -208,9 +208,9 @@ class EnbwStromScraper:
                         await submit_button.click()
                     
                     # Warte auf neue Seite
-                    logger.info("✅ Tarifseite geladen, extrahiere Tarife...")
+                    logger.info("Tarifseite geladen, extrahiere Tarife...")
                     current_url = self.page.url
-                    logger.info(f"📍 Aktuelle URL: {current_url}")
+                    logger.info(f"Aktuelle URL: {current_url}")
                     
                     # Warte darauf, dass Tarife geladen sind
                     await self.page.wait_for_timeout(3000)
@@ -222,24 +222,24 @@ class EnbwStromScraper:
                     tariffs = await self.extract_tariffs_from_page(postal_code, annual_consumption_kwh, city_name)
                     
                     if tariffs and len(tariffs) > 0:
-                        logger.info(f"✅ {len(tariffs)} Tarife gefunden")
+                        logger.info(f"{len(tariffs)} Tarife gefunden")
                         return tariffs
                     else:
-                        logger.warning("⚠️ Keine Tarife auf der Seite gefunden, verwende Fallback")
+                        logger.warning("Keine Tarife auf der Seite gefunden, verwende Fallback")
                         return [self.get_fallback_data(postal_code, annual_consumption_kwh)]
                         
                 except PlaywrightTimeout:
-                    logger.warning("⏱️ Timeout beim Warten auf Tarifseite, verwende Fallback")
+                    logger.warning("Timeout beim Warten auf Tarifseite, verwende Fallback")
                     return [self.get_fallback_data(postal_code, annual_consumption_kwh)]
             else:
-                logger.warning("⚠️ Submit-Button nicht gefunden, verwende Fallback")
+                logger.warning("Submit-Button nicht gefunden, verwende Fallback")
                 return [self.get_fallback_data(postal_code, annual_consumption_kwh)]
                 
         except Exception as e:
-            logger.error(f"❌ Fehler beim Scraping: {e}")
+            logger.error(f"Fehler beim Scraping: {e}")
             import traceback
             traceback.print_exc()
-            logger.info("🔄 Verwende Fallback-Daten")
+            logger.info("Verwende Fallback-Daten")
             return [self.get_fallback_data(postal_code, annual_consumption_kwh)]
             
         finally:
@@ -255,12 +255,12 @@ class EnbwStromScraper:
         tariffs = []
         
         try:
-            logger.info("🔍 Suche nach Tarif-Karten auf der Seite...")
+            logger.info("Suche nach Tarif-Karten auf der Seite...")
             
             # Finde alle Tarif-Karten (product-card)
             product_cards = await self.page.query_selector_all('[data-testid="product-overview-slider-item"]')
             
-            logger.info(f"📊 Gefunden: {len(product_cards)} Tarif-Karten")
+            logger.info(f"Gefunden: {len(product_cards)} Tarif-Karten")
             
             for card in product_cards:
                 try:
@@ -282,7 +282,7 @@ class EnbwStromScraper:
                         arbeitspreis_match = re.search(r'(\d+[,\.]\d+)', arbeitspreis_text)
                         arbeitspreis = float(arbeitspreis_match.group(1).replace(',', '.')) if arbeitspreis_match else 0
                         
-                        logger.info(f"✅ Tarif gefunden: {tariff_name} - {grundpreis}€/Monat, {arbeitspreis}ct/kWh")
+                        logger.info(f"Tarif gefunden: {tariff_name} - {grundpreis}€/Monat, {arbeitspreis}ct/kWh")
                         
                         # Berechne Jahreskosten
                         monthly_base = grundpreis
@@ -312,11 +312,11 @@ class EnbwStromScraper:
                         tariffs.append(tariff_data)
                         
                 except Exception as e:
-                    logger.warning(f"⚠️ Fehler beim Parsen einer Tarif-Karte: {e}")
+                    logger.warning(f"Fehler beim Parsen einer Tarif-Karte: {e}")
                     continue
                     
         except Exception as e:
-            logger.error(f"❌ Fehler beim Extrahieren der Tarife: {e}")
+            logger.error(f"Fehler beim Extrahieren der Tarife: {e}")
             import traceback
             traceback.print_exc()
         

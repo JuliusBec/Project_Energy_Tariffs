@@ -73,7 +73,7 @@ class EnbwScraper:
             Dictionary with pricing information, or None if failed
         """
         try:
-            logger.info(f"🔧 Starting Playwright scraping for PLZ {zip_code}")
+            logger.info(f"Starting Playwright scraping for PLZ {zip_code}")
             
             async with async_playwright() as p:
                 browser = await p.chromium.launch(headless=True)
@@ -86,29 +86,29 @@ class EnbwScraper:
                 # Build direct URL with parameters (this loads the tariff results page directly)
                 tariff_url = f"{self.BASE_URL}?Postleitzahl={zip_code}&Verbrauch={closest_consumption}&Typ=Strom&context=shared.offer-context.electricity.dynamic.pk#tarife"
                 
-                logger.info(f"📍 Loading tariff page with PLZ {zip_code} and {closest_consumption} kWh...")
+                logger.info(f"Loading tariff page with PLZ {zip_code} and {closest_consumption} kWh...")
                 await page.goto(tariff_url, wait_until='networkidle')
                 await asyncio.sleep(3)
                 
                 # Accept cookies
-                logger.info("🍪 Accepting cookies...")
+                logger.info("Accepting cookies...")
                 try:
                     cookie_button = page.locator('button:has-text("Alle akzeptieren")').first
                     await cookie_button.click(timeout=5000, force=True)
-                    logger.info("✅ Cookies accepted")
+                    logger.info("Cookies accepted")
                     await asyncio.sleep(2)
                 except:
-                    logger.info("⚠️ No cookie banner or already accepted")
+                    logger.info("No cookie banner or already accepted")
                 
                 # Click "Weitere Tarifdetails" to open modal with detailed pricing
-                logger.info("🔍 Opening detail modal...")
+                logger.info("Opening detail modal...")
                 try:
                     detail_btn = page.locator('text=Weitere Tarifdetails').first
                     await detail_btn.click(timeout=5000, force=True)
                     await asyncio.sleep(2)  # Wait for modal to open
-                    logger.info("✅ Detail modal opened")
+                    logger.info("Detail modal opened")
                 except Exception as e:
-                    logger.warning(f"⚠️ Could not click detail button: {e}")
+                    logger.warning(f"Could not click detail button: {e}")
                 
                 # Try to get content from modal first, fallback to body
                 modal_text = ""
@@ -116,7 +116,7 @@ class EnbwScraper:
                     modal = page.locator('.modal').first
                     if await modal.is_visible(timeout=2000):
                         modal_text = await modal.inner_text()
-                        logger.info("✅ Found modal content")
+                        logger.info("Found modal content")
                 except:
                     pass
                 
@@ -138,18 +138,18 @@ class EnbwScraper:
                 
                 if grundpreis_match:
                     base_price = float(grundpreis_match.group(1).replace(',', '.'))
-                    logger.info(f"✅ Found Grundpreis: {base_price} €/Monat")
+                    logger.info(f"Found Grundpreis: {base_price} €/Monat")
                     
                     markup = None
                     exchange_price = None
                     
                     if arbeitspreis_match:
                         markup = float(arbeitspreis_match.group(1).replace(',', '.'))
-                        logger.info(f"✅ Found Arbeitspreis: {markup} ct/kWh")
+                        logger.info(f"Found Arbeitspreis: {markup} ct/kWh")
                     
                     if boerse_match:
                         exchange_price = float(boerse_match.group(1).replace(',', '.'))
-                        logger.info(f"✅ Found Börsenpreis: {exchange_price} ct/kWh")
+                        logger.info(f"Found Börsenpreis: {exchange_price} ct/kWh")
                     
                     return {
                         'provider': 'EnBW',
@@ -165,11 +165,11 @@ class EnbwScraper:
                         'url': self.BASE_URL
                     }
                 
-                logger.warning("⚠️ Playwright loaded page but couldn't extract prices")
+                logger.warning("Playwright loaded page but couldn't extract prices")
                 return None
                 
         except Exception as e:
-            logger.error(f"❌ Playwright scraping failed: {e}")
+            logger.error(f"Playwright scraping failed: {e}")
             return None
     
     def _get_fallback_prices(self, zip_code: str, annual_consumption: int) -> Dict:
@@ -188,7 +188,7 @@ class EnbwScraper:
         base_price = self.BASE_PRICE_BY_REGION.get(region, 18.21)
         markup = self.MARKUP_BY_REGION.get(region, 15.36)
         
-        logger.info(f"📊 Using fallback prices for region {region}")
+        logger.info(f"Using fallback prices for region {region}")
         logger.info(f"   Grundpreis: {base_price} €/Monat")
         logger.info(f"   Arbeitspreis: {markup} ct/kWh")
         
@@ -217,14 +217,14 @@ class EnbwScraper:
         Returns:
             Dictionary with pricing information
         """
-        logger.info(f"🔍 Starting EnBW price lookup for PLZ {zip_code}")
+        logger.info(f"Starting EnBW price lookup for PLZ {zip_code}")
         
         # Try Playwright scraping
         result = await self._scrape_with_playwright(zip_code, annual_consumption)
         
         # Fall back to regional data if scraping failed
         if not result:
-            logger.info("⚠️ Playwright scraping failed, using fallback data")
+            logger.info("Playwright scraping failed, using fallback data")
             result = self._get_fallback_prices(zip_code, annual_consumption)
         
         return result
