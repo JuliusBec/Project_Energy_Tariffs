@@ -1,11 +1,15 @@
-try:
- from chronos import ChronosPipeline
- CHRONOS_AVAILABLE = True
-except ImportError:
- CHRONOS_AVAILABLE = False
- ChronosPipeline = None
+"""Energy consumption forecasting using Facebook Prophet.
 
-import numpy as np 
+Provides time-series forecasting for household electricity consumption using
+Prophet models with daily and weekly seasonality. Includes backtesting functionality
+for forecast quality assessment.
+
+Functions:
+    forecast_prophet: Generate consumption forecasts using Prophet.
+    create_backtest: Validate forecast accuracy against historical data.
+    calculate_total_weekly_usage: Aggregate forecasts to weekly totals.
+"""
+import numpy as np
 import pandas as pd
 from datetime import datetime, timedelta
 from prophet import Prophet
@@ -13,188 +17,229 @@ from prophet import Prophet
 
 
 def calculate_total_weekly_usage(forecast_df):
- # Resample to hourly frequency
- forecast_df = forecast_df.resample("H", on="datetime").sum().reset_index()
- # Sum the usage for each week
- weekly_usage = forecast_df.set_index("datetime").resample("W").sum()
- return weekly_usage
+    """Aggregate hourly forecast to weekly totals.
+    
+    Args:
+        forecast_df: DataFrame with columns ['datetime', 'yhat'] containing
+            hourly forecasted consumption in kWh.
+    
+    Returns:
+        DataFrame with weekly aggregated consumption indexed by week end date.
+    """ 
+    # Resample to hourly frequency
+    forecast_df = forecast_df.resample("H", on="datetime").sum().reset_index()
+    # Sum the usage for each week
+    weekly_usage = forecast_df.set_index("datetime").resample("W").sum()
+    return weekly_usage
 
 def forecast_prophet(df, days=30):
- # Explicitly create a copy to avoid SettingWithCopyWarning
- df = df.copy()
- df["datetime"] = pd.to_datetime(df["datetime"], format='%m/%d/%y %H:%M')
+    """Generate future consumption forecast using Prophet time-series model.
+    
+    Trains Prophet model with daily and weekly seasonality on historical hourly
+    consumption data. Returns only future predictions (excludes historical period).
+    
+    Args:
+        df: DataFrame with columns ['datetime', 'value'] containing historical
+            hourly consumption in kWh. Optional 'status' column is dropped.
+        days: Number of days to forecast into the future (default: 30).
+    
+    Returns:
+        DataFrame with Prophet forecast columns including 'ds' (datetime),
+        'yhat' (predicted consumption), 'yhat_lower', 'yhat_upper' for
+        the specified future period only.
+        
+    Note:
+        Model configuration:
+        - Daily and weekly seasonality enabled
+        - Additive seasonality mode
+        - 90% confidence intervals (interval_width=0.9)
+        - Linear growth trend
+    """ 
+    # Explicitly create a copy to avoid SettingWithCopyWarning
+    df = df.copy()
+    df["datetime"] = pd.to_datetime(df["datetime"], format='%m/%d/%y %H:%M')
 
- # Resample to hourly frequency for consistent modeling (sum for energy consumption)
- # Only drop status column if it exists
- if 'status' in df.columns:
- df.drop(columns=['status'], inplace=True)
- df = df.set_index("datetime").resample("h").sum().reset_index()
+    # Resample to hourly frequency for consistent modeling (sum for energy consumption)
+    # Only drop status column if it exists
+    if 'status' in df.columns:
+        df.drop(columns=['status'], inplace=True)
+    df = df.set_index("datetime").resample("h").sum().reset_index()
 
- prophet_df = df.copy()
- prophet_df.rename(columns={'datetime': 'ds', 'value': 'y'}, inplace=True)
+    prophet_df = df.copy()
+    prophet_df.rename(columns={'datetime': 'ds', 'value': 'y'}, inplace=True)
+    
+    prophet_model = Prophet(
+        daily_seasonality=True,
+        yearly_seasonality=False,
+        weekly_seasonality=True,
+        changepoint_prior_scale=0.25,
+        seasonality_prior_scale=2.0,
+        interval_width=0.9,
+        growth="linear",
+        seasonality_mode='additive'    # Additive seasonality (typical for energy consumption)
+    )
 
- prophet_model = Prophet(
- daily_seasonality=True,
- yearly_seasonality=False,
- weekly_seasonality=True,
- changepoint_prior_scale=0.25,
- seasonality_prior_scale=2.0,
- interval_width=0.9,
- growth="linear",
- seasonality_mode='additive' # Additive seasonality (typical for energy consumption)
- )
+    prophet_model.fit(prophet_df)
 
- prophet_model.fit(prophet_df)
+    future = prophet_model.make_future_dataframe(periods=24*days, freq='h')
 
- future = prophet_model.make_future_dataframe(periods=24*days, freq='h')
+    forecast = prophet_model.predict(future)
+    
+    # IMPORTANT: Only return the future forecast, not the historical period
+    # Get the last timestamp from the training data
+    last_train_date = prophet_df['ds'].max()
+    
+    # Filter to only future dates (after the last training date)
+    future_forecast = forecast[forecast['ds'] > last_train_date].copy()
+    
+    print(f"Prophet forecast: {len(future_forecast)} hours ({len(future_forecast)/24:.1f} days) of future data")
+    print(f"Forecast range: {future_forecast['ds'].min()} to {future_forecast['ds'].max()}")
+    print(f"Forecast total consumption: {future_forecast['yhat'].sum():.2f} kWh")
 
- forecast = prophet_model.predict(future)
-
- # IMPORTANT: Only return the future forecast, not the historical period
- # Get the last timestamp from the training data
- last_train_date = prophet_df['ds'].max()
-
- # Filter to only future dates (after the last training date)
- future_forecast = forecast[forecast['ds'] > last_train_date].copy()
-
- print(f"Prophet forecast: {len(future_forecast)} hours ({len(future_forecast)/24:.1f} days) of future data")
- print(f"Forecast range: {future_forecast['ds'].min()} to {future_forecast['ds'].max()}")
- print(f"Forecast total consumption: {future_forecast['yhat'].sum():.2f} kWh")
-
- return future_forecast
+    return future_forecast
 
 def create_backtest(usage_df):
- """
- Create backtest data for API response comparing actual vs forecasted energy usage.
+    """Validate Prophet forecast accuracy using hold-out test period.
+    
+    Splits data into training set and 30-day test period. Trains Prophet on
+    historical data, forecasts the test period, and compares predictions against
+    actual consumption to calculate error metrics.
+    
+    Args:
+        usage_df: DataFrame with columns ['datetime', 'value'] containing
+            historical hourly consumption in kWh. Optional 'status' column dropped.
+    
+    Returns:
+        Dictionary containing:
+            - hourly_data: Hourly timestamps, forecast, confidence intervals, actual.
+            - daily_data: Daily aggregated forecast vs actual.
+            - metrics: Includes total_forecast_usage, total_actual_usage,
+              forecast_error_absolute, forecast_error_percentage, mae, mse,
+              avg_confidence_interval_width, relative_confidence_interval_width.
+    
+    Note:
+        Removes incomplete days from test period to ensure fair comparison.
+        Clips negative forecasts to zero (consumption cannot be negative).
+    """
+    
+    usage_df = usage_df.copy()
+    usage_df['datetime'] = pd.to_datetime(usage_df['datetime'])
+    
+    # Resample to hourly frequency for consistent comparison (sum for energy consumption)
+    if 'status' in usage_df.columns:
+        usage_df.drop(columns=["status"], inplace=True)
+    usage_df = usage_df.set_index("datetime").resample("H").sum().reset_index()
+    
+    # Split the usage_df into train and test sets
+    # Get exactly the last 720 hours (30 days × 24 hours) for backtest
+    backtest_df = usage_df.tail(24 * 30).copy()
+    
+    # Check if the last day is incomplete (less than 24 hours)
+    last_day = backtest_df['datetime'].dt.date.iloc[-1]
+    hours_in_last_day = len(backtest_df[backtest_df['datetime'].dt.date == last_day])
+    
+    if hours_in_last_day < 24:
+        print(f"Removing incomplete last day ({last_day}) with only {hours_in_last_day} hours")
+        # Remove the incomplete day to get exactly 29 complete days
+        backtest_df = backtest_df[backtest_df['datetime'].dt.date != last_day]
+        complete_days = len(backtest_df) // 24
+        print(f"Using {complete_days} complete days ({len(backtest_df)} hours) for backtest")
+    
+    # Train on everything before the backtest period
+    train_end_datetime = backtest_df['datetime'].min() - pd.Timedelta(hours=1)
+    train_df = usage_df[usage_df['datetime'] <= train_end_datetime]
 
- Parameters:
- - usage_df: DataFrame with energy usage data (must have 'datetime' and 'value' columns)
+    # Calculate forecast hours to exactly match backtest period
+    forecast_hours = len(backtest_df)
+    backtest_forecast = forecast_prophet(train_df, days=30)  # Generate more than needed
+    
+    # Extract only the forecast period that exactly matches backtest_df
+    forecast_start_time = backtest_df['datetime'].min()
+    forecast_end_time = backtest_df['datetime'].max()
+    forecast_only = backtest_forecast[
+        (backtest_forecast['ds'] >= forecast_start_time) & 
+        (backtest_forecast['ds'] <= forecast_end_time)
+    ].copy()
+    
+    # Ensure we have exactly the same number of data points
+    if len(forecast_only) != len(backtest_df):
+        print(f"Warning: Forecast has {len(forecast_only)} hours, backtest has {len(backtest_df)} hours")
+        # If forecast is shorter, extend it by taking more from the full forecast
+        if len(forecast_only) < len(backtest_df):
+            needed_hours = len(backtest_df) - len(forecast_only)
+            # Get additional hours from the end of the full forecast
+            additional_forecast = backtest_forecast[
+                backtest_forecast['ds'] > forecast_end_time
+            ].head(needed_hours)
+            forecast_only = pd.concat([forecast_only, additional_forecast], ignore_index=True)
+            print(f"Extended forecast to {len(forecast_only)} hours to match backtest period")
+    
+    # Clip negative values to 0
+    forecast_only['yhat'] = forecast_only['yhat'].clip(lower=0)
+    forecast_only['yhat_lower'] = forecast_only['yhat_lower'].clip(lower=0)
+    forecast_only['yhat_upper'] = forecast_only['yhat_upper'].clip(lower=0)
+    
+    # Calculate and print the total usage in the backtest period
+    total_forecast_usage = forecast_only['yhat'].sum()
+    total_actual_usage = backtest_df['value'].sum()
+    print(f"Total forecasted usage over backtest period: {total_forecast_usage:.2f}")
+    print(f"Total actual usage over backtest period: {total_actual_usage:.2f}")
+    print(f"Forecast error (absolute): {abs(total_forecast_usage - total_actual_usage):.2f}")
+    print(f"Forecast error (percentage): {abs(total_forecast_usage - total_actual_usage) / total_actual_usage * 100:.2f}%")
+    
+    # Calculate and print the MAE and MSE between the forecast and the backtest data
+    merged_df = pd.merge(forecast_only[['ds', 'yhat']], backtest_df[['datetime', 'value']], 
+                        left_on='ds', right_on='datetime', how='inner')
+    mae = np.mean(np.abs(merged_df['yhat'] - merged_df['value']))
+    mse = np.mean((merged_df['yhat'] - merged_df['value'])**2)
+    print(f"Backtest MAE: {mae:.4f}")
+    print(f"Backtest MSE: {mse:.4f}")
+    
+    # Calculate confidence interval metrics
+    confidence_interval_width = forecast_only['yhat_upper'] - forecast_only['yhat_lower']
+    avg_confidence_interval_width = confidence_interval_width.mean()
+    relative_confidence_interval_width = (avg_confidence_interval_width / forecast_only['yhat'].mean()) * 100
+    print(f"Average confidence interval width: {avg_confidence_interval_width:.4f} kWh")
+    print(f"Relative confidence interval width: {relative_confidence_interval_width:.2f}% of mean forecast")
 
- Returns:
- - Dictionary with hourly_data, daily_data, and metrics for visualization
-
- Note:
- - For local plotting and testing, use test_backtest_visualization.py in the analysis folder
- """
-
- usage_df = usage_df.copy()
- usage_df['datetime'] = pd.to_datetime(usage_df['datetime'])
-
- # Resample to hourly frequency for consistent comparison (sum for energy consumption)
- if 'status' in usage_df.columns:
- usage_df.drop(columns=["status"], inplace=True)
- usage_df = usage_df.set_index("datetime").resample("H").sum().reset_index()
-
- # Split the usage_df into train and test sets
- # Get exactly the last 720 hours (30 days × 24 hours) for backtest
- backtest_df = usage_df.tail(24 * 30).copy()
-
- # Check if the last day is incomplete (less than 24 hours)
- last_day = backtest_df['datetime'].dt.date.iloc[-1]
- hours_in_last_day = len(backtest_df[backtest_df['datetime'].dt.date == last_day])
-
- if hours_in_last_day < 24:
- print(f"Removing incomplete last day ({last_day}) with only {hours_in_last_day} hours")
- # Remove the incomplete day to get exactly 29 complete days
- backtest_df = backtest_df[backtest_df['datetime'].dt.date != last_day]
- complete_days = len(backtest_df) // 24
- print(f"Using {complete_days} complete days ({len(backtest_df)} hours) for backtest")
-
- # Train on everything before the backtest period
- train_end_datetime = backtest_df['datetime'].min() - pd.Timedelta(hours=1)
- train_df = usage_df[usage_df['datetime'] <= train_end_datetime]
-
- # Calculate forecast hours to exactly match backtest period
- forecast_hours = len(backtest_df)
- backtest_forecast = forecast_prophet(train_df, days=30) # Generate more than needed
-
- # Extract only the forecast period that exactly matches backtest_df
- forecast_start_time = backtest_df['datetime'].min()
- forecast_end_time = backtest_df['datetime'].max()
- forecast_only = backtest_forecast[
- (backtest_forecast['ds'] >= forecast_start_time) & 
- (backtest_forecast['ds'] <= forecast_end_time)
- ].copy()
-
- # Ensure we have exactly the same number of data points
- if len(forecast_only) != len(backtest_df):
- print(f"Warning: Forecast has {len(forecast_only)} hours, backtest has {len(backtest_df)} hours")
- # If forecast is shorter, extend it by taking more from the full forecast
- if len(forecast_only) < len(backtest_df):
- needed_hours = len(backtest_df) - len(forecast_only)
- # Get additional hours from the end of the full forecast
- additional_forecast = backtest_forecast[
- backtest_forecast['ds'] > forecast_end_time
- ].head(needed_hours)
- forecast_only = pd.concat([forecast_only, additional_forecast], ignore_index=True)
- print(f"Extended forecast to {len(forecast_only)} hours to match backtest period")
-
- # Clip negative values to 0
- forecast_only['yhat'] = forecast_only['yhat'].clip(lower=0)
- forecast_only['yhat_lower'] = forecast_only['yhat_lower'].clip(lower=0)
- forecast_only['yhat_upper'] = forecast_only['yhat_upper'].clip(lower=0)
-
- # Calculate and print the total usage in the backtest period
- total_forecast_usage = forecast_only['yhat'].sum()
- total_actual_usage = backtest_df['value'].sum()
- print(f"Total forecasted usage over backtest period: {total_forecast_usage:.2f}")
- print(f"Total actual usage over backtest period: {total_actual_usage:.2f}")
- print(f"Forecast error (absolute): {abs(total_forecast_usage - total_actual_usage):.2f}")
- print(f"Forecast error (percentage): {abs(total_forecast_usage - total_actual_usage) / total_actual_usage * 100:.2f}%")
-
- # Calculate and print the MAE and MSE between the forecast and the backtest data
- merged_df = pd.merge(forecast_only[['ds', 'yhat']], backtest_df[['datetime', 'value']], 
- left_on='ds', right_on='datetime', how='inner')
- mae = np.mean(np.abs(merged_df['yhat'] - merged_df['value']))
- mse = np.mean((merged_df['yhat'] - merged_df['value'])**2)
- print(f"Backtest MAE: {mae:.4f}")
- print(f"Backtest MSE: {mse:.4f}")
-
- # Calculate confidence interval metrics
- confidence_interval_width = forecast_only['yhat_upper'] - forecast_only['yhat_lower']
- avg_confidence_interval_width = confidence_interval_width.mean()
- relative_confidence_interval_width = (avg_confidence_interval_width / forecast_only['yhat'].mean()) * 100
- print(f"Average confidence interval width: {avg_confidence_interval_width:.4f} kWh")
- print(f"Relative confidence interval width: {relative_confidence_interval_width:.2f}% of mean forecast")
-
- # Aggregate to daily totals
- forecast_daily = forecast_only.copy()
- forecast_daily = forecast_daily.set_index('ds').resample('D').sum().reset_index()
-
- backtest_daily = backtest_df.copy()
- backtest_daily = backtest_daily.set_index('datetime').resample('D').sum().reset_index()
-
- # Prepare hourly data
- hourly_data = {
- 'timestamps': forecast_only['ds'].dt.strftime('%Y-%m-%d %H:%M:%S').tolist(),
- 'forecast': forecast_only['yhat'].tolist(),
- 'forecast_lower': forecast_only['yhat_lower'].tolist(),
- 'forecast_upper': forecast_only['yhat_upper'].tolist(),
- 'actual': backtest_df['value'].tolist()
- }
-
- # Prepare daily data
- daily_data = {
- 'timestamps': forecast_daily['ds'].dt.strftime('%Y-%m-%d').tolist(),
- 'forecast': forecast_daily['yhat'].tolist(),
- 'actual': backtest_daily['value'].tolist()
- }
-
- # Metrics
- metrics = {
- 'total_forecast_usage': float(total_forecast_usage),
- 'total_actual_usage': float(total_actual_usage),
- 'forecast_error_absolute': float(abs(total_forecast_usage - total_actual_usage)),
- 'forecast_error_percentage': float(abs(total_forecast_usage - total_actual_usage) / total_actual_usage * 100),
- 'mae': float(mae),
- 'mse': float(mse),
- 'forecast_period_days': len(forecast_daily),
- 'avg_confidence_interval_width': float(avg_confidence_interval_width),
- 'relative_confidence_interval_width': float(relative_confidence_interval_width)
- }
-
- return {
- 'hourly_data': hourly_data,
- 'daily_data': daily_data,
- 'metrics': metrics
- }
+    # Aggregate to daily totals
+    forecast_daily = forecast_only.copy()
+    forecast_daily = forecast_daily.set_index('ds').resample('D').sum().reset_index()
+    
+    backtest_daily = backtest_df.copy()
+    backtest_daily = backtest_daily.set_index('datetime').resample('D').sum().reset_index()
+    
+    # Prepare hourly data
+    hourly_data = {
+        'timestamps': forecast_only['ds'].dt.strftime('%Y-%m-%d %H:%M:%S').tolist(),
+        'forecast': forecast_only['yhat'].tolist(),
+        'forecast_lower': forecast_only['yhat_lower'].tolist(),
+        'forecast_upper': forecast_only['yhat_upper'].tolist(),
+        'actual': backtest_df['value'].tolist()
+    }
+    
+    # Prepare daily data
+    daily_data = {
+        'timestamps': forecast_daily['ds'].dt.strftime('%Y-%m-%d').tolist(),
+        'forecast': forecast_daily['yhat'].tolist(),
+        'actual': backtest_daily['value'].tolist()
+    }
+    
+    # Metrics
+    metrics = {
+        'total_forecast_usage': float(total_forecast_usage),
+        'total_actual_usage': float(total_actual_usage),
+        'forecast_error_absolute': float(abs(total_forecast_usage - total_actual_usage)),
+        'forecast_error_percentage': float(abs(total_forecast_usage - total_actual_usage) / total_actual_usage * 100),
+        'mae': float(mae),
+        'mse': float(mse),
+        'forecast_period_days': len(forecast_daily),
+        'avg_confidence_interval_width': float(avg_confidence_interval_width),
+        'relative_confidence_interval_width': float(relative_confidence_interval_width)
+    }
+    
+    return {
+        'hourly_data': hourly_data,
+        'daily_data': daily_data,
+        'metrics': metrics
+    }

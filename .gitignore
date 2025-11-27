@@ -24,6 +24,9 @@ env/
 __pycache__/
 *.pyc
 
+# Sphinx documentation build artifacts
+docs/_build/
+
 # Allow app_data folder and its contents (override the *.csv ignore)
 !app_data/
 !app_data/**

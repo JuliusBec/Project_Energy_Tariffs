@@ -210,7 +210,10 @@ docker-compose logs frontend
 # - npm install fails → Check package.json
 # - Vite build fails → Check for syntax errors
 # - Nginx won't start → Check nginx.conf syntax
+# - Missing js/api.js file → Make sure src/frontend/public/js/ exists in repo
 ```
+
+**Note**: The frontend uses Vite's public directory feature. Static files in `src/frontend/public/` are automatically copied to the build output. If you're missing the `js/api.js` file in production, ensure the `public/` directory is committed to Git.
 
 ### Containers can't communicate
 ```bash
@@ -245,44 +248,6 @@ docker system prune -a
 docker-compose up --build
 ```
 
-### Demonstrating the Architecture
-1. Show `docker-compose.yml` - orchestration
-2. Show `Dockerfile.backend` - backend containerization
-3. Show `Dockerfile.frontend` - frontend multi-stage build
-4. Show `nginx.conf` - production serving
-5. Run `docker-compose up` - live demo
-6. Show `docker-compose ps` - running services
-7. Access application in browser
-
-### Key Points for Professors
-- ✅ Multi-container architecture (industry best practice)
-- ✅ Separation of concerns (backend/frontend)
-- ✅ Production-ready setup (Nginx serving, health checks)
-- ✅ Data persistence (volume mounts)
-- ✅ Easy to run (`docker-compose up`)
-- ✅ Reproducible environment
-- ✅ Well documented
-
-## 📊 Resource Requirements
-
-**Minimum**:
-- CPU: 2 cores
-- RAM: 4GB
-- Disk: 5GB free
-
-**Recommended**:
-- CPU: 4 cores
-- RAM: 8GB
-- Disk: 10GB free
-
-**Build Time** (first run):
-- Backend: ~5 minutes
-- Frontend: ~2 minutes
-- Total: ~7 minutes
-
-**Subsequent Starts**:
-- ~10 seconds (using cached images)
-
 ## 🔄 Development Workflow
 
 ### Local Development (Without Docker)
@@ -300,22 +265,6 @@ docker-compose up --build backend
 docker-compose up --build
 ```
 
-### Production Deployment
-The same Docker setup can be used in production:
-- Deploy to AWS ECS/Fargate
-- Use Kubernetes
-- Deploy to any Docker-compatible hosting
-- Add reverse proxy (Traefik/Caddy)
-- Add SSL certificates
-- Configure environment variables
-
-## 📚 Further Reading
-
-- [Docker Documentation](https://docs.docker.com/)
-- [Docker Compose Documentation](https://docs.docker.com/compose/)
-- [Nginx Documentation](https://nginx.org/en/docs/)
-- [FastAPI Deployment](https://fastapi.tiangolo.com/deployment/)
-- [Vue.js Production Deployment](https://vuejs.org/guide/best-practices/production-deployment.html)
 
 ## 🐛 Common Issues
 
@@ -351,32 +300,6 @@ docker system prune -a --volumes
 # Remove unused images
 docker image prune -a
 ```
-
-## ✅ Checklist for Submission
-
-Before submitting your project:
-
-- [ ] `docker-compose up` works on fresh clone
-- [ ] Both containers start successfully
-- [ ] Frontend accessible at http://localhost:3000
-- [ ] Backend accessible at http://localhost:8000
-- [ ] API documentation available at http://localhost:8000/docs
-- [ ] Health check returns healthy status
-- [ ] README.md has clear Docker instructions
-- [ ] All configuration files committed to Git
-- [ ] No hardcoded credentials or sensitive data
-- [ ] Logs show no critical errors
-- [ ] Sample data included for testing
-
-## 📞 Support
-
-If you encounter issues:
-1. Check this guide first
-2. Review Docker logs: `docker-compose logs`
-3. Verify Docker is running: `docker --version`
-4. Check system resources: `docker system df`
-5. Try clean rebuild: `docker-compose down -v && docker-compose up --build`
-
 ---
 
 **Last Updated**: November 2025  

@@ -8,5 +8,3 @@ This section contains the complete API documentation for all modules in the proj
    :caption: API Documentation:
 
    backend
-   forecasting
-   webscraping
