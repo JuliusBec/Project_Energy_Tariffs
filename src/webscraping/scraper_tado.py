@@ -39,30 +39,30 @@ class TadoScraper:
                 # Build URL with parameters for direct tariff display
                 tariff_url = f"{self.BASE_URL}?yearlyConsumption={annual_consumption}&zipcode={zip_code}&includeHourlyTariffSavings=true&hasSmartMeter=true"
                 
-                logger.info(f"📍 Loading Tado price page for PLZ {zip_code}, {annual_consumption} kWh...")
+                logger.info(f"Loading Tado price page for PLZ {zip_code}, {annual_consumption} kWh...")
                 await page.goto(tariff_url, wait_until='networkidle')
                 await asyncio.sleep(8)  # Wait for SPA (Angular/Vue) to load fully
                 
                 # Accept cookies if present
-                logger.info("🍪 Accepting cookies...")
+                logger.info("Accepting cookies...")
                 try:
                     cookie_button = page.locator('button:has-text("Accept")').first
                     await cookie_button.click(timeout=3000, force=True)
-                    logger.info("✅ Cookies accepted")
+                    logger.info("Cookies accepted")
                     await asyncio.sleep(2)
                 except:
-                    logger.info("⚠️ No cookie banner or already accepted")
+                    logger.info("No cookie banner or already accepted")
                 
                 # Click "Mehr Details" button to expand price breakdown
-                logger.info("🔍 Expanding price details...")
+                logger.info("Expanding price details...")
                 try:
                     # Click first "Mehr Details" button (for Arbeitspreis)
                     detail_buttons = page.locator('text=Mehr Details')
                     await detail_buttons.first.click(force=True, timeout=5000)
                     await asyncio.sleep(3)
-                    logger.info("✅ Price details expanded")
+                    logger.info("Price details expanded")
                 except Exception as e:
-                    logger.warning(f"⚠️ Could not expand details: {e}")
+                    logger.warning(f"Could not expand details: {e}")
                 
                 # Get page content
                 body_text = await page.locator('body').inner_text()
@@ -94,23 +94,23 @@ class TadoScraper:
                 
                 if grundpreis_match:
                     base_price = float(grundpreis_match.group(1).replace(',', '.'))
-                    logger.info(f"✅ Found Grundpreis: {base_price} €/Monat")
+                    logger.info(f"Found Grundpreis: {base_price} €/Monat")
                 
                 if arbeitspreis_kwh_match:
                     kwh_price_ct = float(arbeitspreis_kwh_match.group(1).replace(',', '.'))
-                    logger.info(f"✅ Found Arbeitspreis pro kWh: {kwh_price_ct} ct/kWh")
+                    logger.info(f"Found Arbeitspreis pro kWh: {kwh_price_ct} ct/kWh")
                 elif monthly_tariff_match:
                     # Fallback to monthly tariff price
                     kwh_price_ct = float(monthly_tariff_match.group(1).replace(',', '.'))
-                    logger.info(f"✅ Found Monthly tariff price: {kwh_price_ct} ct/kWh")
+                    logger.info(f"Found Monthly tariff price: {kwh_price_ct} ct/kWh")
                 
                 if arbeitspreis_total_match:
                     monthly_arbeitspreis = float(arbeitspreis_total_match.group(1).replace(',', '.'))
-                    logger.info(f"✅ Found monthly Arbeitspreis: {monthly_arbeitspreis} €")
+                    logger.info(f"Found monthly Arbeitspreis: {monthly_arbeitspreis} €")
                 
                 if network_fees_match:
                     network_fees_euro = float(network_fees_match.group(1).replace(',', '.'))
-                    logger.info(f"✅ Found Netznutzung/Umlagen/Steuern: {network_fees_euro} €")
+                    logger.info(f"Found Netznutzung/Umlagen/Steuern: {network_fees_euro} €")
                 
                 if base_price is not None and kwh_price_ct is not None:
                     # Berechnung des Markup (Netznutzung, Steuern, Umlagen):
@@ -120,11 +120,11 @@ class TadoScraper:
                     if network_fees_euro is not None and monthly_kwh > 0:
                         # Markup ct/kWh = (Netznutzung € / monatliche kWh) * 100
                         markup_ct_kwh = (network_fees_euro / monthly_kwh) * 100
-                        logger.info(f"📊 Markup berechnet: {network_fees_euro}€ / {monthly_kwh:.2f} kWh = {markup_ct_kwh:.2f} ct/kWh")
+                        logger.info(f"Markup berechnet: {network_fees_euro}€ / {monthly_kwh:.2f} kWh = {markup_ct_kwh:.2f} ct/kWh")
                     else:
                         # Fallback: assume ~18 ct/kWh is markup (typical for Tado)
                         markup_ct_kwh = 18.0
-                        logger.warning(f"⚠️ Network fees not found, using fallback markup: {markup_ct_kwh} ct/kWh")
+                        logger.warning(f"Network fees not found, using fallback markup: {markup_ct_kwh} ct/kWh")
                     
                     monthly_cost = base_price + (monthly_kwh * (kwh_price_ct / 100))
                     
@@ -145,11 +145,11 @@ class TadoScraper:
                         'url': tariff_url
                     }
                 
-                logger.warning("⚠️ Playwright loaded page but couldn't extract complete prices")
+                logger.warning("Playwright loaded page but couldn't extract complete prices")
                 return None
                 
         except Exception as e:
-            logger.error(f"❌ Playwright scraping failed: {e}")
+            logger.error(f"Playwright scraping failed: {e}")
             return None
     
     def _get_fallback_prices(self, zip_code: str, annual_consumption: int) -> Dict:
@@ -171,7 +171,7 @@ class TadoScraper:
         monthly_kwh_cost = (annual_consumption / 12) * (kwh_price_ct / 100)
         monthly_cost = base_price + monthly_kwh_cost
         
-        logger.info("📊 Using fallback Tado pricing estimates")
+        logger.info("Using fallback Tado pricing estimates")
         logger.info(f"   Grundpreis: {base_price} €/Monat")
         logger.info(f"   Arbeitspreis: {kwh_price_ct} ct/kWh (estimated)")
         
@@ -200,17 +200,17 @@ class TadoScraper:
         Returns:
             Dict with tariff data (either scraped or fallback)
         """
-        logger.info(f"🔍 Starting Tado price lookup for PLZ {zip_code}")
+        logger.info(f"Starting Tado price lookup for PLZ {zip_code}")
         
         # Try Playwright scraping first
-        logger.info("🔧 Starting Playwright scraping")
+        logger.info("Starting Playwright scraping")
         result = await self._scrape_with_playwright(zip_code, annual_consumption)
         
         if result:
             return result
         
         # Fallback to estimates
-        logger.info("⚠️ Playwright scraping failed, using fallback data")
+        logger.info("Playwright scraping failed, using fallback data")
         return self._get_fallback_prices(zip_code, annual_consumption)
 
 

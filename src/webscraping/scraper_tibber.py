@@ -65,49 +65,49 @@ class TibberScraper:
             Dictionary with base_price_monthly and additional_price_ct_kwh, or None if failed
         """
         try:
-            logger.info(f"🔧 Starting Playwright scraping for PLZ {postal_code}")
+            logger.info(f"Starting Playwright scraping for PLZ {postal_code}")
             
             async with async_playwright() as p:
                 browser = await p.chromium.launch(headless=True)
                 page = await browser.new_page()
                 
                 # Load page
-                logger.info(f"📍 Loading {self.BASE_URL}...")
+                logger.info(f"Loading {self.BASE_URL}...")
                 await page.goto(self.BASE_URL, wait_until='networkidle')
                 await asyncio.sleep(2)
                 
                 # Accept cookies to avoid blocking
-                logger.info("🍪 Accepting cookies...")
+                logger.info("Accepting cookies...")
                 try:
                     cookie_button = page.locator('text=/Akzeptieren|Alle akzeptieren|Accept/i').first
                     await cookie_button.click(timeout=5000)
-                    logger.info("✅ Cookies accepted")
+                    logger.info("Cookies accepted")
                     await asyncio.sleep(1)
                 except:
-                    logger.info("⚠️ No cookie banner or already accepted")
+                    logger.info("No cookie banner or already accepted")
                 
                 # Fill in postal code
-                logger.info(f"📝 Entering PLZ: {postal_code}")
+                logger.info(f"Entering PLZ: {postal_code}")
                 await page.fill('input[name="postalCode"]', postal_code)
                 await asyncio.sleep(1)
                 
                 # Fill in consumption
-                logger.info(f"📝 Entering consumption: {annual_consumption_kwh} kWh")
+                logger.info(f"Entering consumption: {annual_consumption_kwh} kWh")
                 await page.fill('input[name="energyConsumption"]', str(annual_consumption_kwh))
                 
                 # Wait for calculation
-                logger.info("⏳ Waiting for price calculation...")
+                logger.info("Waiting for price calculation...")
                 await asyncio.sleep(10)
                 
                 # Click on "Preiszusammensetzung" to reveal details
-                logger.info("🔍 Opening price breakdown...")
+                logger.info("Opening price breakdown...")
                 try:
                     breakdown_button = page.locator('text=Preiszusammensetzung').first
                     await breakdown_button.click(timeout=10000)
-                    logger.info("✅ Price breakdown opened")
+                    logger.info("Price breakdown opened")
                     await asyncio.sleep(3)
                 except Exception as e:
-                    logger.warning(f"⚠️ Could not open breakdown: {str(e)[:100]}")
+                    logger.warning(f"Could not open breakdown: {str(e)[:100]}")
                 
                 # Get page text
                 body_text = await page.locator('body').inner_text()
@@ -125,7 +125,7 @@ class TibberScraper:
                     grundpreis = float(grundpreis_match.group(1).replace(',', '.'))
                     arbeitspreis = float(arbeitspreis_match.group(1).replace(',', '.'))
                     
-                    logger.info(f"✅ Playwright scraping successful!")
+                    logger.info(f"Playwright scraping successful!")
                     logger.info(f"   Grundpreis: {grundpreis} €/Monat")
                     logger.info(f"   Arbeitspreis: {arbeitspreis} ct/kWh")
                     
@@ -135,12 +135,12 @@ class TibberScraper:
                         'source': 'playwright_scraping'
                     }
                 
-                logger.warning("⚠️ Playwright loaded page but couldn't extract prices")
+                logger.warning("Playwright loaded page but couldn't extract prices")
                 logger.debug(f"Text sample: {body_text[:500]}")
                 return None
                 
         except Exception as e:
-            logger.error(f"❌ Playwright scraping failed: {e}")
+            logger.error(f"Playwright scraping failed: {e}")
             return None
     
     def _get_fallback_prices(self, postal_code: str) -> Dict:
@@ -158,7 +158,7 @@ class TibberScraper:
         base_price = self.BASE_PRICE_BY_REGION.get(region, 14.99)
         additional_price = self.ADDITIONAL_PRICE_BY_REGION.get(region, 15.50)
         
-        logger.info(f"📊 Using fallback prices for region {region}")
+        logger.info(f"Using fallback prices for region {region}")
         logger.info(f"   Grundpreis: {base_price} €/Monat")
         logger.info(f"   Arbeitspreis: {additional_price} ct/kWh")
         
@@ -184,11 +184,11 @@ class TibberScraper:
             - additional_price_ct_kwh: Additional price per kWh in ct
             - source: Data source ('playwright_scraping' or 'fallback_regional_data')
         """
-        logger.info(f"🔍 Starting Tibber price lookup for PLZ {postal_code}")
+        logger.info(f"Starting Tibber price lookup for PLZ {postal_code}")
         
         # Validate postal code
         if not postal_code or len(postal_code) < 2:
-            logger.warning(f"⚠️ Invalid postal code: {postal_code}, using default region")
+            logger.warning(f"Invalid postal code: {postal_code}, using default region")
             postal_code = "10000"  # Default to Berlin
         
         # Try Playwright scraping
@@ -196,7 +196,7 @@ class TibberScraper:
         
         # Fall back to regional data if scraping failed
         if not result:
-            logger.info("⚠️ Playwright scraping failed, using fallback data")
+            logger.info("Playwright scraping failed, using fallback data")
             result = self._get_fallback_prices(postal_code)
         
         return result
