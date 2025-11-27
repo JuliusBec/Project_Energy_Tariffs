@@ -1,0 +1,86 @@
+"""
+SARIMAX Energy Price Predictor
+
+Loads a pre-trained SARIMAX model to generate 90-day energy price forecasts.
+Uses historical weather averages and time-based features as exogenous variables.
+Validates predictions against actual data and exports results with confidence intervals.
+"""
+import pandas as pd
+import matplotlib.pyplot as plt
+import time
+from statsmodels.tsa.statespace.sarimax import SARIMAX
+import analysis.EnergyPrices as energy_prices
+import pickle
+import os
+
+
+training_data = pd.read_csv("data/training_dataset_weather.csv")
+training_data['datetime'] = pd.to_datetime(training_data['datetime'])
+training_data.set_index('datetime', inplace=True)
+
+validation_data = energy_prices.get_german_price_data("data/validation_dataset.csv")
+validation_data = energy_prices.adjust_df_format(validation_data)
+
+validation_data.set_index('datetime', inplace=True)  # Set 'datetime' as index
+
+# Load the energy prices data
+# Use the loaded model for forecasting
+loaded_model = pickle.load(open('data/prediction_models/sarimax_model_2years', 'rb'))
+
+plt.figure(figsize=(12, 6))
+# Define number of periods to show for historical data (e.g., last 10 days)
+historical_periods = 24 * 10  # 10 days of hourly data
+# Plot historical data
+plt.plot(training_data.index[-historical_periods:], 
+         training_data['market_price'][-historical_periods:], 
+         color='blue', label='Historical Data')
+
+# Create forecast dates
+last_date = training_data.index[-1]
+# Create date range for forecast (24 points per day * 90 days, at hourly intervals)
+forecast_dates = pd.date_range(start=last_date, periods=24*90+1, freq='H')[1:]  # Skip first point
+
+# Create future exogenous variables for the forecast period
+future_exog = pd.DataFrame(index=forecast_dates)
+
+# Add weekday features (these can be calculated directly from dates)
+future_exog['weekday'] = future_exog.index.dayofweek
+future_exog['is_weekend'] = future_exog['weekday'].apply(lambda x: 1 if x >= 5 else 0)
+
+# For temperature and humidity, you need historical averages or forecasts
+# Option 1: Use historical averages by date
+avg_temp_by_month = training_data.groupby(training_data.index.month)['temperature'].mean()
+avg_humidity_by_month = training_data.groupby(training_data.index.month)['relative_humidity'].mean()
+
+future_exog['temperature'] = future_exog.index.month.map(avg_temp_by_month)
+future_exog['relative_humidity'] = future_exog.index.month.map(avg_humidity_by_month)
+
+# Now use these variables in the forecast
+forecast_result = loaded_model.get_forecast(steps=24*90, exog=future_exog[['temperature', 'relative_humidity', 'weekday', 'is_weekend']])
+
+# Save the forecast result to a CSV file
+forecast_df = pd.DataFrame({
+    'datetime': forecast_dates,
+    'predicted_mean': forecast_result.predicted_mean,
+    'lower_ci': forecast_result.conf_int().iloc[:, 0],
+    'upper_ci': forecast_result.conf_int().iloc[:, 1]
+})
+forecast_df.set_index('datetime', inplace=True)
+forecast_df.to_csv('data/forecast_90days.csv')
+
+# Plot validation data for the same timeframe as the forecast
+validation_start = forecast_dates[0]
+validation_end = forecast_dates[-1]
+validation_mask = (validation_data.index >= validation_start) & (validation_data.index <= validation_end)
+plt.plot(validation_data.index[validation_mask], 
+         validation_data['market_price'][validation_mask], 
+         color='green', label='Validation Data')
+
+# Plot forecast
+plt.plot(forecast_dates, forecast_result.predicted_mean, color='red', label='Forecast')
+plt.title('Energy Price Forecast')
+plt.legend()
+plt.tight_layout()
+plt.grid()
+plt.savefig('figures/forecast_plot_90days.png')
+print("Plot saved to figures/forecast_plot_90days.png")

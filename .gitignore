@@ -1,0 +1,38 @@
+# Data files
+/data/
+*.csv
+*.json
+*.xlsx
+
+# Figures
+/figures/
+*.png
+*.jpg
+*.svg
+
+.DS_Store
+
+# Node.js dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Python virtual environments
+venv/
+env/
+__pycache__/
+*.pyc
+
+# Sphinx documentation build artifacts
+docs/_build/
+
+# Allow app_data folder and its contents (override the *.csv ignore)
+!app_data/
+!app_data/**
+src/frontend/node_modules/
+
+# Debug files
+*.log
+enbw_page.html
+enbw_tarif_page.txt
