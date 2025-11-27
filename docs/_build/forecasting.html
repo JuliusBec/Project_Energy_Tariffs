@@ -44,7 +44,7 @@ It combines Prophet and Chronos for accurate short-term and long-term forecasts.
 <li><p><strong>Energy Price Forecast</strong> - Prediction of day-ahead electricity prices</p></li>
 <li><p><strong>Energy Usage Forecast</strong> - Prediction of household consumption</p></li>
 </ul>
-<p>Both modules use machine learning algorithms and historical data for accurate predictions.</p>
+<p>Both modules use Prophet, a powerful time series forecasting library by Meta, and historical data for accurate predictions.</p>
 </section>
 <section id="module-backend.forecasting.energy_price_forecast">
 <span id="energy-price-forecast"></span><h2>Energy Price Forecast<a class="headerlink" href="#module-backend.forecasting.energy_price_forecast" title="Link to this heading">¶</a></h2>
@@ -467,17 +467,19 @@ based on SMARD data (Federal Network Agency).</p>
 
 <section id="id1">
 <h3>Description<a class="headerlink" href="#id1" title="Link to this heading">¶</a></h3>
-<p>The Energy Usage Forecaster predicts household electricity consumption.
-Prophet is used for traditional time series analysis and Chronos for deep learning-based predictions.</p>
+<p>The Energy Usage Forecaster predicts household electricity consumption using Facebook Prophet.
+Prophet is particularly well-suited for energy consumption forecasting due to its ability to handle
+multiple seasonality patterns (daily, weekly) and missing data.</p>
 </section>
 <section id="id2">
 <h3>Features<a class="headerlink" href="#id2" title="Link to this heading">¶</a></h3>
 <ul class="simple">
-<li><p>Prophet &amp; Chronos models</p></li>
+<li><p>Prophet-based time series forecasting</p></li>
 <li><p>Hourly consumption forecast</p></li>
 <li><p>Weekly aggregation</p></li>
 <li><p>Seasonality detection (daily, weekly)</p></li>
 <li><p>Flexible forecast periods</p></li>
+<li><p>Automatic handling of missing data</p></li>
 </ul>
 </section>
 <section id="id3">
@@ -505,34 +507,6 @@ Prophet is used for traditional time series analysis and Chronos for deep learni
 <span class="p">)</span>
 <span class="n">weekly_usage</span> <span class="o">=</span> <span class="n">calculate_total_weekly_usage</span><span class="p">(</span><span class="n">forecast_df</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Weekly consumption:</span><span class="se">\n</span><span class="si">{</span><span class="n">weekly_usage</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-</pre></div>
-</div>
-</section>
-<section id="chronos-deep-learning-modell">
-<h4>Chronos Deep Learning Modell<a class="headerlink" href="#chronos-deep-learning-modell" title="Link to this heading">¶</a></h4>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">chronos</span><span class="w"> </span><span class="kn">import</span> <span class="n">ChronosPipeline</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
-
-<span class="c1"># Chronos Pipeline laden</span>
-<span class="n">pipeline</span> <span class="o">=</span> <span class="n">ChronosPipeline</span><span class="o">.</span><span class="n">from_pretrained</span><span class="p">(</span>
-    <span class="s2">&quot;amazon/chronos-t5-small&quot;</span><span class="p">,</span>
-    <span class="n">device_map</span><span class="o">=</span><span class="s2">&quot;cpu&quot;</span><span class="p">,</span>  <span class="c1"># Oder &quot;cuda&quot; für GPU</span>
-    <span class="n">torch_dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">bfloat16</span><span class="p">,</span>
-<span class="p">)</span>
-
-<span class="c1"># Prepare historical data</span>
-<span class="n">context</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">df</span><span class="p">[</span><span class="s1">&#39;value&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">[</span><span class="o">-</span><span class="mi">168</span><span class="p">:])</span>  <span class="c1"># Last 7 days</span>
-
-<span class="c1"># Forecast for 24 hours</span>
-<span class="n">forecast</span> <span class="o">=</span> <span class="n">pipeline</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span>
-    <span class="n">context</span><span class="o">=</span><span class="n">context</span><span class="p">,</span>
-    <span class="n">prediction_length</span><span class="o">=</span><span class="mi">24</span><span class="p">,</span>
-    <span class="n">num_samples</span><span class="o">=</span><span class="mi">20</span>
-<span class="p">)</span>
-
-<span class="c1"># Median forecast</span>
-<span class="n">median_forecast</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">median</span><span class="p">(</span><span class="n">forecast</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">numpy</span><span class="p">(),</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
 </pre></div>
 </div>
 </section>
@@ -809,9 +783,9 @@ Prophet is used for traditional time series analysis and Chronos for deep learni
 </li>
 <li><p><strong>Model Selection</strong></p>
 <ul class="simple">
-<li><p>Prophet for interpretable results</p></li>
-<li><p>Chronos for highest accuracy</p></li>
-<li><p>Combine models for ensemble predictions</p></li>
+<li><p>Prophet for interpretable and accurate results</p></li>
+<li><p>Tune hyperparameters for your specific use case</p></li>
+<li><p>Use ensemble methods with different configurations</p></li>
 </ul>
 </li>
 <li><p><strong>Validation</strong></p>
@@ -974,49 +948,6 @@ Prophet is used for traditional time series analysis and Chronos for deep learni
     <span class="p">})</span>
 
     <span class="k">return</span> <span class="n">ensemble</span>
-</pre></div>
-</div>
-</section>
-<section id="hybrid-prophet-chronos">
-<h3>Hybrid Prophet-Chronos<a class="headerlink" href="#hybrid-prophet-chronos" title="Link to this heading">¶</a></h3>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">hybrid_forecast</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">days</span><span class="o">=</span><span class="mi">30</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Combine Prophet (interpretable) with Chronos (accurate)&quot;&quot;&quot;</span>
-
-    <span class="c1"># Prophet for long-term trends</span>
-    <span class="n">prophet_forecast</span> <span class="o">=</span> <span class="n">forecast_prophet</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">days</span><span class="o">=</span><span class="n">days</span><span class="p">)</span>
-
-    <span class="c1"># Chronos for short-term accuracy (last 7 days for context)</span>
-    <span class="kn">from</span><span class="w"> </span><span class="nn">chronos</span><span class="w"> </span><span class="kn">import</span> <span class="n">ChronosPipeline</span>
-    <span class="kn">import</span><span class="w"> </span><span class="nn">torch</span>
-
-    <span class="n">pipeline</span> <span class="o">=</span> <span class="n">ChronosPipeline</span><span class="o">.</span><span class="n">from_pretrained</span><span class="p">(</span>
-        <span class="s2">&quot;amazon/chronos-t5-small&quot;</span><span class="p">,</span>
-        <span class="n">device_map</span><span class="o">=</span><span class="s2">&quot;cpu&quot;</span><span class="p">,</span>
-        <span class="n">torch_dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">bfloat16</span>
-    <span class="p">)</span>
-
-    <span class="n">context</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="n">df</span><span class="p">[</span><span class="s1">&#39;value&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">[</span><span class="o">-</span><span class="mi">168</span><span class="p">:])</span>
-    <span class="n">chronos_forecast</span> <span class="o">=</span> <span class="n">pipeline</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span>
-        <span class="n">context</span><span class="o">=</span><span class="n">context</span><span class="p">,</span>
-        <span class="n">prediction_length</span><span class="o">=</span><span class="mi">24</span><span class="o">*</span><span class="n">days</span><span class="p">,</span>
-        <span class="n">num_samples</span><span class="o">=</span><span class="mi">20</span>
-    <span class="p">)</span>
-    <span class="n">chronos_median</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">median</span><span class="p">(</span><span class="n">chronos_forecast</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">numpy</span><span class="p">(),</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
-
-    <span class="c1"># Weighted combination: more weight on Chronos for near-term</span>
-    <span class="n">hybrid</span> <span class="o">=</span> <span class="n">prophet_forecast</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
-
-    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">chronos_median</span><span class="p">)):</span>
-        <span class="c1"># Decay weight from Chronos as we go further into future</span>
-        <span class="n">chronos_weight</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mf">0.7</span> <span class="o">-</span> <span class="p">(</span><span class="n">i</span> <span class="o">/</span> <span class="p">(</span><span class="mi">24</span><span class="o">*</span><span class="n">days</span><span class="p">))</span> <span class="o">*</span> <span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.2</span><span class="p">)</span>
-        <span class="n">prophet_weight</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">chronos_weight</span>
-
-        <span class="n">hybrid</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="s1">&#39;yhat&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
-            <span class="n">chronos_weight</span> <span class="o">*</span> <span class="n">chronos_median</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">+</span>
-            <span class="n">prophet_weight</span> <span class="o">*</span> <span class="n">hybrid</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="s1">&#39;yhat&#39;</span><span class="p">]</span>
-        <span class="p">)</span>
-
-    <span class="k">return</span> <span class="n">hybrid</span>
 </pre></div>
 </div>
 </section>

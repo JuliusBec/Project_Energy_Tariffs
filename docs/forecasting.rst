@@ -12,7 +12,7 @@ The module contains two main components:
 * **Energy Price Forecast** - Prediction of day-ahead electricity prices
 * **Energy Usage Forecast** - Prediction of household consumption
 
-Both modules use machine learning algorithms and historical data for accurate predictions.
+Both modules use Prophet, a powerful time series forecasting library by Meta, and historical data for accurate predictions.
 
 Energy Price Forecast
 ---------------------
@@ -154,17 +154,19 @@ Energy Usage Forecast
 Description
 ^^^^^^^^^^^^
 
-The Energy Usage Forecaster predicts household electricity consumption.
-Prophet is used for traditional time series analysis and Chronos for deep learning-based predictions.
+The Energy Usage Forecaster predicts household electricity consumption using Facebook Prophet.
+Prophet is particularly well-suited for energy consumption forecasting due to its ability to handle
+multiple seasonality patterns (daily, weekly) and missing data.
 
 Features
 ^^^^^^^^
 
-* Prophet & Chronos models
+* Prophet-based time series forecasting
 * Hourly consumption forecast
 * Weekly aggregation
 * Seasonality detection (daily, weekly)
 * Flexible forecast periods
+* Automatic handling of missing data
 
 Usage
 ^^^^^
@@ -195,35 +197,6 @@ Prophet-based Forecast
    )
    weekly_usage = calculate_total_weekly_usage(forecast_df)
    print(f"Weekly consumption:\n{weekly_usage}")
-
-Chronos Deep Learning Modell
-""""""""""""""""""""""""""""
-
-.. code-block:: python
-
-   from chronos import ChronosPipeline
-   import torch
-   import numpy as np
-   
-   # Chronos Pipeline laden
-   pipeline = ChronosPipeline.from_pretrained(
-       "amazon/chronos-t5-small",
-       device_map="cpu",  # Oder "cuda" für GPU
-       torch_dtype=torch.bfloat16,
-   )
-   
-   # Prepare historical data
-   context = torch.tensor(df['value'].values[-168:])  # Last 7 days
-   
-   # Forecast for 24 hours
-   forecast = pipeline.predict(
-       context=context,
-       prediction_length=24,
-       num_samples=20
-   )
-   
-   # Median forecast
-   median_forecast = np.median(forecast[0].numpy(), axis=0)
 
 Data Format
 ^^^^^^^^^^^
@@ -490,9 +463,9 @@ Best Practices
 
 2. **Model Selection**
    
-   - Prophet for interpretable results
-   - Chronos for highest accuracy
-   - Combine models for ensemble predictions
+   - Prophet for interpretable and accurate results
+   - Tune hyperparameters for your specific use case
+   - Use ensemble methods with different configurations
 
 3. **Validation**
    
@@ -663,50 +636,6 @@ Combine multiple models for better accuracy:
        })
        
        return ensemble
-
-Hybrid Prophet-Chronos
-^^^^^^^^^^^^^^^^^^^^^^
-
-.. code-block:: python
-
-   def hybrid_forecast(df, days=30):
-       """Combine Prophet (interpretable) with Chronos (accurate)"""
-       
-       # Prophet for long-term trends
-       prophet_forecast = forecast_prophet(df, days=days)
-       
-       # Chronos for short-term accuracy (last 7 days for context)
-       from chronos import ChronosPipeline
-       import torch
-       
-       pipeline = ChronosPipeline.from_pretrained(
-           "amazon/chronos-t5-small",
-           device_map="cpu",
-           torch_dtype=torch.bfloat16
-       )
-       
-       context = torch.tensor(df['value'].values[-168:])
-       chronos_forecast = pipeline.predict(
-           context=context,
-           prediction_length=24*days,
-           num_samples=20
-       )
-       chronos_median = np.median(chronos_forecast[0].numpy(), axis=0)
-       
-       # Weighted combination: more weight on Chronos for near-term
-       hybrid = prophet_forecast.copy()
-       
-       for i in range(len(chronos_median)):
-           # Decay weight from Chronos as we go further into future
-           chronos_weight = max(0.7 - (i / (24*days)) * 0.5, 0.2)
-           prophet_weight = 1 - chronos_weight
-           
-           hybrid.iloc[i]['yhat'] = (
-               chronos_weight * chronos_median[i] +
-               prophet_weight * hybrid.iloc[i]['yhat']
-           )
-       
-       return hybrid
 
 Feature Engineering
 -------------------

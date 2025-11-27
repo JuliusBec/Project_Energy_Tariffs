@@ -19,7 +19,7 @@ Features
 --------
 
 * Real-time energy price tracking
-* Advanced forecasting models (Prophet & Chronos)
+* Advanced forecasting models (Prophet)
 * Risk assessment for different tariff structures
 * Interactive web interface
 * Automated web scraping for multiple energy providers
@@ -61,8 +61,8 @@ Forecasting & Predictions
 Machine learning models for price and usage predictions.
 
 :doc:`forecasting`
-   Prophet and Chronos models for energy price and consumption forecasting.
-   Includes SMARD integration and time series analysis.
+   Prophet models for energy price and consumption forecasting.
+   Includes SMARD integration, time series analysis, and ensemble methods.
 
 Quick Start
 -----------
