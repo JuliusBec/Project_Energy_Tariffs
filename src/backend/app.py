@@ -296,9 +296,9 @@ async def calculate_yearly_usage(
 # =============================================================================
 
 class TariffComparisonRequest(BaseModel):
-    """Request for tariff comparison with CSV and PLZ"""
-    zip_code: str  # Postleitzahl (5-stellig)
-    providers: List[str] = ["tibber", "enbw"]  # Anbieter zum Vergleich
+    """Request for tariff comparison with CSV and postal code"""
+    zip_code: str  # Postal code (5 digits)
+    providers: List[str] = ["tibber", "enbw"]  # Providers to compare
 
 @app.post("/api/compare-tariffs-with-csv")
 async def compare_tariffs_with_csv(
@@ -307,24 +307,24 @@ async def compare_tariffs_with_csv(
     providers: str = Form("tibber,enbw")  # Comma-separated
 ):
     """
-    Tarifvergleich mit hochgeladenen Verbrauchsdaten (CSV) und PLZ-spezifischen Preisen
+    Compare tariffs with uploaded consumption data (CSV) and postal-code-specific prices.
     
-    **Dieser Endpunkt kombiniert:**
-    - Hochgeladene CSV-Verbrauchsdaten (echte Smart-Meter Daten)
-    - PLZ-spezifische Preise von verschiedenen Anbietern (gescrapt)
-    - Prophet-Forecast für zukünftige Börsenstrompreise
+    This endpoint combines:
+    - Uploaded CSV consumption data (real smart meter data)
+    - Postal-code-specific prices from various providers (scraped)
+    - Prophet forecast for future exchange electricity prices
     
-    **Parameter:**
-    - file: CSV-Datei mit Verbrauchsdaten (Spalten: datetime, value)
-    - zip_code: Deutsche Postleitzahl (5 Stellen, z.B. "68167")
-    - providers: Komma-separierte Liste von Anbietern (z.B. "tibber,enbw")
+    Args:
+        file: CSV file with consumption data (columns: datetime, value)
+        zip_code: German postal code (5 digits, e.g., "68167")
+        providers: Comma-separated list of providers (e.g., "tibber,enbw")
     
-    **Rückgabe:**
-    - Tarifvergleich mit realistischen, PLZ-spezifischen Preisen
-    - Basierend auf ECHTEN Verbrauchsdaten aus CSV
+    Returns:
+        Tariff comparison with realistic, postal-code-specific prices
+        based on ACTUAL consumption data from CSV
     """
     try:
-        # 1. CSV-Datei validieren und einlesen
+        # 1. Validate and read CSV file
         if not file.filename.endswith('.csv'):
             raise HTTPException(status_code=400, detail="File must be a CSV")
         
@@ -332,26 +332,26 @@ async def compare_tariffs_with_csv(
         df = pd.read_csv(io.StringIO(contents.decode('utf-8')))
         
         print(f"\n{'='*80}")
-        print(f"📊 CSV-DATEI ANALYSE")
+        print(f"📊 CSV FILE ANALYSIS")
         print(f"{'='*80}")
-        print(f"Datei: {file.filename}")
-        print(f"Spalten: {list(df.columns)}")
-        print(f"Zeilen: {len(df)}")
-        print(f"Erste 3 Zeilen:")
+        print(f"File: {file.filename}")
+        print(f"Columns: {list(df.columns)}")
+        print(f"Rows: {len(df)}")
+        print(f"First 3 rows:")
         print(df.head(3))
         
-        # Flexible Spaltenerkennung
+        # Flexible column recognition
         time_col = None
         value_col = None
         
-        # Suche Zeitstempel-Spalte
+        # Search for timestamp column
         for col in df.columns:
             col_lower = col.lower()
             if any(keyword in col_lower for keyword in ['time', 'date', 'zeit', 'datum', 'timestamp']):
                 time_col = col
                 break
         
-        # Suche Verbrauchs-Spalte
+        # Search for consumption column
         for col in df.columns:
             col_lower = col.lower()
             if any(keyword in col_lower for keyword in ['value', 'consumption', 'verbrauch', 'kwh', 'wh', 'leistung']):
@@ -361,27 +361,27 @@ async def compare_tariffs_with_csv(
         if not time_col or not value_col:
             raise HTTPException(
                 status_code=400,
-                detail=f"CSV-Spalten nicht erkannt. Gefunden: {list(df.columns)}. Erwartet: Zeitstempel + Verbrauchswert"
+                detail=f"CSV columns not recognized. Found: {list(df.columns)}. Expected: timestamp + consumption value"
             )
         
-        print(f"✓ Erkannte Zeitstempel-Spalte: '{time_col}'")
-        print(f"✓ Erkannte Verbrauchs-Spalte: '{value_col}'")
+        print(f"✓ Detected timestamp column: '{time_col}'")
+        print(f"✓ Detected consumption column: '{value_col}'")
         
-        # Normalisiere Spaltennamen
+        # Normalize column names
         df['datetime'] = pd.to_datetime(df[time_col])
         df['value'] = pd.to_numeric(df[value_col], errors='coerce')
         
-        # Entferne NaN-Werte
+        # Remove NaN values
         original_len = len(df)
         df = df.dropna(subset=['datetime', 'value'])
         if len(df) < original_len:
-            print(f"⚠️  {original_len - len(df)} Zeilen mit ungültigen Werten entfernt")
+            print(f"⚠️  {original_len - len(df)} rows with invalid values removed")
         
         if len(df) == 0:
-            raise HTTPException(status_code=400, detail="Keine gültigen Daten in CSV gefunden")
+            raise HTTPException(status_code=400, detail="No valid data found in CSV")
         
-        # 2. Jahresverbrauch aus CSV berechnen
-        # Erkenne automatisch das Intervall
+        # 2. Calculate annual consumption from CSV
+        # Automatically detect interval
         if len(df) > 1:
             time_diff_seconds = (df['datetime'].iloc[1] - df['datetime'].iloc[0]).total_seconds()
             if time_diff_seconds <= 900:  # 15 Minuten
@@ -402,23 +402,23 @@ async def compare_tariffs_with_csv(
             annual_kwh = total_consumption
         
         print(f"\n{'='*80}")
-        print(f"📊 CSV-VERBRAUCHSDATEN ANALYSE")
+        print(f"📊 CSV CONSUMPTION DATA ANALYSIS")
         print(f"{'='*80}")
-        print(f"Datei: {file.filename}")
-        print(f"PLZ: {zip_code}")
-        print(f"Zeitraum: {df['datetime'].min()} bis {df['datetime'].max()}")
-        print(f"Daten: {len(df)} Einträge ({date_range_years:.2f} Jahre)")
-        print(f"Jahresverbrauch: {annual_kwh:.2f} kWh")
+        print(f"File: {file.filename}")
+        print(f"Postal code: {zip_code}")
+        print(f"Time period: {df['datetime'].min()} to {df['datetime'].max()}")
+        print(f"Data: {len(df)} entries ({date_range_years:.2f} years)")
+        print(f"Annual consumption: {annual_kwh:.2f} kWh")
         print(f"{'='*80}\n")
         
-        # 3. Anbieter scrapen und Tarife erstellen
+        # 3. Scrape providers and create tariffs
         provider_list = [p.strip() for p in providers.split(",")]
         tariffs = []
         start_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
         
         for provider in provider_list:
             try:
-                print(f"\n🔍 Scrape {provider.upper()} für PLZ {zip_code}...")
+                print(f"\n🔍 Scraping {provider.upper()} for postal code {zip_code}...")
                 
                 if provider.lower() == "tibber":
                     from ..webscraping.scraper_tibber import scrape_tibber_price
@@ -438,8 +438,8 @@ async def compare_tariffs_with_csv(
                         features=["dynamic", "green", "app", "real-time-pricing", "smart-meter-required"]
                     )
                     tariffs.append(('Tibber', tariff, scraped_data))
-                    print(f"   ✓ Grundpreis: {scraped_data['base_price_monthly']:.2f} €/Mon")
-                    print(f"   ✓ Zusatz-Komponenten: {scraped_data['additional_price_ct_kwh']:.2f} ct/kWh")
+                    print(f"   ✓ Base price: {scraped_data['base_price_monthly']:.2f} €/month")
+                    print(f"   ✓ Additional components: {scraped_data['additional_price_ct_kwh']:.2f} ct/kWh")
                     
                 elif provider.lower() == "enbw":
                     from ..webscraping.scraper_enbw import scrape_enbw_tariff
@@ -459,24 +459,24 @@ async def compare_tariffs_with_csv(
                         features=["dynamic", "green", "app", "real-time-pricing", "smart-meter-required"]
                     )
                     tariffs.append(('EnBW', tariff, scraped_data))
-                    print(f"   ✓ Grundpreis: {scraped_data['base_price_monthly']:.2f} €/Mon")
-                    print(f"   ✓ Zusatz-Komponenten: {scraped_data['markup_ct_kwh']:.2f} ct/kWh")
+                    print(f"   ✓ Base price: {scraped_data['base_price_monthly']:.2f} €/month")
+                    print(f"   ✓ Additional components: {scraped_data['markup_ct_kwh']:.2f} ct/kWh")
                 
             except Exception as e:
-                print(f"   ❌ Fehler beim Scrapen von {provider}: {e}")
+                print(f"   ❌ Error scraping {provider}: {e}")
                 import traceback
                 traceback.print_exc()
                 continue
         
-        # 4. Kosten für jeden Tarif mit ECHTEN CSV-Daten berechnen
+        # 4. Calculate costs for each tariff with ACTUAL CSV data
         results = []
         
-        # 4a. Berechne Kosten für gescrapte dynamische Tarife
+        # 4a. Calculate costs for scraped dynamic tariffs
         for provider_name, tariff, scraped_data in tariffs:
             try:
-                print(f"\n💰 Berechne Kosten für {provider_name} mit CSV-Daten...")
+                print(f"\n💰 Calculating costs for {provider_name} with CSV data...")
                 
-                # Verwende die ECHTEN Verbrauchsdaten aus der CSV!
+                # Use the ACTUAL consumption data from the CSV!
                 result = tariff.calculate_cost_with_breakdown(df)
                 
                 results.append({
@@ -492,31 +492,31 @@ async def compare_tariffs_with_csv(
                     "tariff_type": "dynamic"
                 })
                 
-                print(f"   ✓ Durchschnitt: {result['avg_kwh_price']*100:.2f} ct/kWh")
-                print(f"   ✓ Monatliche Kosten: {result['total_cost']:.2f} €")
+                print(f"   ✓ Average: {result['avg_kwh_price']*100:.2f} ct/kWh")
+                print(f"   ✓ Monthly cost: {result['total_cost']:.2f} €")
                 
             except Exception as e:
-                print(f"   ❌ Fehler bei Berechnung für {provider_name}: {e}")
+                print(f"   ❌ Error calculating for {provider_name}: {e}")
                 import traceback
                 traceback.print_exc()
                 continue
         
-        # 4b. Füge konventionelle Fixpreis-Tarife hinzu
-        print(f"\n💰 Berechne Kosten für konventionelle Fixpreis-Tarife...")
+        # 4b. Add conventional fixed-rate tariffs
+        print(f"\n💰 Calculating costs for conventional fixed-rate tariffs...")
         conventional_tariffs = create_enbw_tariffs()
         
         for conv_tariff in conventional_tariffs:
             try:
-                print(f"\n   Berechne {conv_tariff.name}...")
+                print(f"\n   Calculating {conv_tariff.name}...")
                 
-                # Berechne Kosten mit CSV-Daten
+                # Calculate costs with CSV data
                 monthly_cost = conv_tariff.calculate_cost(df)
                 
                 results.append({
                     "provider": conv_tariff.provider,
                     "tariff_name": conv_tariff.name,
                     "base_price_monthly": conv_tariff.base_price,
-                    "additional_price_ct_kwh": None,  # Fixpreis hat kein Markup
+                    "additional_price_ct_kwh": None,  # Fixed price has no markup
                     "avg_kwh_price_ct": conv_tariff.kwh_rate * 100,
                     "monthly_cost": monthly_cost,
                     "annual_cost": monthly_cost * 12,
@@ -525,19 +525,19 @@ async def compare_tariffs_with_csv(
                     "tariff_type": "fixed"
                 })
                 
-                print(f"   ✓ Fixpreis: {conv_tariff.kwh_rate*100:.2f} ct/kWh")
-                print(f"   ✓ Monatliche Kosten: {monthly_cost:.2f} €")
+                print(f"   ✓ Fixed price: {conv_tariff.kwh_rate*100:.2f} ct/kWh")
+                print(f"   ✓ Monthly cost: {monthly_cost:.2f} €")
                 
             except Exception as e:
-                print(f"   ❌ Fehler bei Berechnung für {conv_tariff.name}: {e}")
+                print(f"   ❌ Error calculating for {conv_tariff.name}: {e}")
                 import traceback
                 traceback.print_exc()
                 continue
         
-        # 5. Sortiere nach Kosten
+        # 5. Sort by cost
         results.sort(key=lambda x: x['monthly_cost'])
         
-        # 6. Berechne Ersparnis
+        # 6. Calculate savings
         if len(results) > 1:
             cheapest = results[0]['monthly_cost']
             for r in results[1:]:
@@ -545,7 +545,7 @@ async def compare_tariffs_with_csv(
                 r['savings_annual'] = r['savings_monthly'] * 12
         
         print(f"\n{'='*80}")
-        print(f"✅ VERGLEICH ABGESCHLOSSEN")
+        print(f"✅ COMPARISON COMPLETE")
         print(f"{'='*80}\n")
         
         return {
@@ -564,7 +564,7 @@ async def compare_tariffs_with_csv(
         }
         
     except Exception as e:
-        print(f"❌ Fehler: {e}")
+        print(f"❌ Error: {e}")
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
@@ -1525,23 +1525,23 @@ def create_dynamic_tariff_from_scraper(scraper_data: dict, provider: str) -> Dyn
     network_fee = 0
     
     if provider.lower() == "tibber":
-        # Tibber: additional_price_ct enthält Netzentgelte, Steuern, Umlagen (~18.4 ct/kWh)
+        # Tibber: additional_price_ct contains network fees, taxes, levies (~18.4 ct/kWh)
         additional_price_ct_kwh = scraper_data.get("additional_price_ct", 18.4)
-        network_fee = 0  # Bei Tibber in base_price enthalten
+        network_fee = 0  # Included in base_price for Tibber
         
     elif provider.lower() == "enbw":
-        # EnBW: markup_ct_kwh enthält die festen Komponenten (Netzentgelte + Steuern + Umlagen)
-        # Diese werden direkt als ct/kWh berechnet, NICHT als einmalige network_fee!
+        # EnBW: markup_ct_kwh contains fixed components (network fees + taxes + levies)
+        # These are calculated directly as ct/kWh, NOT as a one-time network_fee!
         additional_price_ct_kwh = scraper_data.get("markup_ct_kwh", 18.4)
-        network_fee = 0  # EnBW hat keine einmalige Netzgebühr, alles ist im markup_ct_kwh
+        network_fee = 0  # EnBW has no one-time network fee, everything is in markup_ct_kwhh
         
     elif provider.lower() == "tado":
-        # Tado: Monatliche Netzgebühr umrechnen in ct/kWh
+        # Tado: Convert monthly network fee to ct/kWh
         annual_consumption = scraper_data.get("annual_consumption", 2500)
         network_fee_monthly = scraper_data.get("network_fee_monthly", 51.85)
-        # (51.85€/Monat * 12) / annual_consumption * 100 = ct/kWh
+        # (51.85€/month * 12) / annual_consumption * 100 = ct/kWh
         additional_price_ct_kwh = (network_fee_monthly * 12 / annual_consumption * 100) if annual_consumption > 0 else 18.4
-        network_fee = 0  # Bei Tado monatlich, nicht einmalig
+        network_fee = 0  # For Tado it's monthly, not one-time
     
     # Fallback auf default, falls nicht gesetzt
     if additional_price_ct_kwh is None:
@@ -1604,16 +1604,16 @@ def scraper_to_tariff(scraper_data: dict, provider: str, tariff_type: str = "dyn
     
     # Provider-specific data mapping
     if provider == "EnBW":
-        # EnBW: markup_ct_kwh enthält Netznutzung, Steuern, Umlagen
+        # EnBW: markup_ct_kwh contains network usage, taxes, levies
         tariff_dict.update({
             "base_price": scraper_data.get("base_price_monthly", 0),
-            "kwh_rate": scraper_data.get("exchange_price_ct_kwh", 0) / 100 if scraper_data.get("exchange_price_ct_kwh") else 0,  # Börsenpreis
-            "network_fee": 0,  # Bei EnBW nicht separat
-            "additional_price_ct_kwh": scraper_data.get("markup_ct_kwh", 15.36),  # Netzentgelte, Steuern, Umlagen in ct/kWh
+            "kwh_rate": scraper_data.get("exchange_price_ct_kwh", 0) / 100 if scraper_data.get("exchange_price_ct_kwh") else 0,  # Exchange price
+            "network_fee": 0,  # Not separate for EnBW
+            "additional_price_ct_kwh": scraper_data.get("markup_ct_kwh", 15.36),  # Network fees, taxes, levies in ct/kWh
             "min_duration": None
         })
     elif provider == "EnBW Strom":
-        # EnBW Strom: Festpreis-Tarif
+        # EnBW Strom: Fixed-rate tariff
         # Build features list for fixed-rate tariff
         fixed_features = ["fixed"]
         if scraper_data.get("renewable_energy"):
@@ -1621,30 +1621,30 @@ def scraper_to_tariff(scraper_data: dict, provider: str, tariff_type: str = "dyn
         
         tariff_dict.update({
             "base_price": scraper_data.get("base_price_monthly", 0),
-            "kwh_rate": scraper_data.get("work_price_ct_per_kwh", 0) / 100,  # Arbeitspreis in €/kWh
-            "network_fee": 0,  # Im Arbeitspreis enthalten
-            "additional_price_ct_kwh": 0,  # Kein Markup bei Festpreis
+            "kwh_rate": scraper_data.get("work_price_ct_per_kwh", 0) / 100,  # Work price in €/kWh
+            "network_fee": 0,  # Included in work price
+            "additional_price_ct_kwh": 0,  # No markup for fixed price
             "min_duration": scraper_data.get("contract_duration_months", 12),
             "features": fixed_features
         })
-        tariff_dict["is_dynamic"] = False  # Festpreis-Tarif
+        tariff_dict["is_dynamic"] = False  # Fixed-rate tariffff
     elif provider == "Tado":
-        # Tado: markup_ct_kwh enthält nur Netzentgelte/Steuern (ohne aktuellen Börsenpreis)
-        # Der Scraper berechnet: kwh_price_ct (gesamt) - tatsächlicher Börsenpreis = markup_ct_kwh
+        # Tado: markup_ct_kwh contains only network fees/taxes (without current exchange price)
+        # The scraper calculates: kwh_price_ct (total) - actual exchange price = markup_ct_kwh
         tariff_dict.update({
             "base_price": scraper_data.get("base_price_monthly", 0),
-            "kwh_rate": 0,  # Forecast-Preis wird später verwendet
-            "network_fee": 0,  # Bei Tado im markup_ct_kwh enthalten
-            "additional_price_ct_kwh": scraper_data.get("markup_ct_kwh", 18.0),  # Nur Markup (Netz + Steuern, ohne Börse)
+            "kwh_rate": 0,  # Forecast price will be used later
+            "network_fee": 0,  # Included in markup_ct_kwh for Tado
+            "additional_price_ct_kwh": scraper_data.get("markup_ct_kwh", 18.0),  # Only markup (network + taxes, without exchange)
             "min_duration": None
         })
     elif provider == "Tibber":
-        # Tibber: additional_price_ct_kwh enthält alle Zusatzkosten (18,25 ct/kWh)
+        # Tibber: additional_price_ct_kwh contains all additional costs (18.25 ct/kWh)
         tariff_dict.update({
-            "base_price": scraper_data.get("base_price_monthly", 0),  # Grundpreis
-            "kwh_rate": 0,  # Forecast-Preis wird später verwendet
-            "network_fee": 0,  # Bei Tibber in additional_price_ct_kwh enthalten
-            "additional_price_ct_kwh": scraper_data.get("additional_price_ct_kwh", 18.25),  # Netzentgelte + Steuern + Umlagen
+            "base_price": scraper_data.get("base_price_monthly", 0),  # Base price
+            "kwh_rate": 0,  # Forecast price will be used later
+            "network_fee": 0,  # Included in additional_price_ct_kwh for Tibber
+            "additional_price_ct_kwh": scraper_data.get("additional_price_ct_kwh", 18.25),  # Network fees + taxes + levies
             "min_duration": None
         })
     
@@ -1725,21 +1725,21 @@ async def scrape_enbw_tariff(request: EnbwScraperRequest):
                 source_url=result.get('url', 'https://www.enbw.com/strom/dynamischer-stromtarif')
             )
             
-            logger.info(f"✅ EnBW Scraping erfolgreich: {response.base_price_monthly} €/Mon, {response.markup_ct_kwh} ct/kWh (Quelle: {result.get('data_source')})")
+            logger.info(f"✅ EnBW scraping successful: {response.base_price_monthly} €/month, {response.markup_ct_kwh} ct/kWh (Source: {result.get('data_source')})")
             
             return response
         else:
             # Scraping failed
             raise HTTPException(
                 status_code=500,
-                detail="Scraping fehlgeschlagen - keine Daten erhalten"
+                detail="Scraping failed - no data received"
             )
             
     except ImportError as e:
         print(f"❌ Import Error: {e}")
         raise HTTPException(
             status_code=503,
-            detail=f"EnBW Scraper nicht verfügbar: {str(e)}"
+            detail=f"EnBW scraper not available: {str(e)}"
         )
     except Exception as e:
         print(f"❌ Scraping Error: {e}")
@@ -1832,21 +1832,21 @@ async def scrape_tado_tariff(request: TadoScraperRequest):
                 note=f"Quelle: {result.get('data_source')}"
             )
             
-            logger.info(f"✅ Tado scraping erfolgreich: {response.base_price_monthly} €/Mon, {response.kwh_price_ct} ct/kWh (Quelle: {result.get('data_source')})")
+            logger.info(f"✅ Tado scraping successful: {response.base_price_monthly} €/month, {response.kwh_price_ct} ct/kWh (Source: {result.get('data_source')})")
             
             return response
         else:
             # Failed
             raise HTTPException(
                 status_code=500,
-                detail="Scraping fehlgeschlagen - keine Daten erhalten"
+                detail="Scraping failed - no data received"
             )
             
     except ImportError as e:
         print(f"❌ Import Error: {e}")
         raise HTTPException(
             status_code=503,
-            detail=f"Tado Scraper nicht verfügbar: {str(e)}"
+            detail=f"Tado scraper not available: {str(e)}"
         )
     except Exception as e:
         print(f"❌ Error: {e}")
@@ -1871,53 +1871,53 @@ async def scrape_tado_tariff(request: TadoScraperRequest):
 # =============================================================================
 
 class TibberScraperRequest(BaseModel):
-    """Request-Modell für Tibber Scraper"""
-    zip_code: str = Field(..., description="Deutsche Postleitzahl")
-    annual_consumption: int = Field(..., description="Jahresverbrauch in kWh", gt=0)
-    headless: bool = Field(default=True, description="Browser im Headless-Modus")
-    debug_mode: bool = Field(default=False, description="Debug-Ausgaben aktivieren")
+    """Request model for Tibber scraper"""
+    zip_code: str = Field(..., description="German postal code")
+    annual_consumption: int = Field(..., description="Annual consumption in kWh", gt=0)
+    headless: bool = Field(default=True, description="Run browser in headless mode")
+    debug_mode: bool = Field(default=False, description="Enable debug output")
 
 
 class TibberScraperResponse(BaseModel):
-    """Response-Modell für Tibber Scraper"""
+    """Response model for Tibber scraper"""
     success: bool
-    kwh_price_ct: float = Field(..., description="Arbeitspreis in ct/kWh")
-    exchange_price_ct: float = Field(..., description="Börsenstrompreis in ct/kWh")
-    additional_price_ct: float = Field(..., description="Weitere Preisbestandteile (Steuern, Abgaben) in ct/kWh")
-    average_price_12m_ct: float = Field(..., description="Durchschnittspreis letzte 12 Monate in ct/kWh")
-    network_fees_monthly: float = Field(..., description="Netznutzungs- und Messstellengebühren pro Monat in €")
-    tibber_fee_monthly: float = Field(..., description="Tibber-Gebühr pro Monat in €")
-    total_base_monthly: float = Field(..., description="Summe Grundpreis pro Monat in €")
-    monthly_cost_example: float = Field(..., description="Beispiel-Monatskosten von Webseite in €")
-    calculated_monthly_cost: float = Field(..., description="Berechnete Monatskosten in €")
-    calculated_annual_cost: float = Field(..., description="Berechnete Jahreskosten in €")
+    kwh_price_ct: float = Field(..., description="Work price in ct/kWh")
+    exchange_price_ct: float = Field(..., description="Exchange electricity price in ct/kWh")
+    additional_price_ct: float = Field(..., description="Additional price components (taxes, levies) in ct/kWh")
+    average_price_12m_ct: float = Field(..., description="Average price last 12 months in ct/kWh")
+    network_fees_monthly: float = Field(..., description="Network usage and metering fees per month in €")
+    tibber_fee_monthly: float = Field(..., description="Tibber fee per month in €")
+    total_base_monthly: float = Field(..., description="Total base price per month in €")
+    monthly_cost_example: float = Field(..., description="Example monthly cost from website in €")
+    calculated_monthly_cost: float = Field(..., description="Calculated monthly cost in €")
+    calculated_annual_cost: float = Field(..., description="Calculated annual cost in €")
     timestamp: str
-    note: Optional[str] = Field(default=None, description="Hinweis bei Fallback-Daten")
+    note: Optional[str] = Field(default=None, description="Note for fallback data")
 
 
 @app.post(
     "/api/scrape/tibber",
     response_model=TibberScraperResponse,
     tags=["scraper"],
-    summary="Tibber Energiepreise scrapen",
-    description="Extrahiert aktuelle Preisdaten von Tibber für eine PLZ und Jahresverbrauch"
+    summary="Scrape Tibber energy prices",
+    description="Extracts current price data from Tibber for a postal code and annual consumption"
 )
 async def scrape_tibber_tariff(request: TibberScraperRequest):
     """
-    Scraped Tibber Energiepreise
+    Scrapes current pricing data from Tibber for a given postal code and annual consumption.
     
-    **Parameter:**
-    - zip_code: Deutsche Postleitzahl (5 Stellen)
-    - annual_consumption: Jahresverbrauch in kWh
-    - headless: Browser ohne GUI (Standard: True)
-    - debug_mode: Erweiterte Logs (Standard: False)
+    Args:
+        - zip_code: German postal code (5 digits)
+        - annual_consumption: Annual consumption in kWh
+        - headless: Run browser without GUI (default: True)
+        - debug_mode: Extended logs (default: False)
     
-    **Rückgabe:**
-    - Preisdaten inkl. Arbeitspreis, Börsenstrompreis, Grundpreise
-    - Berechnete Monats- und Jahreskosten
-    - Bei Scraping-Fehler: Realistische Fallback-Beispieldaten
+    Returns:
+    - Price data including work price, exchange price, base prices
+    - Calculated monthly and annual costs
+    - On scraping error: Realistic fallback example data
     
-    **Beispiel:**
+    Example:
     ```
     curl -X POST "http://localhost:8000/api/scrape/tibber" \\
          -H "Content-Type: application/json" \\
@@ -1930,7 +1930,7 @@ async def scrape_tibber_tariff(request: TibberScraperRequest):
     ```
     """
     try:
-        logger.info(f"📞 Tibber-Scraper API-Request: PLZ {request.zip_code}, {request.annual_consumption} kWh/Jahr")
+        logger.info(f"Tibber-Scraper API-Request: PLZ {request.zip_code}, {request.annual_consumption} kWh/Jahr")
         
         # Import Scraper function
         from ..webscraping.scraper_tibber import scrape_tibber_price
@@ -1970,14 +1970,14 @@ async def scrape_tibber_tariff(request: TibberScraperRequest):
             note=f"Datenquelle: {result['source']}"
         )
         
-        logger.info(f"✅ Tibber-Scraper erfolgreich: {response.calculated_monthly_cost:.2f} €/Monat")
+        logger.info(f"Tibber scraper successful: {response.calculated_monthly_cost:.2f} €/month")
         return response
         
     except Exception as e:
-        logger.error(f"❌ Fehler beim Tibber-Scraping: {e}")
+        logger.error(f"Error during Tibber scraping: {e}")
         raise HTTPException(
             status_code=500,
-            detail=f"Tibber-Scraping fehlgeschlagen: {str(e)}"
+            detail=f"Tibber scraping failed: {str(e)}"
         )
 
 
@@ -2053,7 +2053,7 @@ async def scrape_all_tariffs(
     consumption_df = None
     if file and file.filename:
         try:
-            logger.info(f"📊 Processing CSV file for risk analysis: {file.filename}")
+            logger.info(f"Processing CSV file for risk analysis: {file.filename}")
             contents = await file.read()
             consumption_df = pd.read_csv(io.StringIO(contents.decode('utf-8')))
             
@@ -2063,9 +2063,9 @@ async def scrape_all_tariffs(
                 consumption_df = None
             else:
                 consumption_df['datetime'] = pd.to_datetime(consumption_df['datetime'])
-                logger.info(f"✅ CSV loaded: {len(consumption_df)} rows")
+                logger.info(f"CSV loaded: {len(consumption_df)} rows")
         except Exception as e:
-            logger.error(f"❌ Error parsing CSV: {e}")
+            logger.error(f"Error parsing CSV: {e}")
             consumption_df = None
     
     for provider in providers_list:
@@ -2079,7 +2079,7 @@ async def scrape_all_tariffs(
                 if result and result.get('base_price_monthly') is not None:
                     tariff_data = scraper_to_tariff(result, "EnBW", "dynamic")
                     tariffs.append(tariff_data)
-                    logger.info(f"✅ EnBW: {result.get('base_price_monthly')} €/Mon, {result.get('markup_ct_kwh')} ct/kWh")
+                    logger.info(f"EnBW: {result.get('base_price_monthly')} €/Mon, {result.get('markup_ct_kwh')} ct/kWh")
                 else:
                     errors.append({"provider": "EnBW", "error": "No data returned"})
                     
@@ -2089,13 +2089,13 @@ async def scrape_all_tariffs(
                     postal_code=zip_code,
                     annual_consumption_kwh=int(annual_consumption)
                 )
-                # EnBW Strom gibt eine Liste von Tarifen zurück (normalerweise 3)
+                # EnBW Strom returns a list of tariffs (typically 3)
                 if results and len(results) > 0:
                     for result in results:
                         if result.get('base_price_monthly') is not None:
                             tariff_data = scraper_to_tariff(result, "EnBW Strom", "fixed")
                             tariffs.append(tariff_data)
-                    logger.info(f"✅ EnBW Strom: {len(results)} Tarife hinzugefügt")
+                    logger.info(f"EnBW Strom: {len(results)} tariffs added")
                 else:
                     errors.append({"provider": "EnBW Strom", "error": "No data returned"})
                     
@@ -2108,7 +2108,7 @@ async def scrape_all_tariffs(
                 if result and result.get('base_price_monthly') is not None:
                     tariff_data = scraper_to_tariff(result, "Tado", "dynamic")
                     tariffs.append(tariff_data)
-                    logger.info(f"✅ Tado: {result.get('base_price_monthly')} €/Mon, {result.get('markup_ct_kwh')} ct/kWh markup (gesamt: {result.get('kwh_price_ct')} ct/kWh)")
+                    logger.info(f"Tado: {result.get('base_price_monthly')} €/Mon, {result.get('markup_ct_kwh')} ct/kWh markup (gesamt: {result.get('kwh_price_ct')} ct/kWh)")
                 else:
                     errors.append({"provider": "Tado", "error": "No data returned"})
                     
@@ -2121,16 +2121,16 @@ async def scrape_all_tariffs(
                 if result and result.get('base_price_monthly') is not None:
                     tariff_data = scraper_to_tariff(result, "Tibber", "dynamic")
                     tariffs.append(tariff_data)
-                    logger.info(f"✅ Tibber: {result.get('base_price_monthly')} €/Mon, {result.get('additional_price_ct_kwh')} ct/kWh")
+                    logger.info(f"Tibber: {result.get('base_price_monthly')} €/Mon, {result.get('additional_price_ct_kwh')} ct/kWh")
                 else:
                     errors.append({"provider": "Tibber", "error": "No data returned"})
                     
         except Exception as e:
-            logger.error(f"❌ Error scraping {provider}: {e}")
+            logger.error(f"Error scraping {provider}: {e}")
             errors.append({"provider": provider, "error": str(e)})
     
-    # ENTFERNT: Hardcodierte ENBW_TARIFFS werden nicht mehr automatisch hinzugefügt
-    # Diese Tarife sind veraltet und sollten durch echte gescrapte Tarife ersetzt werden
+    # REMOVED: Hardcoded ENBW_TARIFFS are no longer automatically added
+    # These tariffs are outdated and should be replaced by actual scraped tariffs
     # logger.info(f"Adding {len(ENBW_TARIFFS)} conventional fixed-rate tariffs")
     # for conv_tariff in ENBW_TARIFFS:
     #     tariff_data = {
@@ -2148,7 +2148,7 @@ async def scrape_all_tariffs(
     
     # Calculate risk scores per tariff if CSV data is available
     if consumption_df is not None:
-        logger.info(f"🛡️ Calculating risk scores for {len(tariffs)} tariffs...")
+        logger.info(f"Calculating risk scores for {len(tariffs)} tariffs...")
         try:
             from .risk_analysis import (
                 create_historic_risk_analysis,
@@ -2177,19 +2177,19 @@ async def scrape_all_tariffs(
             try:
                 backtest_data = create_backtest(consumption_df)
                 usage_forecast_quality = backtest_data.get('metrics', {})
-                logger.info(f"✅ Backtest metrics calculated: CI width={usage_forecast_quality.get('relative_confidence_interval_width', 'N/A')}%")
+                logger.info(f"Backtest metrics calculated: CI width={usage_forecast_quality.get('relative_confidence_interval_width', 'N/A')}%")
             except Exception as e:
                 # If backtest fails (e.g., not enough data), continue without forecast quality
-                logger.warning(f"⚠️  Could not calculate backtest metrics: {str(e)}")
+                logger.warning(f"Could not calculate backtest metrics: {str(e)}")
             
             # Calculate price forecast volatility
             from .risk_analysis import get_price_forecast_volatility
             forecast_price_volatility = {}
             try:
                 forecast_price_volatility = get_price_forecast_volatility(app_data_dir=app_data_dir)
-                logger.info(f"✅ Price forecast volatility calculated: σ={forecast_price_volatility.get('forecast_std_dev', 'N/A')} €/kWh")
+                logger.info(f"Price forecast volatility calculated: σ={forecast_price_volatility.get('forecast_std_dev', 'N/A')} €/kWh")
             except Exception as e:
-                logger.warning(f"⚠️  Could not calculate price forecast volatility: {str(e)}")
+                logger.warning(f"Could not calculate price forecast volatility: {str(e)}")
             
             # Calculate risk score TWICE: once for dynamic tariffs, once for fixed tariffs
             # This avoids redundant calculations since metrics are the same for all dynamic/fixed tariffs
@@ -2200,7 +2200,7 @@ async def scrape_all_tariffs(
                 is_dynamic=True,
                 usage_forecast_quality=usage_forecast_quality
             )
-            logger.info(f"  📊 Dynamic tariff risk: {risk_assessment_dynamic['risk_level']} (score: {risk_assessment_dynamic['risk_score']})")
+            logger.info(f"  Dynamic tariff risk: {risk_assessment_dynamic['risk_level']} (score: {risk_assessment_dynamic['risk_score']})")
             
             risk_assessment_fixed = get_aggregated_risk_score(
                 historic_risk,
@@ -2209,7 +2209,7 @@ async def scrape_all_tariffs(
                 is_dynamic=False,
                 usage_forecast_quality=usage_forecast_quality
             )
-            logger.info(f"  📊 Fixed tariff risk: {risk_assessment_fixed['risk_level']} (score: {risk_assessment_fixed['risk_score']})")
+            logger.info(f"  Fixed tariff risk: {risk_assessment_fixed['risk_level']} (score: {risk_assessment_fixed['risk_score']})")
             
             # Apply the appropriate risk assessment to each tariff based on its type
             for tariff in tariffs:
@@ -2223,20 +2223,20 @@ async def scrape_all_tariffs(
                     tariff['risk_message'] = risk_assessment['risk_message']
                     tariff['risk_factors'] = risk_assessment.get('risk_factors', [])
                     
-                    logger.info(f"  ✅ {tariff['name']}: {risk_assessment['risk_level']} (score: {risk_assessment['risk_score']})")
+                    logger.info(f"  {tariff['name']}: {risk_assessment['risk_level']} (score: {risk_assessment['risk_score']})")
                     
                 except Exception as e:
-                    logger.error(f"  ❌ Error applying risk data for {tariff.get('name', 'unknown')}: {e}")
+                    logger.error(f"  Error applying risk data for {tariff.get('name', 'unknown')}: {e}")
                     # Set default risk values on error
                     tariff['risk_level'] = 'moderate'
                     tariff['risk_score'] = 50
-                    tariff['risk_message'] = 'Risikobewertung nicht verfügbar'
+                    tariff['risk_message'] = 'Risk assessment not available'
                     
         except Exception as e:
-            logger.error(f"❌ Error in risk analysis: {e}")
+            logger.error(f"Error in risk analysis: {e}")
             traceback.print_exc()
     else:
-        logger.info("ℹ️ No CSV data provided, skipping risk analysis")
+        logger.info("No CSV data provided, skipping risk analysis")
     
     logger.info(f"Total: {len(tariffs)} scraped tariffs, {len(errors)} errors")
     
