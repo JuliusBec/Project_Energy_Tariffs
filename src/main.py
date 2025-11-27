@@ -36,15 +36,15 @@ async def run_price_forecast():
         await loop.run_in_executor(None, forecast_main)
         
         duration = (datetime.now() - start_time).total_seconds()
-        logger.info(f"✅ Price forecast completed in {duration:.1f}s")
+        logger.info(f"Price forecast completed in {duration:.1f}s")
         
     except Exception as e:
-        logger.error(f"❌ Price forecast failed: {e}", exc_info=True)
+        logger.error(f"Price forecast failed: {e}", exc_info=True)
 
 
 async def forecast_scheduler():
     """Background task that runs forecasting every hour."""
-    logger.info("📅 Forecast scheduler started (runs every hour)")
+    logger.info("Forecast scheduler started (runs every hour)")
     
     while True:
         try:
@@ -67,25 +67,25 @@ async def lifespan(app: FastAPI):
     - Run initial price forecast
     - Start hourly forecast scheduler
     """
-    logger.info("🚀 Starting DYNERGY application...")
+    logger.info("Starting DYNERGY application...")
     
     # Run initial forecast
     await run_price_forecast()
     
     # Start background scheduler
     scheduler_task = asyncio.create_task(forecast_scheduler())
-    logger.info("✅ Application startup complete")
+    logger.info("Application startup complete")
     
     yield
     
     # Cleanup on shutdown
-    logger.info("🛑 Shutting down DYNERGY application...")
+    logger.info("Shutting down DYNERGY application...")
     scheduler_task.cancel()
     try:
         await scheduler_task
     except asyncio.CancelledError:
         pass
-    logger.info("✅ Shutdown complete")
+    logger.info("Shutdown complete")
 
 
 # Import the main app and add lifespan
