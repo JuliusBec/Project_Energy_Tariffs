@@ -2,7 +2,7 @@ Forecasting & Predictions
 =========================
 
 The forecasting module provides powerful prediction models for energy prices and energy consumption.
-It combines Prophet and Chronos for accurate short-term and long-term forecasts.
+It uses Facebook Prophet for accurate time series forecasting with automatic seasonality detection.
 
 Overview
 --------
@@ -855,6 +855,5 @@ Resources
 ---------
 
 * `Prophet Documentation <https://facebook.github.io/prophet/>`_
-* `Chronos Paper <https://arxiv.org/abs/2403.07815>`_
 * `SMARD API <https://www.smard.de/home/downloadcenter/download-marktdaten/>`_
 * `Time Series Forecasting Best Practices <https://otexts.com/fpp3/>`_
