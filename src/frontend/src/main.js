@@ -10,15 +10,15 @@ import ElectricityPriceInfo from './views/ElectricityPriceInfo.vue'
 import './style.css'
 
 const routes = [
-  { path: '/', name: 'Home', component: Home },
-  { path: '/comparison', name: 'TariffComparison', component: TariffComparison },
-  { path: '/tips', name: 'SavingsTips', component: SavingsTips },
-  { path: '/price-info', name: 'ElectricityPriceInfo', component: ElectricityPriceInfo }
+ { path: '/', name: 'Home', component: Home },
+ { path: '/comparison', name: 'TariffComparison', component: TariffComparison },
+ { path: '/tips', name: 'SavingsTips', component: SavingsTips },
+ { path: '/price-info', name: 'ElectricityPriceInfo', component: ElectricityPriceInfo }
 ]
 
 const router = createRouter({
-  history: createWebHistory(),
-  routes
+ history: createWebHistory(),
+ routes
 })
 
 createApp(App).use(router).mount('#app')
