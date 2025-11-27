@@ -1,18 +1,15 @@
-Forecasting & Predictions
+Price Forecasting
 =========================
 
-The forecasting module provides powerful prediction models for energy prices and energy consumption.
-It uses Facebook Prophet for accurate time series forecasting with automatic seasonality detection.
+The forecasting module provides prediction models for energy prices.
+It uses Facebook Prophet for time series forecasting with automatic seasonality detection.
 
 Overview
 --------
 
-The module contains two main components:
+The module focuses on:
 
-* **Energy Price Forecast** - Prediction of day-ahead electricity prices
-* **Energy Usage Forecast** - Prediction of household consumption
-
-Both modules use Prophet, a powerful time series forecasting library by Meta, and historical data for accurate predictions.
+* **Energy Price Forecast** - Prediction of day-ahead electricity prices using SMARD data
 
 Energy Price Forecast
 ---------------------
@@ -25,17 +22,16 @@ Energy Price Forecast
 Description
 ^^^^^^^^^^^^
 
-The Energy Price Forecaster uses Facebook Prophet to predict day-ahead electricity prices
-based on SMARD data (Federal Network Agency).
+Predicts day-ahead electricity prices using Facebook Prophet and SMARD data from the German Federal Network Agency.
 
 Features
 ^^^^^^^^
 
-* Prophet-based time series forecasting
+* Prophet time series forecasting
 * SMARD API integration
-* Automatic seasonality detection
+* Seasonality detection
 * Confidence intervals
-* Up to 720 hours forecast
+* Forecasts up to 720 hours
 
 Usage
 ^^^^^
@@ -143,83 +139,6 @@ Visualization
    fig3 = plot_plotly(model, forecast)
    fig3.write_html('interactive_forecast.html')
 
-Energy Usage Forecast
----------------------
-
-.. automodule:: backend.forecasting.energy_usage_forecast
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-Description
-^^^^^^^^^^^^
-
-The Energy Usage Forecaster predicts household electricity consumption using Facebook Prophet.
-Prophet is particularly well-suited for energy consumption forecasting due to its ability to handle
-multiple seasonality patterns (daily, weekly) and missing data.
-
-Features
-^^^^^^^^
-
-* Prophet-based time series forecasting
-* Hourly consumption forecast
-* Weekly aggregation
-* Seasonality detection (daily, weekly)
-* Flexible forecast periods
-* Automatic handling of missing data
-
-Usage
-^^^^^
-
-Prophet-based Forecast
-"""""""""""""""""""""""""""
-
-.. code-block:: python
-
-   from src.backend.forecasting.energy_usage_forecast import forecast_prophet
-   import pandas as pd
-   
-   # Load historical consumption data
-   df = pd.read_csv('app_data/example_smart_meter.csv')
-   
-   # Format: datetime, value
-   # datetime: Timestamp
-   # value: Consumption in kWh
-   
-   # 30-day forecast
-   forecast_df = forecast_prophet(df, days=30)
-   
-   print(forecast_df[['datetime', 'yhat', 'yhat_lower', 'yhat_upper']].head())
-   
-   # Calculate weekly totals
-   from src.backend.forecasting.energy_usage_forecast import (
-       calculate_total_weekly_usage
-   )
-   weekly_usage = calculate_total_weekly_usage(forecast_df)
-   print(f"Weekly consumption:\n{weekly_usage}")
-
-Data Format
-^^^^^^^^^^^
-
-Input data must have the following format:
-
-.. code-block:: python
-
-   # CSV structure
-   datetime,value,status
-   01/15/24 00:00,0.45,
-   01/15/24 01:00,0.38,
-   01/15/24 02:00,0.32,
-   ...
-
-   # Or as DataFrame
-   import pandas as pd
-   
-   df = pd.DataFrame({
-       'datetime': pd.date_range('2024-01-01', periods=8760, freq='h'),
-       'value': np.random.uniform(0.2, 2.5, 8760)  # kWh per hour
-   })
-
 Model Parameters
 ----------------
 
@@ -243,7 +162,7 @@ Important parameters for model optimization:
      - ``True``
    * - ``yearly_seasonality``
      - Annual patterns (seasons)
-     - ``False`` (for consumption)
+     - ``True``
    * - ``changepoint_prior_scale``
      - Flexibility for trend changes
      - ``0.15-0.25``
@@ -391,66 +310,7 @@ Complete Pipeline: Price Forecast
    print(f"Min: {forecast['yhat'].min():.2f} €/MWh")
    print(f"Max: {forecast['yhat'].max():.2f} €/MWh")
 
-Complete Pipeline: Usage Forecast
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. code-block:: python
-
-   from src.backend.forecasting.energy_usage_forecast import (
-       forecast_prophet,
-       calculate_total_weekly_usage
-   )
-   import pandas as pd
-   
-   # 1. Load smart meter data
-   df = pd.read_csv('app_data/example_smart_meter.csv')
-   
-   # 2. 30-day forecast
-   forecast = forecast_prophet(df, days=30)
-   
-   # 3. Weekly aggregation
-   weekly = calculate_total_weekly_usage(forecast)
-   
-   # 4. Output
-   print("Weekly consumption (kWh):")
-   print(weekly['yhat'])
-   
-   # 5. Total consumption
-   total_month = forecast['yhat'].sum()
-   print(f"\nTotal consumption (30 days): {total_month:.2f} kWh")
-
-Integration in Tariff Comparison
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-.. code-block:: python
-
-   from src.backend.forecasting.energy_usage_forecast import forecast_prophet
-   from src.backend.forecasting.energy_price_forecast import forecast_prices
-   import pandas as pd
-   
-   # Predict consumption
-   usage_df = pd.read_csv('app_data/smart_meter.csv')
-   usage_forecast = forecast_prophet(usage_df, days=30)
-   
-   # Predict prices
-   price_model = create_prophet_model()
-   price_forecast = forecast_prices(price_model, periods=720)
-   
-   # Combine for cost calculation
-   merged = pd.merge(
-       usage_forecast[['datetime', 'yhat']],
-       price_forecast[['ds', 'yhat']],
-       left_on='datetime',
-       right_on='ds',
-       suffixes=('_usage', '_price')
-   )
-   
-   # Calculate costs (price in €/MWh -> €/kWh)
-   merged['cost'] = (merged['yhat_usage'] * 
-                     merged['yhat_price'] / 1000)
-   
-   total_cost = merged['cost'].sum()
-   print(f"Estimated costs (30 days): {total_cost:.2f}€")
 
 Best Practices
 --------------
@@ -533,9 +393,15 @@ Functions
 
 .. autofunction:: backend.forecasting.energy_price_forecast.forecast_prices
 
-.. autofunction:: backend.forecasting.energy_usage_forecast.forecast_prophet
+.. autofunction:: backend.forecasting.energy_price_forecast.create_chart_data
 
-.. autofunction:: backend.forecasting.energy_usage_forecast.calculate_total_weekly_usage
+   Generates Chart.js-compatible visualization data combining historical and forecast prices.
+   Resamples hourly data to daily averages for frontend charts.
+
+.. autofunction:: backend.forecasting.energy_price_forecast.get_price_breakdown
+
+   Calculates electricity price component breakdown based on Bundesnetzagentur data.
+   Returns wholesale, network fees, and tax components for visualization.
 
 Advanced Features
 -----------------
@@ -568,74 +434,7 @@ Anomaly Detection
    anomalies = df[df['anomaly'] == True]
    print(f"Detected anomalies: {len(anomalies)}")
 
-Ensemble Methods
-----------------
 
-Combining Predictions
-^^^^^^^^^^^^^^^^^^^^^
-
-Combine multiple models for better accuracy:
-
-.. code-block:: python
-
-   from src.backend.forecasting.energy_usage_forecast import forecast_prophet
-   import pandas as pd
-   import numpy as np
-   
-   def ensemble_forecast(df, days=30):
-       """Ensemble forecast using multiple Prophet configurations"""
-       
-       # Model 1: Conservative
-       model1 = Prophet(
-           changepoint_prior_scale=0.15,
-           seasonality_prior_scale=2.0
-       )
-       
-       # Model 2: Moderate
-       model2 = Prophet(
-           changepoint_prior_scale=0.20,
-           seasonality_prior_scale=5.0
-       )
-       
-       # Model 3: Aggressive
-       model3 = Prophet(
-           changepoint_prior_scale=0.25,
-           seasonality_prior_scale=10.0
-       )
-       
-       # Train all models
-       prophet_df = df.copy()
-       prophet_df.rename(columns={'datetime': 'ds', 'value': 'y'}, inplace=True)
-       
-       model1.fit(prophet_df)
-       model2.fit(prophet_df)
-       model3.fit(prophet_df)
-       
-       # Generate forecasts
-       future = model1.make_future_dataframe(periods=24*days, freq='h')
-       forecast1 = model1.predict(future)
-       forecast2 = model2.predict(future)
-       forecast3 = model3.predict(future)
-       
-       # Ensemble: Weighted average
-       ensemble = pd.DataFrame({
-           'datetime': forecast1['ds'],
-           'yhat': (
-               0.3 * forecast1['yhat'] + 
-               0.4 * forecast2['yhat'] + 
-               0.3 * forecast3['yhat']
-           ),
-           'yhat_lower': np.minimum(
-               forecast1['yhat_lower'],
-               np.minimum(forecast2['yhat_lower'], forecast3['yhat_lower'])
-           ),
-           'yhat_upper': np.maximum(
-               forecast1['yhat_upper'],
-               np.maximum(forecast2['yhat_upper'], forecast3['yhat_upper'])
-           )
-       })
-       
-       return ensemble
 
 Feature Engineering
 -------------------
@@ -822,7 +621,6 @@ Production API
    
    # Load model at startup
    price_model = load_latest_model('models/price/')
-   usage_model = load_latest_model('models/usage/')
    
    class ForecastRequest(BaseModel):
        days: int = 7
@@ -845,11 +643,6 @@ Production API
            }
        except Exception as e:
            raise HTTPException(status_code=500, detail=str(e))
-   
-   @app.post("/api/forecast/usage")
-   async def forecast_usage(request: ForecastRequest):
-       # Similar implementation
-       pass
 
 Resources
 ---------
