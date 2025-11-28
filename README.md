@@ -2,6 +2,11 @@
 
 A comprehensive web application for comparing dynamic and fixed energy tariffs in Germany, helping consumers make informed decisions about their electricity contracts.
 
+## Documentation
+
+View the documentation on readthedocs
+https://project-energy-tariffs.readthedocs.io/en/latest/index.html
+
 ## 📋 Project Overview
 
 This university project provides an intelligent platform that:
