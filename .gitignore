@@ -2,6 +2,7 @@
 /data/
 *.csv
 *.json
+!package-lock.json
 *.xlsx
 
 # Figures
