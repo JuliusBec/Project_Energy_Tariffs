@@ -22,7 +22,7 @@ Features
 --------
 
 * Real-time energy price tracking
-* Advanced forecasting models (Prophet & Chronos)
+* Advanced forecasting models (Prophet)
 * Risk assessment for different tariff structures
 * Interactive web interface
 * Automated web scraping for multiple energy providers
@@ -159,33 +159,28 @@ Project Structure
 
    Project_Energy_Tariffs/
    ├── src/
+   │   ├── main.py
    │   ├── backend/
+   │   │   ├── app.py
    │   │   ├── energy_tariff.py
    │   │   ├── risk_analysis.py
    │   │   └── forecasting/
    │   │       ├── energy_price_forecast.py
    │   │       └── energy_usage_forecast.py
    │   ├── frontend/
-   │   │   └── src/
+   │   │   ├── src/
+   │   │   ├── index.html
+   │   │   ├── package.json
+   │   │   └── vite.config.js
    │   └── webscraping/
    │       ├── scraper_tibber.py
    │       ├── scraper_enbw.py
+   │       ├── scraper_enbw_strom.py
    │       └── scraper_tado.py
    ├── app_data/
    ├── docs/
-   ├── app.py
    └── requirements.txt
 
-Contributing
-------------
-
-Contributions are welcome! Please follow these guidelines:
-
-1. Fork the repository
-2. Create a feature branch
-3. Add tests for new features
-4. Update documentation
-5. Submit a pull request
 
 License
 -------

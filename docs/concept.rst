@@ -276,7 +276,6 @@ The system predicts the household's future energy consumption.
 2. **Train Forecast Model**
    
    - Prophet for traditional time series
-   - Optional: Chronos for deep learning approach
    - Captures seasonality and trends
 
 3. **Generate Consumption Forecast**
@@ -771,7 +770,7 @@ Technical Stack Summary
    * - Data Processing
      - Pandas, NumPy
    * - Forecasting
-     - Prophet, Chronos (optional)
+     - Prophet
    * - Risk Analysis
      - Statistical modeling, VaR
    * - Backend API
@@ -790,9 +789,10 @@ Planned improvements to the system:
 
 1. **Machine Learning Optimization**
    
-   - Ensemble forecasting (Prophet + Chronos)
+   - Improve forecast accuracy
    - Consumption pattern recognition
    - Automated parameter tuning
+   - Use real user data for model refinement
 
 2. **Extended Provider Support**
    
@@ -807,17 +807,6 @@ Planned improvements to the system:
    - Carbon footprint tracking
    - Solar production forecasting
 
-4. **Mobile App**
-   
-   - Native iOS/Android apps
-   - Push notifications
-   - Quick consumption logging
-
-5. **AI-Powered Insights**
-   
-   - Anomaly detection in consumption
-   - Personalized saving tips
-   - Predictive maintenance alerts
 
 Conclusion
 ----------
@@ -839,16 +828,3 @@ For detailed information on specific components, see:
 - :doc:`price_forecasting` - Energy price forecasting
 - :doc:`usage_forecasting` - Consumption forecasting
 
-Contributing
-------------
-
-To contribute to this project:
-
-1. Fork the repository
-2. Create a feature branch
-3. Follow the existing architecture patterns
-4. Add comprehensive tests
-5. Update documentation
-6. Submit a pull request
-
-For questions or suggestions, please open an issue on GitHub.
