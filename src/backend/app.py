@@ -33,6 +33,15 @@ from ..webscraping.scraper_enbw_strom import scrape_enbw_strom_tariff
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Helper function to get correct app_data path
+def get_app_data_dir():
+    """Get the correct path to app_data directory, works in both dev and Docker"""
+    # In Docker: /app/app_data
+    # In dev: /path/to/project/app_data
+    current_file = os.path.abspath(__file__)  # /app/src/backend/app.py
+    project_root = os.path.dirname(os.path.dirname(os.path.dirname(current_file)))  # /app
+    app_data_path = os.path.join(project_root, "app_data")
+    return app_data_path
 
 app = FastAPI(title="DYNERGY API", description="Backend for Dynamic Energy Tariff Comparison")
 
@@ -1032,8 +1041,7 @@ async def get_price_forecast():
     
     try:
         # Load the most recent day-ahead prices data
-        project_root = os.path.dirname(os.path.abspath(__file__))
-        app_data_path = os.path.join(project_root, "app_data")
+        app_data_path = get_app_data_dir()
         
         # Find the most recent day-ahead prices file
         dayahead_files = [f for f in os.listdir(app_data_path) if f.startswith('germany_dayahead_prices_raw_') and f.endswith('.csv')]
@@ -1196,7 +1204,7 @@ async def get_risk_analysis(file: UploadFile = File(...), days: int = Form(30)):
         df['datetime'] = pd.to_datetime(df['datetime'])
         
         # Determine app_data directory
-        app_data_dir = os.path.join(os.path.dirname(__file__), "app_data")
+        app_data_dir = get_app_data_dir()
         
         # Calculate all risk metrics
         historic_risk = create_historic_risk_analysis(df, days=days, app_data_dir=app_data_dir)
@@ -1267,7 +1275,7 @@ async def get_risk_score(file: UploadFile = File(...), days: int = Form(30)):
         df['datetime'] = pd.to_datetime(df['datetime'])
         
         # Determine app_data directory
-        app_data_dir = os.path.join(os.path.dirname(__file__), "app_data")
+        app_data_dir = get_app_data_dir()
         
         # Calculate risk metrics (shared for both tariff types)
         historic_risk = create_historic_risk_analysis(df, days=days, app_data_dir=app_data_dir)
@@ -1375,7 +1383,7 @@ async def get_risk_score_per_tariff(
         df['datetime'] = pd.to_datetime(df['datetime'])
         
         # Determine app_data directory
-        app_data_dir = os.path.join(os.path.dirname(__file__), "app_data")
+        app_data_dir = get_app_data_dir()
         
         # Calculate risk metrics
         historic_risk = create_historic_risk_analysis(df, days=days, app_data_dir=app_data_dir)
@@ -1461,7 +1469,7 @@ async def get_risk_score_yearly_usage(
     
     try:
         # Determine app_data directory
-        app_data_dir = os.path.join(os.path.dirname(__file__), "app_data")
+        app_data_dir = get_app_data_dir()
         
         # Calculate price forecast volatility
         forecast_price_volatility = {}
@@ -2157,7 +2165,7 @@ async def scrape_all_tariffs(
             )
             
             # Determine app_data directory
-            app_data_dir = os.path.join(os.path.dirname(__file__), "app_data")
+            app_data_dir = get_app_data_dir()
             
             # Calculate base risk metrics ONCE (same for all tariffs)
             historic_risk = create_historic_risk_analysis(
