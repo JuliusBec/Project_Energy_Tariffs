@@ -11,6 +11,8 @@ for German electricity markets.
    :caption: Contents:
 
    concept
+   motivation
+   frontend
    api
    tariff_models
    risk_analysis
