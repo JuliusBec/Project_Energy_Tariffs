@@ -74,14 +74,6 @@ Feature Set:
 Technical Architecture
 ----------------------
 
-Design Principles
-~~~~~~~~~~~~~~~~~
-
-- **Mobile-First Design**: Responsive breakpoints at 768px (tablet) and 1024px (desktop)
-- **Accessibility**: WCAG 2.1 compliant with semantic HTML and keyboard navigation
-- **Performance**: Lazy loading, code splitting, and caching strategies
-- **User Experience**: Intuitive navigation and progressive disclosure
-
 Technology Stack
 ~~~~~~~~~~~~~~~~
 
@@ -89,6 +81,7 @@ Technology Stack
 - **Chart.js**: High-performance data visualization
 - **Vite**: Bundle optimization and code splitting
 - **Axios**: Reliable API communication with error handling
+- **User Experience**: Intuitive navigation and progressive disclosure
 
 
 
