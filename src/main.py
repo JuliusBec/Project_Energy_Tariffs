@@ -88,19 +88,11 @@ async def lifespan(app: FastAPI):
     logger.info("Shutdown complete")
 
 
-# Import the main app and add lifespan
-from .backend.app import app as original_app
+# Import the main app and attach lifespan
+from .backend.app import app
 
-# Create new app with lifespan
-app = FastAPI(
-    title=original_app.title,
-    description=original_app.description,
-    lifespan=lifespan
-)
-
-# Copy all routes and middleware from original app
-app.router = original_app.router
-app.middleware_stack = original_app.middleware_stack
+# Override the app's lifespan with our custom one
+app.router.lifespan_context = lifespan
 
 
 if __name__ == "__main__":

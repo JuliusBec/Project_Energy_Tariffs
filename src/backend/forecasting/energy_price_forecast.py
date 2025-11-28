@@ -455,30 +455,23 @@ def calculate_required_chunks(target_days):
     days_per_chunk = 7
     return int(target_days / days_per_chunk) + 1  # Add 1 for safety
 
-def main():
+def main(horizon_hours=768, training_days=730, save_eur_kwh=False):
+    """
+    Main forecasting function
+    
+    Args:
+        horizon_hours: Forecast horizon in hours (default: 768=32 days)
+        training_days: Number of days of training data to use (default: 730=2 years)
+        save_eur_kwh: Also save prices in EUR/kWh (default: False)
+    """
     try:
-        # Parse command line arguments
-        parser = argparse.ArgumentParser(
-            description="SMARD Day-Ahead Price Forecasting using Prophet"
-        )
-        parser.add_argument(
-            "--horizon-hours",
-            type=int,
-            default=768,  # 32 days
-            help="Forecast horizon in hours (default: 768=32 days)"
-        )
-        parser.add_argument(
-            "--training-days",
-            type=int,
-            default=730,  # 2 years
-            help="Number of days of training data to use (default: 730=2 years)"
-        )
-        parser.add_argument(
-            "--save-eur-kwh",
-            action="store_true",
-            help="Also save prices in EUR/kWh"
-        )
-        args = parser.parse_args()
+        # Create args object for compatibility with existing code
+        class Args:
+            pass
+        args = Args()
+        args.horizon_hours = horizon_hours
+        args.training_days = training_days
+        args.save_eur_kwh = save_eur_kwh
 
         # Use app_data directory for output
         output_dir = 'app_data'
@@ -924,4 +917,33 @@ def get_price_breakdown(avg_price_eur_per_mwh=None, app_data_dir='app_data'):
         return None
 
 if __name__ == "__main__":
-    main()
+    # Parse command line arguments when run as a script
+    parser = argparse.ArgumentParser(
+        description="SMARD Day-Ahead Price Forecasting using Prophet"
+    )
+    parser.add_argument(
+        "--horizon-hours",
+        type=int,
+        default=768,  # 32 days
+        help="Forecast horizon in hours (default: 768=32 days)"
+    )
+    parser.add_argument(
+        "--training-days",
+        type=int,
+        default=730,  # 2 years
+        help="Number of days of training data to use (default: 730=2 years)"
+    )
+    parser.add_argument(
+        "--save-eur-kwh",
+        action="store_true",
+        help="Also save prices in EUR/kWh"
+    )
+    args = parser.parse_args()
+    
+    # Call main with parsed arguments
+    main(
+        horizon_hours=args.horizon_hours,
+        training_days=args.training_days,
+        save_eur_kwh=args.save_eur_kwh
+    )
+
