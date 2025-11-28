@@ -3,6 +3,7 @@
 *.csv
 *.json
 !package-lock.json
+!package.json
 *.xlsx
 
 # Figures
