@@ -464,8 +464,8 @@ def main():
         parser.add_argument(
             "--horizon-hours",
             type=int,
-            default=720,  # 30 days
-            help="Forecast horizon in hours (default: 720=30 days)"
+            default=768,  # 32 days
+            help="Forecast horizon in hours (default: 768=32 days)"
         )
         parser.add_argument(
             "--training-days",
@@ -613,7 +613,7 @@ def get_forecast_volatility(forecast: pd.DataFrame) -> dict:
         raise
 
 def create_chart_data(historical_file=None, 
-                        forecast_file='germany_price_forecast_720h.csv',
+                        forecast_file='germany_price_forecast_768h.csv',
                         app_data_dir='app_data'):
     """
     Create chart data for visualization on the frontend using Chart.js.
@@ -681,11 +681,11 @@ def create_chart_data(historical_file=None,
         last_historical_date = historical_daily['ds'].max()
         forecast_future_only = forecast_daily[forecast_daily['ds'] > last_historical_date].copy()
         
-        # Limit forecast to exactly 30 days from the last historical date
-        forecast_end_date = last_historical_date + pd.Timedelta(days=30)
+        # Limit forecast to exactly 32 days from the last historical date
+        forecast_end_date = last_historical_date + pd.Timedelta(days=32)
         forecast_future_only = forecast_future_only[forecast_future_only['ds'] <= forecast_end_date].copy()
         
-        logging.info(f"Forecast limited to 30 days: {len(forecast_future_only)} days from {forecast_future_only['ds'].min()} to {forecast_future_only['ds'].max()}")
+        logging.info(f"Forecast limited to 32 days: {len(forecast_future_only)} days from {forecast_future_only['ds'].min()} to {forecast_future_only['ds'].max()}")
         
         # Replace any remaining NaN/Inf values with None for JSON compatibility
         def clean_for_json(series):

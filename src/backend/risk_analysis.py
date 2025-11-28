@@ -44,7 +44,7 @@ def _get_price_forecast_file(app_data_dir: str) -> str:
     FileNotFoundError: If no forecast file is found
     """
     # Look for the forecast file (static name for now)
-    forecast_file = os.path.join(app_data_dir, "germany_price_forecast_720h.csv")
+    forecast_file = os.path.join(app_data_dir, "germany_price_forecast_768h.csv")
     
     if not os.path.exists(forecast_file):
         raise FileNotFoundError(f"Price forecast file not found: {forecast_file}")
